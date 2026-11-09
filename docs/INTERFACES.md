@@ -1,6 +1,6 @@
 # INTERFACES — Sözleşmeler (sahibi: müdür)
 
-Sürüm: 1 (v0.1.0 kapsamı). Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
+Sürüm: 1.1 (v0.1.0 kapsamı). Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
 
 ## 1. Genel kurallar
 - Dil: Python 3.12+ (Python sürümü Karar B sonrası sabitlenir). Paketler: `core` → `kimlikcore`, `server` → `kimlikserver`, `importers` → `kimlikimport`. Her klasörün altında `src/<paket>/` ve `tests/` bulunur.
@@ -111,3 +111,13 @@ Ortak hata sınıfları `kimlikcore.errors`: `HubLockedError`, `PermissionDenied
 - MCP başlatma komutu ve kabuk: Karar B sonrası.
 - MCP kütüphanesi ve sürümü: Karar C sonrası.
 - Giden kutusu biçimi ve PC aktarım protokolü: Karar A sonrası (v0.2.0).
+
+## 11. Ek 1.1 (İ1 Aşama 1 sonrası, bağlayıcı)
+- `facts`: ek sütunlar `fact_key` (çelişki eşleşmesi için anahtar), `hidden`, `updated`. `app_keys.revoked` 0/1 tamsayıdır.
+- `purge_source`: API onay parametresi almaz; **onay çağıranın sorumluluğudur** (CLI `--onayla`; Windows arayüzü kendi onay ekranını gösterir).
+- İçe aktarıcı çalıştırıcısı (`kimlikimport.run`), `add_source` öncesi `hub.previously_purged(sha256)` sorar; true ise kullanıcıya "daha önce kalıcı sildin, yine de alınsın mı" der (CLI: `--yine-de`). İmza: `run(hub, path, tur=None, *, yine_de=False, progress=None) -> RunResult`; `ice-al --tur X` bunu çağırır (İ3 yazar).
+- Kalıcı silinen kaynağın `facts` satırları silinmez: `source_id=NULL`, `status='eskimis'`.
+- Çekirdekte eklenen geri uyumlu yöntemler geçerlidir (ayrıntı `docs/SEMA.md`): `Hub.sources/raw_files/get_event/verify_archive/summary/previously_purged/compact`, `timeline(ascending=)`, `search(prefix=)`, `add_events(batch_size=)`, `import_jsonl(progress=)`; hata sınıfları `SchemaTooOld`, `HubNotFoundError`, `HubReadOnlyError`, `HubNotEmptyError`, `NotFoundError`; yardımcılar `init_erisim_db`, `connect_erisim`.
+- Salt okunur açış göç etmez; eski şemada `SchemaTooOld`. MCP bunu "önce Kimlik Merkezi uygulamasını bir kez açın" iletisine çevirir.
+- Sunucu doğrudan SQL yazarsa `events.hidden=0` koşulunu kendisi ekler; tercihen `Hub.search/timeline` kullanır. `access_log.category` boş olabilir.
+- Python: `>=3.12`. MCP kütüphanesi (öneri, Karar C onayı bekliyor): resmî `mcp==2.3.0`.
