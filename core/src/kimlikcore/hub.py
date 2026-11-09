@@ -598,6 +598,8 @@ class Hub:
                 )
                 for h in hashes:
                     c.execute("INSERT INTO tombstone_hashes(tombstone_id, sha256) VALUES (?, ?)", (tid, h))
+            # FTS5 silinen satırların terimlerini eski bölümlerde tutar; birleştirerek at.
+            c.execute("INSERT INTO events_fts(events_fts) VALUES ('optimize')")
             deleted_files = 0
             for path, _sha in raws:
                 still = c.execute("SELECT 1 FROM raw_files WHERE path = ? LIMIT 1", (path,)).fetchone()
