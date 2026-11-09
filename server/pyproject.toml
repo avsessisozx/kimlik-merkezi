@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kimlikserver"
+version = "0.1.0"
+description = "Kimlik Merkezi: persona, izinler/anahtarlar, erişim kaydı ve MCP (stdio) adaptörü"
+requires-python = ">=3.12"
+# mcp sürümü sabit: 1.x/2.x uyumsuz (Karar C önerisi; kullanıcı onayı bekleniyor).
+dependencies = ["kimlikcore", "mcp==2.3.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
