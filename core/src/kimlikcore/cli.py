@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import platform
@@ -12,7 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from . import donusum
+from . import sifreleme as sif
 from .errors import (
+    AnahtarGerekli,
+    KuralHatasi,
+    SifrelemeHatasi,
     FormatError,
     HubLockedError,
     HubNotEmptyError,
@@ -52,9 +58,172 @@ def _event_line(e: Event) -> str:
 
 
 def cmd_baslat(args):
-    with Hub.open(args.veri, write=True) as hub:
-        _out(args, {"veri": str(args.veri), "sema_surumu": hub.schema_version},
-             f"Veri klasörü hazır: {args.veri}\nŞema sürümü: {hub.schema_version}")
+    yeni = not (Path(args.veri) / "kimlik.db").exists()
+    sifreli, not_ = None, ""
+    if yeni and not args.sifresiz:
+        if sif.varsayilan_acik_mi():
+            sifreli = True
+        else:
+            not_ = ("\nUYARI: Bu sistemde anahtar koruması (Windows DPAPI) yok; veri klasörü "
+                    "ŞİFRESİZ oluşturuldu.")
+    elif yeni:
+        not_ = "\nUyarı: --sifresiz verildi; veri klasörü şifresiz oluşturuldu."
+    with Hub.open(args.veri, write=True, sifreli=sifreli) as hub:
+        durum = "şifreli" if hub.sifreli else "şifresiz"
+        if not yeni and not hub.sifreli:
+            not_ = "\nBu klasör şifresiz. Şifrelemek için: kimlikmerkezi sifrele"
+        _out(args, {"veri": str(args.veri), "sema_surumu": hub.schema_version, "sifreli": hub.sifreli},
+             f"Veri klasörü hazır: {args.veri}\nŞema sürümü: {hub.schema_version}\nŞifreleme: {durum}{not_}")
+
+
+# ---------------------------------------------------------------------------- şifreleme komutları
+def _gizli_oku(istem: str) -> str:
+    return getpass.getpass(istem)
+
+
+def _evet_mi(istem: str, beklenen: str) -> bool:
+    try:
+        return input(istem).strip() == beklenen
+    except (EOFError, OSError):
+        return False
+
+
+def _dek(args) -> bytes:
+    """Veri anahtarını açar; parola gerekiyorsa etkileşimli terminalde sorar."""
+    try:
+        return sif.anahtari_coz(args.veri)
+    except AnahtarGerekli:
+        z = sif.zarf_oku(args.veri)
+        if z and z.get("parola") and sys.stdin.isatty():
+            return sif.anahtari_coz(args.veri, parola=_gizli_oku("Parola: "))
+        raise
+
+
+def _sifreli_olmali(args) -> None:
+    if sif.db_durumu(Path(args.veri) / "kimlik.db") != "sifreli":
+        raise FormatError("Bu veri klasörü şifreli değil. Önce: kimlikmerkezi sifrele")
+
+
+def cmd_durum(args):
+    d = sif.durum(args.veri)
+    if d["veritabani"] == "yok":
+        raise FormatError(f"Veri klasöründe kimlik.db yok: {args.veri}")
+    satir = [
+        f"Şifreli: {'evet' if d['sifreli'] else 'HAYIR (veri düz metin)'}",
+        f"Hesap (Windows) korumalı anahtar: {'evet' if d['os_korumasi'] else 'hayır'}"
+        + (f" ({d['saglayici']})" if d["saglayici"] else ""),
+        f"Parola: {'var' if d['parola_var'] else 'yok'}",
+        f"Kurtarma ifadesi: {'kurulu' if d['kurtarma_var'] else 'KURULU DEĞİL'}",
+        f"Ham arşiv dosyaları: {d['ham_dosya_sifreli']} şifreli, {d['ham_dosya_duz']} düz",
+        f"Bu sistemde anahtar sağlayıcısı: {d['bu_sistemde_saglayici'] or 'YOK'}",
+    ]
+    if d["saglayici"] == "sahte":
+        satir.append("UYARI: SAHTE sağlayıcı (yalnız test); gerçek koruma sağlamaz.")
+    if d["sifreli"] and not d["kurtarma_var"]:
+        satir.append("Öneri: kurtarma ifadesi kurun (kimlikmerkezi kurtarma-kur); Windows hesabınız "
+                     "kaybolursa veri açılamaz.")
+    if d["duz_kalintilar"]:
+        satir.append("UYARI: düz metin kalıntı dosya var: " + ", ".join(d["duz_kalintilar"])
+                     + " (yarım kalmış dönüşüm; 'kimlikmerkezi sifrele' yeniden çalıştırın).")
+    if d["sifreli"] and d["ham_dosya_duz"]:
+        satir.append("UYARI: bazı ham arşiv dosyaları düz; 'kimlikmerkezi sifrele' tamamlar.")
+    if not d["sifreli"]:
+        satir.append("Şifrelemek için: kimlikmerkezi sifrele")
+    _out(args, d, "\n".join(satir))
+
+
+def cmd_sifrele(args):
+    r = donusum.sifrele(args.veri, ilerleme=None if args.json else print)
+    _out(args, r, "Şifrelendi. Ham arşiv dosyası: " + str(r["ham_dosya_sifrelendi"])
+         + "\n" + r["uyari"]
+         + "\nÖneri: kurtarma ifadesi kurun (kimlikmerkezi kurtarma-kur).")
+
+
+def cmd_sifreyi_kaldir(args):
+    _sifreli_olmali(args)
+    if not args.onayla:
+        if not sys.stdin.isatty() or not _evet_mi(
+                "Şifreleme KAPATILACAK; veri düz metin olarak diske yazılacak. Devam için KALDIR yazın: ",
+                "KALDIR"):
+            raise FormatError("Onaylanmadı; hiçbir şey değişmedi (script için --onayla).")
+    try:
+        r = donusum.sifreyi_kaldir(args.veri, ilerleme=None if args.json else print)
+    except AnahtarGerekli:
+        z = sif.zarf_oku(args.veri)
+        if z and z.get("parola") and sys.stdin.isatty():
+            r = donusum.sifreyi_kaldir(args.veri, parola=_gizli_oku("Parola: "),
+                                       ilerleme=None if args.json else print)
+        else:
+            raise
+    _out(args, r, "Şifreleme kapatıldı; veri düz metin. Anahtar dosyası silindi.")
+
+
+def _iki_kez(istem: str, tekrar: str) -> tuple[str, str]:
+    return _gizli_oku(istem), _gizli_oku(tekrar)
+
+
+def _kurtarma_kurulumu(args, dek: bytes) -> None:
+    print("Kurtarma ifadesi: parolayı unutursanız verinize dönmenin TEK yoludur.")
+    print("Kurallar: en az 4 kelime ya da 20 karakter; tahmin edilebilir/kısa olamaz; "
+          "'gizli soru' cevabı kullanmayın. Kendi seçtiğiniz uzun bir cümle olsun.")
+    print(sif.UYARI_KURTARMA)
+    for deneme in range(3):
+        a, b = _iki_kez("Kurtarma ifadesi: ", "Kurtarma ifadesini tekrar yazın: ")
+        d = sif.ifade_degerlendir(a)
+        print(f"Güç göstergesi (sezgisel): {d['guc']}")
+        try:
+            sif.kurtarma_kur(args.veri, dek, a, b)
+            return
+        except KuralHatasi as e:
+            print(f"Olmadı: {e}", file=sys.stderr)
+            if deneme == 2:
+                raise
+
+
+def cmd_kurtarma_kur(args):
+    _sifreli_olmali(args)
+    dek = _dek(args)
+    _kurtarma_kurulumu(args, dek)
+    _out(args, {"kurtarma": True}, "Kurtarma ifadesi kuruldu. Kâğıda yazıp güvenli yerde saklayın.")
+
+
+def cmd_parola_ekle(args):
+    _sifreli_olmali(args)
+    dek = _dek(args)
+    z = sif.zarf_oku(args.veri)
+    if z and z.get("parola"):
+        raise FormatError("Zaten bir parola var. Değiştirmek için önce parola-kaldir.")
+    if not (z and z.get("kurtarma")):
+        print("Parola eklemeden önce kurtarma ifadesi kurulmalı.")
+        _kurtarma_kurulumu(args, dek)
+    print(sif.UYARI_KURTARMA)
+    print("Parola eklenince Windows hesabına bağlı otomatik açılış KAPANIR: veri her açılışta "
+          "parola ister. MCP/arka plan süreçleri için KIMLIK_PAROLA ortam değişkeni gerekir "
+          "(parolayı bir yapılandırma dosyasına düz yazmak korumayı azaltır).")
+    if not args.anladim and not _evet_mi("Anladım, devam için ANLADIM yazın: ", "ANLADIM"):
+        raise FormatError("Onaylanmadı; parola eklenmedi.")
+    a, b = _iki_kez("Yeni parola: ", "Parolayı tekrar yazın: ")
+    sif.parola_ekle(args.veri, dek, a, b)
+    _out(args, {"parola": True}, "Parola eklendi.")
+
+
+def cmd_parola_kaldir(args):
+    _sifreli_olmali(args)
+    dek = _dek(args)
+    sif.parola_kaldir(args.veri, dek)
+    _out(args, {"parola": False}, "Parola kaldırıldı; anahtar yeniden Windows hesabına bağlandı.")
+
+
+def cmd_kurtar(args):
+    _sifreli_olmali(args)
+    ifade = _gizli_oku("Kurtarma ifadesi: ")
+    yeni = yeni2 = None
+    if args.yeni_parola:
+        yeni, yeni2 = _iki_kez("Yeni parola: ", "Yeni parolayı tekrar yazın: ")
+    sonuc = sif.kurtar(args.veri, ifade, yeni, yeni2)
+    _out(args, {"mod": sonuc},
+         "Yeni parola kuruldu." if sonuc == "parola"
+         else "Kurtarıldı: anahtar bu bilgisayar/hesaba yeniden bağlandı (parola yok).")
 
 
 def cmd_surum(args):
@@ -217,7 +386,18 @@ def build_parser() -> argparse.ArgumentParser:
         sp.set_defaults(fn=fn)
         return sp
 
-    add("baslat", cmd_baslat, "veri klasörünü (hub) oluşturur/günceller")
+    sp = add("baslat", cmd_baslat, "veri klasörünü (hub) oluşturur/günceller (yeni klasör varsayılan ŞİFRELİ)")
+    sp.add_argument("--sifresiz", action="store_true", help="yeni klasörü şifresiz oluştur")
+    add("durum", cmd_durum, "şifreleme durumu (şifreli mi, parola/kurtarma var mı)")
+    add("sifrele", cmd_sifrele, "şifresiz veri klasörünü şifreler (veri yeniden yazılır)")
+    sp = add("sifreyi-kaldir", cmd_sifreyi_kaldir, "şifrelemeyi kapatır (veri düz metin olur)")
+    sp.add_argument("--onayla", action="store_true")
+    add("kurtarma-kur", cmd_kurtarma_kur, "kurtarma ifadesi kurar/değiştirir")
+    sp = add("parola-ekle", cmd_parola_ekle, "isteğe bağlı parola ekler (önce kurtarma ifadesi kurulur)")
+    sp.add_argument("--anladim", action="store_true", help="kurtarılamama uyarısını okudum (onay sorusunu atlar)")
+    add("parola-kaldir", cmd_parola_kaldir, "parolayı kaldırır (Windows hesabına bağlı anahtara döner)")
+    sp = add("kurtar", cmd_kurtar, "kurtarma ifadesiyle erişimi yeniden kurar")
+    sp.add_argument("--yeni-parola", action="store_true", help="yeni parola belirle (yoksa hesaba yeniden bağlanır)")
     add("surum", cmd_surum, "sürüm bilgisi")
     sp = add("ice-al", cmd_ice_al, "dosyayı içe alır")
     sp.add_argument("yol")
@@ -274,7 +454,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.veri is None:
         args.veri = default_root()
     try:
-        args.fn(args)
+        try:
+            args.fn(args)
+        except AnahtarGerekli:
+            z = sif.zarf_oku(args.veri) if args.komut not in ("sifreyi-kaldir",) else None
+            if z and z.get("parola") and sys.stdin.isatty() and not os.environ.get(sif.ENV_PAROLA):
+                os.environ[sif.ENV_PAROLA] = _gizli_oku("Parola: ")
+                try:
+                    args.fn(args)
+                finally:
+                    os.environ.pop(sif.ENV_PAROLA, None)
+            else:
+                raise
         return EXIT_OK
     except HubLockedError as e:
         print(f"Hata: {e}", file=sys.stderr)

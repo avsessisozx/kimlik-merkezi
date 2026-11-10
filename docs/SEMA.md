@@ -77,3 +77,6 @@ Gizli kayıt süzmesi bu yöntemlerde otomatik DEĞİLDİR: `events` sorguların
 
 ## 10. CLI `ice-al`
 `kimlikmerkezi ice-al <yol> [--tur auto|jsonl|<içe aktarıcı adı>] [--yine-de]`. Yol dosya ya da klasör olabilir. Varsayılan `auto`: `kimlikimport.run.run(hub, yol, tur=None)` ile otomatik tanıma. `jsonl`: dahili, yalnız dosya, her satır bir EventIn. "Daha önce kalıcı silindi" sorgusu tek yerde yapılır: içe aktarıcı yolunda çalıştırıcıda, `jsonl` yolunda `_run_jsonl` içinde.
+
+## 11. Şifreli veri klasörü (şema sürümü değişmedi)
+`kimlik.db` şifreliyse (başlık `KMSIFRE1`) düz SQLite dosyası değil, şifreli kapsayıcıdır; şema bellekteki kopyada aynen çalışır, göçler aynı yolla uygulanır ve kapsayıcıya yazılır. Salt okunur açılış bellekte anlık görüntü alır (WAL yok). Ayrıntı ve sınırlar: `docs/SIFRELEME.md`. `arsiv/` dosyaları şifreliyse `Hub.raw_parcalari` ile okunmalıdır.

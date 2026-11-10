@@ -7,6 +7,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 gizli = (collect_submodules("mcp", filter=lambda n: not n.startswith("mcp.cli"))
          + collect_submodules("mcp_types")
          + collect_submodules("ijson")            # C uzantısı (yajl2_c) dahil
+         + ["cryptography.hazmat.primitives.ciphers.aead"]   # şifreleme (docs/SIFRELEME.md)
          + collect_submodules("kimlikcore") + collect_submodules("kimlikserver")
          + collect_submodules("kimlikimport") + collect_submodules("kimlikwin"))
 veri = collect_data_files("mcp") + collect_data_files("kimlikwin")

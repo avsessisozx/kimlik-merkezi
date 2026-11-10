@@ -11,6 +11,10 @@ from .errors import (
     PermissionDenied,
     SchemaTooNew,
     SchemaTooOld,
+    AnahtarGerekli,
+    KuralHatasi,
+    SifrelemeHatasi,
+    YanlisParola,
 )
 from .hub import Hub, norm_ts
 from .models import (
@@ -37,5 +41,6 @@ __all__ = [
     "PurgeResult", "PurgedInfo", "ExportResult", "ImportResult", "SCHEMA_VERSION",
     "KimlikError", "HubLockedError", "PermissionDenied", "FormatError", "SchemaTooNew",
     "SchemaTooOld", "HubNotFoundError", "HubReadOnlyError", "HubNotEmptyError", "NotFoundError",
+    "AnahtarGerekli", "YanlisParola", "KuralHatasi", "SifrelemeHatasi",
     "init_erisim_db", "connect_erisim", "sha256_file", "fold", "norm_ts", "__version__",
 ]

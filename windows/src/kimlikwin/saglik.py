@@ -33,6 +33,7 @@ def denetle(veri: str | Path) -> dict:
     try:
         with Hub.open(veri, write=False) as h:
             ekle("veritabanı açılıyor (salt okunur)", True, f"şema {h.schema_version}")
+            ekle("veri şifreleme durumu", True, "şifreli" if h.sifreli else "şifresiz (kimlikmerkezi sifrele ile şifrelenir)")
             ekle("arama dizini (FTS5) çalışıyor", isinstance(h.search("a", limit=1), list))
             ekle("özet okunuyor", isinstance(h.summary(), dict))
     except (KimlikError, OSError) as e:

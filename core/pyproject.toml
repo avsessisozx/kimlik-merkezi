@@ -7,7 +7,8 @@ name = "kimlikcore"
 version = "0.1.0"
 description = "Kimlik Merkezi çekirdek kütüphanesi (SQLite, ham arşiv, Türkçe FTS5)"
 requires-python = ">=3.12"
-dependencies = []
+# cryptography: AES-256-GCM (stdlib'te AEAD yok). Lisans: Apache-2.0 OR BSD-3-Clause. Yalnız şifreleme açıkken yüklenir.
+dependencies = ["cryptography>=42"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

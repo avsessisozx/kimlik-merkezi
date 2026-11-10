@@ -165,3 +165,13 @@ def test_rapor_kullanici_yolunu_maskeler(tmp_path, monkeypatch):
 def test_saglik_bozuk_klasor(tmp_path):
     s = saglik.denetle(tmp_path / "yok")
     assert not s["ok"]
+
+
+def test_olustur_yeni_klasor_varsayilan_sifreli_saglayici_varsa(tmp_path, monkeypatch):
+    """Sahte sağlayıcı (DPAPI yerine) varken yeni klasör şifreli kurulur ve okunur."""
+    monkeypatch.setenv("KIMLIK_SAHTE_SAGLAYICI", "windows-testi")
+    p = tmp_path / "sifreli"
+    r = veri_klasoru.olustur(p)
+    assert r["sifreli"] and "anahtar.json" in r["dosyalar"]
+    assert b"SQLite format" not in (p / "kimlik.db").read_bytes()
+    assert veri_klasoru.olustur(p)["mevcut_idi"]       # yeniden açılır
