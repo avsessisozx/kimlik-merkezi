@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kimlikimport"
+version = "0.1.0"
+description = "Kimlik Merkezi içe aktarıcıları (Google Takeout, Reddit)"
+requires-python = ">=3.12"
+# ijson: BSD-3-Clause ve ISC lisanslı (paket meta verisinden doğrulandı), akışla JSON okur.
+dependencies = ["kimlikcore", "ijson>=3.3"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q -m 'not buyuk'"
+markers = [
+    "buyuk: 1 GB'tan büyük sentetik dosya testi; varsayılan çalıştırmada atlanır (pytest -m buyuk ile çalıştırın)",
+]

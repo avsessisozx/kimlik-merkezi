@@ -1,0 +1,3 @@
+message_id,created_at,updated_at,username,message,thread_parent_message_id,channel_url,subreddit,channel_name,conversation_type
+x1,2023-04-01 10:00:00 UTC,,ornekkullanici,Sohbet mesaji bir,,https://chat.example.test/1,,Ornek kanal,
+x2,2023-04-01 10:05:00 UTC,,digerkullanici,Sohbet mesaji iki,,https://chat.example.test/1,,Ornek kanal,

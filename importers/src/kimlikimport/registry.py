@@ -1,0 +1,46 @@
+"""Içe aktarıcı kayıt defteri: ad -> fabrika. Yeni kaynak eklemek çekirdeği değiştirmez."""
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+
+from .base import Importer
+from .google_takeout import factory as _takeout
+from .reddit import factory as _reddit
+
+_REGISTRY: dict[str, Callable[[], Importer]] = {
+    "google_takeout": _takeout,
+    "reddit": _reddit,
+}
+# CLI'de kısa takma adlar (ice-al --tur takeout)
+ALIASES = {"takeout": "google_takeout", "google": "google_takeout"}
+
+
+def register(name: str, factory: Callable[[], Importer]) -> None:
+    _REGISTRY[name] = factory
+
+
+def names() -> list[str]:
+    return sorted(_REGISTRY)
+
+
+def create(name: str) -> Importer:
+    name = ALIASES.get(name, name)
+    if name not in _REGISTRY:
+        raise KeyError(name)
+    return _REGISTRY[name]()
+
+
+def detect_best(path: Path) -> tuple[Importer | None, list[tuple[str, object]]]:
+    """Tüm içe aktarıcıları dener; en yüksek güvenli eşleşmeyi döner (>= 0.5)."""
+    results = []
+    best, best_conf = None, 0.0
+    for n in names():
+        imp = create(n)
+        d = imp.detect(path)
+        results.append((n, d))
+        if d.matches and d.confidence > best_conf:
+            best, best_conf = imp, d.confidence
+    if best_conf < 0.5:
+        best = None
+    return best, results

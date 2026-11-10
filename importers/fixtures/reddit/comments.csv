@@ -1,0 +1,5 @@
+id,permalink,date,ip,subreddit,gildings,link,parent,body,media
+c1,/r/ornek/comments/p1/_/c1/,2023-01-15 12:34:56 UTC,1.2.3.4,ornek,0,/r/ornek/comments/p1/,,"Ornek yorum bir, virgullu
+ikinci satir",
+c2,/r/ornek/comments/p1/_/c2/,2023-01-16 01:02:03 UTC,1.2.3.4,ornek,0,/r/ornek/comments/p1/,c1,Ornek yorum iki,
+c3,/r/diger/comments/p2/_/c3/,2023-02-01 10:00:00 UTC,1.2.3.4,diger,0,/r/diger/comments/p2/,,Ornek yorum uc,

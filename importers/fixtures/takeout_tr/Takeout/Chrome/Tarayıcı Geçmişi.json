@@ -1,0 +1,33 @@
+{
+ "Browser History": [
+  {
+   "favicon_url": "https://example.test/f.ico",
+   "page_transition": "LINK",
+   "title": "Ornek Sayfa Bir",
+   "url": "https://example.test/bir",
+   "client_id": "cid1",
+   "time_usec": 1709287200000000
+  },
+  {
+   "page_transition": "TYPED",
+   "title": "Ornek Sayfa Iki",
+   "url": "https://example.test/iki",
+   "client_id": "cid1",
+   "time_usec": 1709290800000000
+  },
+  {
+   "page_transition": "LINK",
+   "title": "Ornek Sayfa Uc",
+   "url": "https://example.test/uc?x=1",
+   "client_id": "cid1",
+   "time_usec": 1709294400000000
+  },
+  {
+   "page_transition": "LINK",
+   "title": "Ornek Harita",
+   "url": "https://www.google.com/maps/place/Ornek/@40.987654,28.987654,17z",
+   "client_id": "cid1",
+   "time_usec": 1709298000000000
+  }
+ ]
+}
