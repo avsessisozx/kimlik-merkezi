@@ -112,7 +112,7 @@ def test_karsilastirma_baska_kisi_salt_okunur(demo, tmp_path):
     demo.api("kisi_sec", {"kisi_id": ilk["id"]})
     ikinci = next(x for x in demo.api("kisiler", {})["kisiler"] if x["ad"] == "İkinci")
     with Hub.open(tmp_path / "ikinci", write=True) as h:
-        demo_veri.uret(h, olcek=0.02, tohum=9, profil="mehmet")
+        demo_veri.uret(h, olcek=0.02, tohum=9, profil="deniz")
     b = demo.api("harita_karsilastir", {"kisi_id": ikinci["id"], "bolge_id": "goz"})
     assert b["kisi"] == "İkinci" and b["toplam"] > 0
     a = demo.api("harita_karsilastir", {"kisi_id": ilk["id"], "bolge_id": "goz"})
