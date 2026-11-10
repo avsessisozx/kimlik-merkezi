@@ -146,4 +146,8 @@ finally:
         surec.kill()
         adim("uygulama zorla kapatıldı")
 
+try:
+    adim("uygulama günlüğü:\n" + (ayar / "gunluk.log").read_text(encoding="utf-8"))
+except OSError:
+    adim("günlük yok")
 adim("TÜM ADIMLAR GEÇTİ")
