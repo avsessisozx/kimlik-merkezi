@@ -45,7 +45,8 @@ jobs:
         env:
           GIRDI_SURUM: ${{ inputs.surum }}
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then S="${GITHUB_REF_NAME#v}"; else S="${GIRDI_SURUM}"; fi
+          UYG=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' windows/src/kimlikwin/__init__.py)
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then S="${GITHUB_REF_NAME#v}"; else S="${GIRDI_SURUM:-$UYG}"; fi
           echo "$S" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Geçersiz sürüm: '$S' (örnek 0.1.0)"; exit 1; }
           UYG=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' windows/src/kimlikwin/__init__.py)
           PRJ=$(sed -n 's/^version = "\(.*\)"/\1/p' windows/pyproject.toml | head -1)
@@ -85,7 +86,7 @@ jobs:
   yayin:
     # Paket yeşilse Release'i bu iş açar. Etiket zaten varsa (ya da etiket tetiğinde Release varsa) hata vermeden durur.
     needs: paket
-    if: needs.paket.result == 'success'
+    if: needs.paket.result == 'success' && (github.event_name == 'workflow_dispatch' || github.ref_type == 'tag')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
