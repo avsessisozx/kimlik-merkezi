@@ -343,10 +343,11 @@ def test_parolaliyken_kapatmak_parola_ister(tmp_path, ym, veri, saat):
     assert not ym.api("guvenlik_durum", {})["parola_var"]
 
 
-def test_saglayici_yoksa_sifrelemeyi_acmak_reddedilir(ym):
+def test_saglayici_yoksa_sifrelemeyi_acmak_reddedilir(ym, monkeypatch):
     ym.api("guvenlik_donustur_baslat", {"tur": "kapat", "onay": "KALDIR"})
     bekle(ym)
     sif.saglayici_ayarla(None)
+    monkeypatch.setattr(sif, "varsayilan_saglayici", lambda: None)   # gerçek DPAPI (Windows) devre dışı: sağlayıcı AÇIKÇA yok
     assert hata_kodu(ym.api, "guvenlik_donustur_baslat", {"tur": "ac"}) == "saglayici_yok"
     assert ym.uygulama is not None
 

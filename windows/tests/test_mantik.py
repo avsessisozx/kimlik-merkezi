@@ -63,12 +63,11 @@ def test_sihirbaz_tamamla_ayar_ve_otomatik_baslama(yonetici, veri, arka_uc):
     assert arka_uc.deger is None and not yonetici.api("ayarlar", {})["otomatik_baslat"]
 
 
-def test_otomatik_destek_yoksa_hata_degil_uyari(tmp_path):
-    from kimlikwin.ayarlar import Ayarlar
+def test_otomatik_destek_yoksa_hata_degil_uyari(tmp_path, monkeypatch):
+    from kimlikwin import baslangic
     from kimlikwin.ayarlar import Ayarlar
     from kimlikwin.yonetici import Yonetici
-    if sys.platform == "win32":
-        pytest.skip("Windows'ta gerçek kayıt defteri var")
+    monkeypatch.setattr(baslangic, "varsayilan_arka_uc", lambda: None)   # kayıt defteri arka ucu yok (platformdan bağımsız)
     y = Yonetici(Ayarlar(tmp_path / "a"), Otomatik(None), claude_yolu=lambda: None)
     assert not y.otomatik.desteklenir
     assert "desteklenm" in y.api("ayar_yaz", {"otomatik_baslat": True})["uyari"]
@@ -181,6 +180,7 @@ def test_olustur_yeni_klasor_varsayilan_sifreli_saglayici_varsa(tmp_path, monkey
 
 def test_claude_ekle_basarisizsa_aranan_yerleri_soyler_basariliysa_soylemez(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path / "AppData"))
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)   # gerçek Windows'ta kendi Claude kurulumu bulunmasın
     from kimlikwin.ayarlar import Ayarlar
     from kimlikwin.yonetici import Yonetici
     y = Yonetici(Ayarlar(tmp_path / "a"), Otomatik(None), claude_yolu=lambda: None)

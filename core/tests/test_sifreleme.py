@@ -153,11 +153,11 @@ def test_baska_hesap_acamaz(tmp_path):
         sif.anahtari_coz(tmp_path)
 
 
-def test_saglayici_yoksa_kurulamaz(tmp_path):
+def test_saglayici_yoksa_kurulamaz(tmp_path, monkeypatch):
     sif.saglayici_ayarla(None)
-    if sys.platform != "win32":
-        with pytest.raises(SaglayiciYok):
-            sif.anahtar_kur(tmp_path)
+    monkeypatch.setattr(sif, "varsayilan_saglayici", lambda: None)   # sağlayıcı AÇIKÇA yok (Windows'ta DPAPI olsa da)
+    with pytest.raises(SaglayiciYok):
+        sif.anahtar_kur(tmp_path)
 
 
 def test_parola_kurtarma_olmadan_eklenemez(tmp_path):
@@ -259,9 +259,8 @@ def test_kurtar_yeni_parola_ve_hesaba_yeniden_baglama(tmp_path):
     assert sif.anahtari_coz(tmp_path) == dek
 
 
-def test_dpapi_windows_disinda_kurulamaz():
-    if sys.platform == "win32":
-        pytest.skip("Windows'ta gerçek DPAPI testi aşağıda")
+def test_dpapi_windows_disinda_kurulamaz(monkeypatch):
+    monkeypatch.setattr(sif.sys, "platform", "linux")   # platform AÇIKÇA Windows değil (yalnız bu test süresince)
     with pytest.raises(SaglayiciYok):
         sif.DpapiSaglayici()
 
@@ -332,7 +331,7 @@ def test_sifreli_hub_salt_okunur_yazamaz_ve_ikinci_yazici_kilitli(root):
                 r.query("DELETE FROM events")
 
 
-def test_yanlis_saglayici_ile_hub_acilmaz(root):
+def test_yanlis_saglayici_ile_hub_acilmaz(root, monkeypatch):
     with Hub.open(root, write=True, sifreli=True) as h:
         doldur(h)
     sif.saglayici_ayarla(sif.SahteSaglayici("baska"))
@@ -340,9 +339,9 @@ def test_yanlis_saglayici_ile_hub_acilmaz(root):
         with pytest.raises(AnahtarGerekli):
             Hub.open(root, write=yaz)
     sif.saglayici_ayarla(None)
-    if sys.platform != "win32":
-        with pytest.raises(SaglayiciYok):
-            Hub.open(root, write=False)
+    monkeypatch.setattr(sif, "varsayilan_saglayici", lambda: None)   # sağlayıcı AÇIKÇA yok
+    with pytest.raises(SaglayiciYok):
+        Hub.open(root, write=False)
 
 
 def test_parolali_hub(root, monkeypatch):
