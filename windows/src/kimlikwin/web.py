@@ -85,7 +85,8 @@ class _Isleyici(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-                         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+                         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+                         "base-uri 'none'; form-action 'none'; object-src 'none'")
         self.end_headers()
         self.wfile.write(govde)
 
@@ -115,7 +116,9 @@ class _Isleyici(BaseHTTPRequestHandler):
             return self._json(403, {"hata": "Geçersiz Host."})
         if not self.path.startswith("/api/"):
             return self._json(404, {"hata": "Bulunamadı."})
-        if not secrets.compare_digest(self.headers.get("X-Kimlik-Jeton", ""), self.sunucu.jeton):
+        # Bayt olarak karşılaştır: ASCII dışı başlık str karşılaştırmasında TypeError verirdi.
+        gelen = self.headers.get("X-Kimlik-Jeton", "").encode("utf-8", "replace")
+        if not secrets.compare_digest(gelen, self.sunucu.jeton.encode("utf-8")):
             return self._json(403, {"hata": "Yetkisiz istek."})
         origin = self.headers.get("Origin")
         if origin and origin not in (f"http://{ADRES}:{self.sunucu.port}", f"http://localhost:{self.sunucu.port}"):

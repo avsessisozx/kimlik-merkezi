@@ -76,15 +76,21 @@ Notlar:
   bunların kendi lisans dosyaları tekerleğin `dist-info` klasöründedir. Windows tekerlekleri için tek tek incelenmedi.
 - `cryptography` iki lisanslıdır (Apache-2.0 **veya** BSD-3-Clause).
 
-## Lisans metinleri paketle birlikte geliyor mu? (dürüst kontrol)
+## Lisans metinleri paketle birlikte geliyor mu?
 
-PyInstaller spec'i ve Inno Setup betiği okundu; ayrıca aynı PyInstaller sürümüyle (6.22.3), aynı düzende
-küçük bir **Linux** deneme derlemesi yapılıp çıktı incelendi. Sonuç:
-- Kurulum paketine **`LICENSE`, bu dosya ve LGPL/GPL metinleri konmuyor**. Yalnızca ECharts'ın lisans/bildirim dosyaları
-  (`statik/` içinde) ve Python paketlerinin kendi içindekiler geliyor; deneme derlemesinde `pystray`in
-  `COPYING.LGPL` dosyası çıktıda yoktu. MIT/BSD/Apache/LGPL lisanslarının çoğu, ikili dağıtımda telif ve lisans
-  metninin bulunmasını ister. **Eksik.** Önerilen düzeltme (bu değişiklikte yapılmadı): `kimlikmerkezi.spec`
-  `datas` listesine `LICENSE`, `THIRD-PARTY-NOTICES.md` ve `pystray`in `COPYING*` dosyalarını eklemek.
+Önceki denetimde kurulum paketinin `LICENSE`, bu dosyayı ve LGPL metnini **taşımadığı** görülmüştü. Düzeltildi:
+`windows/paket/kimlikmerkezi.spec` artık `LICENSE`, `THIRD-PARTY-NOTICES.md` ve `pystray`in `COPYING`,
+`COPYING.LGPL` dosyalarını pakete `lisanslar/` altına koyar; Inno Setup betiği (`KimlikMerkezi.iss`)
+`dist\KimlikMerkezi` klasörünü `recursesubdirs` ile olduğu gibi kurduğu için bunlar kurulum klasöründe
+`_internal\lisanslar\` içinde durur (`.iss` değiştirilmedi). Paket CI'sındaki `kurulu_dene.py` bunu kurulu
+pakette denetler.
+- **Doğrulananlar:** gerçek spec ile **Linux'ta** deneme derlemesi (PyInstaller 6.22.3) başarıyla bitti; çıktıda
+  `_internal/lisanslar/{LICENSE,THIRD-PARTY-NOTICES.md,pystray/COPYING,pystray/COPYING.LGPL}` var ve derlenen
+  konsol programı çalıştı (`surum` komutu).
+- **Doğrulanamayanlar:** Windows'ta derleme, Inno Setup kurulumu ve `kurulu_dene.py`'nin yeni denetimleri bu
+  ortamda çalıştırılamadı; ilk Windows paket CI çalışmasında görülecek. Diğer bağımlılıkların (MIT/BSD/Apache)
+  kendi lisans dosyaları pakete **ayrıca** eklenmiyor; yalnızca bu belge ve SBOM bunları listeler.
+  Bunların ikili dağıtım yükümlülüğünün bu şekilde yeterli olup olmadığı hukuki değerlendirme ister.
 
 ## pystray hakkında not (LGPL-3.0)
 
@@ -92,28 +98,23 @@ pystray ayrı bir kütüphane olarak kullanılır, kodu **değiştirilmemiştir*
 (`windows[tepsi]` isteğe bağlı eki; kod, pystray yoksa tepsisiz de çalışır). Kaynağı:
 https://github.com/moses-palmer/pystray (üst verideki ana sayfa).
 
-Paket yapısı kontrolü (`windows/paket/kimlikmerkezi.spec`, `KimlikMerkezi.iss`):
-- **Klasör tipi (onedir) paket:** evet. Spec `COLLECT` kullanır, Inno Setup `dist\KimlikMerkezi` klasörünü
-  olduğu gibi kurar (`recursesubdirs`). Tek dosyalık (onefile) paket değildir.
-- **pystray kullanıcı tarafından ayrı dosya olarak değiştirilebilir mi: HAYIR (şu an).** `pystray` saf Python'dur ve
-  PyInstaller varsayılanıyla modüller `KimlikMerkezi.exe` içindeki sıkıştırılmış bir arşive (PYZ) gömülür. Aynı
-  PyInstaller sürümü ve aynı spec yapısıyla yapılan deneme derlemesinde (Linux) çıktı klasöründe hiç `pystray`
-  dosyası yoktu; `archive_viewer` ile modüllerin exe içinde olduğu görüldü. Windows'ta derlenmiş gerçek paket bu
-  oturumda incelenmedi ama mekanizma aynıdır. Yani kullanıcı kurulu klasörde kütüphaneyi dosya olarak
-  değiştiremez.
-- **Önerilen düzeltme (yapılmadı, spec davranışı değişir):** `Analysis(..., noarchive=True)` kullanmak. Aynı deneme
-  derlemesinde bu ayarla `_internal/pystray/*.pyc` dosyaları ayrı çıktı; kullanıcı, değiştirilmiş pystray'ı aynı
-  Python sürümüyle derleyip bu dosyaların yerine koyabilir. Daha sağlam alternatif, pystray'ı derlemeye hiç
-  katmayıp ayrı bir klasörden yüklemektir. Hangisinin LGPL-3.0 §4'ü karşıladığı hukuki değerlendirme ister.
-
-Şu anki dürüst durum ve kullanıcıya sunulan yol:
-1. Uygulamanın tüm kaynak kodu (MIT) ve paketleme betikleri herkese açıktır; pystray sürümü `windows/paket/gereksinim.txt`
-   içinde sabittir (`pystray==0.19.5`).
-2. **Değiştirilmiş pystray ile kendi paketinizi üretmek için:** depoyu indirin; `pip install ./core ./server ./importers`
-   ve `pip install "./windows[tepsi]"` sonrasında kendi (değiştirilmiş) pystray'ınızı `pip install` ile kurun
-   (`pip install --force-reinstall --no-deps <değiştirilmiş-pystray-klasörü>`); sonra `windows/paket` klasöründe
-   `python simge_uret.py` ve `python -m PyInstaller --noconfirm kimlikmerkezi.spec` çalıştırın, Inno Setup ile
-   `KimlikMerkezi.iss` derleyin. (Adımlar betik/CI akışından yazılmıştır; bu oturumda Windows'ta uçtan uca
-   denenmedi.)
-3. Doğrudan kurulu pakette değiştirme (yukarıdaki `noarchive` değişikliğinden sonra) ayrıca belgelenecektir; **şu an
-   desteklenmiyor**, bu yüzden "kullanıcı kütüphaneyi kendisi değiştirebilir" iddiasında bulunmuyoruz.
+Paket yapısı (`windows/paket/kimlikmerkezi.spec`, `KimlikMerkezi.iss`):
+- **Klasör tipi (onedir) paket:** evet (`COLLECT`; Inno Setup klasörü olduğu gibi kurar). Tek dosyalık değildir.
+- **`noarchive=True`:** spec'te iki `Analysis` için açıldı. Bu yüzden Python modülleri `KimlikMerkezi.exe` içindeki
+  arşive gömülmez; kurulum klasöründe `_internal\pystray\*.pyc` gibi ayrı dosyalar olarak durur
+  (Linux deneme derlemesinde görüldü). Yan etki: **uygulamanın kendi modülleri de** ayrı `.pyc` dosyaları olur
+  (kurulum biraz büyür, açılış biraz yavaşlayabilir; ölçülmedi).
+- **Kullanıcı pystray'ı nasıl değiştirir:** kendi (değiştirilmiş) pystray 0.19.5 kaynağını, **paketin
+  derlendiği Python sürümüyle** (şu an 3.13) `python -m compileall` ya da `py_compile` ile `.pyc`'ye derleyip
+  `_internal\pystray\` içindeki aynı adlı dosyaların (`__init__.pyc`, `_base.pyc`, `_win32.pyc` ...) yerine koyar;
+  uygulamayı yeniden başlatır. Pystray'ın LGPL metni `_internal\lisanslar\pystray\` içindedir. Bu yolun
+  Windows'ta çalıştığı **bu ortamda denenmedi** (yalnızca dosyaların ayrı durduğu Linux'ta görüldü); `.pyc`
+  uyumu Python sürümüne bağlıdır.
+- **Alternatif (her zaman geçerli):** uygulamanın tüm kaynak kodu (MIT) ve paketleme betikleri herkese açıktır,
+  pystray sürümü `windows/paket/gereksinim.txt` içinde sabittir (`pystray==0.19.5`). Değiştirilmiş pystray ile
+  kendi paketinizi üretmek için: depoyu indirin; `pip install ./core ./server ./importers` ve
+  `pip install "./windows[tepsi]"` sonrasında değiştirilmiş pystray'ınızı `pip install --force-reinstall --no-deps
+  <klasör>` ile kurun; `windows/paket` içinde `python simge_uret.py` ve
+  `python -m PyInstaller --noconfirm kimlikmerkezi.spec` çalıştırın, ardından Inno Setup ile `KimlikMerkezi.iss`
+  derleyin (adımlar betik ve CI akışından yazıldı; Windows'ta uçtan uca denenmedi).
+- LGPL-3.0'ın bu düzenle tam olarak karşılanıp karşılanmadığı hukuki bir değerlendirmedir; burada iddia edilmiyor.

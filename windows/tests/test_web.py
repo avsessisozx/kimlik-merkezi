@@ -254,3 +254,41 @@ def test_sohbet_hassas_ayri_onay_ister_ve_toplu_acmaya_girmez(ist):
     assert kod == 400 and "hassas" in j["hata"]
     assert "sohbet" not in ist.api("izin_toplu", {"app_id": app})["acilan"]
     assert ist.post("izin_ver", {"app_id": app, "kategori": "sohbet", "hassas_onay": True})[0] == 200
+
+
+def _ham(sunucu, istek: bytes) -> bytes:
+    with socket.create_connection(("127.0.0.1", sunucu.port), timeout=5) as c:
+        c.sendall(istek)
+        veri = b""
+        while True:
+            try:
+                x = c.recv(65536)
+            except OSError:
+                break
+            if not x:
+                break
+            veri += x
+            if b"\r\n\r\n" in veri:
+                bas, _, govde = veri.partition(b"\r\n\r\n")
+                n = [int(l.split(b":")[1]) for l in bas.split(b"\r\n") if l.lower().startswith(b"content-length")]
+                if n and len(govde) >= n[0]:
+                    break
+        return veri
+
+
+def test_ascii_disi_jeton_403_doner(sunucu):
+    """ASCII dışı X-Kimlik-Jeton başlığı yakalanmamış istisna/kopan bağlantı değil, 403 vermeli."""
+    host = f"127.0.0.1:{sunucu.port}".encode()
+    istek = (b"POST /api/acilis HTTP/1.1\r\nHost: " + host + b"\r\nConnection: close\r\n"
+             b"Content-Type: application/json\r\nX-Kimlik-Jeton: \xe9\xe9\xe9\r\nContent-Length: 2\r\n\r\n{}")
+    yanit = _ham(sunucu, istek)
+    assert yanit.startswith(b"HTTP/1.1 403"), yanit[:80]
+    # sunucu hâlâ yaşıyor ve doğru jetonla çalışıyor
+    assert Istemci(sunucu).post("acilis")[0] == 200
+
+
+def test_csp_ek_yonergeler(sunucu):
+    with urllib.request.urlopen(f"http://127.0.0.1:{sunucu.port}/") as r:
+        csp = r.headers["Content-Security-Policy"]
+    for y in ("base-uri 'none'", "form-action 'none'", "object-src 'none'", "frame-ancestors 'none'"):
+        assert y in csp
