@@ -8,7 +8,7 @@ let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) { process.stderr.write('playwright yok: ' + e.message + '\n'); process.exit(77); }
 const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const SAYFALAR = [['Anasayfa', 'Ana sayfa'], ['Harita', 'Harita'], ['İçe aktar', 'İçe aktar'], ['Arama', 'Arama'],
-  ['Zaman çizelgesi', 'Zaman çizelgesi'], ['Persona', 'Persona'], ['Erişim', 'Erişim'], ['Kaynaklar', 'Kaynaklar'], ['Ayarlar', 'Ayarlar'], ['Hakkında', 'Hakkında']];
+  ['Zaman çizelgesi', 'Zaman çizelgesi'], ['Persona', 'Persona'], ['Erişim', 'Erişim'], ['Kaynaklar', 'Kaynaklar'], ['Güvenlik', 'Güvenlik'], ['Ayarlar', 'Ayarlar'], ['Hakkında', 'Hakkında']];
 const bekle = ms => new Promise(r => setTimeout(r, ms));
 
 async function toplayici(sayfa) {

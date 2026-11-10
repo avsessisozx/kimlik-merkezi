@@ -51,11 +51,23 @@ Teknik ayrıntı ve sınırlar: [docs/SIFRELEME.md](docs/SIFRELEME.md).
   (en az 4 kelime ya da 20 karakter; kısa, "gizli soru" tarzı, tekrar eden ya da bilinen zayıf ifadeler reddedilir; iki
   kez yazarak doğrulanır). **Parolayı ve kurtarma ifadesini ikisini birden unutursanız verinizi KİMSE kurtaramaz**
   (biz de, kimse de). Kurtarma ifadesi gücü sezgiseldir, gerçek bir entropi ölçümü değildir.
-- **Windows uygulamasında parola ekranı YOK.** Parola, kurtarma ifadesi ve şifrele/şifreyi kaldır yalnız komut
-  satırından (`kimlikmerkezi parola-ekle`, `kurtarma-kur`, `kurtar`, `sifrele`, `sifreyi-kaldir`) yönetilir; uygulama
-  parola sormaz, parolalı bir klasörü kendiliğinden açamaz. Hazır Windows kurulum paketinin bu komut satırı aracını
-  içerdiği **doğrulanmadı**; kaynaktan kurulumda (`pip install`) vardır. Parola katmanı ayrıca MCP'yi de etkiler (MCP süreci parolayı
-  `KIMLIK_PAROLA` ortam değişkeninden alır; bu, parolayı yapılandırma dosyasında düz metin yapar).
+- **Uygulamadaki "Güvenlik" sayfası.** Şifreleme durumu (açık/kapalı, parola var mı, kurtarma ifadesi kuruldu mu),
+  kurtarma ifadesi kurma, parola ekleme/kaldırma, parolayı kurtarma ifadesiyle sıfırlama ve şifrelemeyi açıp kapatma
+  uygulamanın içinden yapılır; komut satırı gerekmez (komutlar `kimlikmerkezi ...` hâlâ vardır). Parola eklerken sıra
+  zorunludur: önce kurtarma ifadesi (kural göstergesi, güç göstergesi, iki kez yazma), sonra "kurtarılamaz" uyarısı ve
+  onay kutusu, sonra parola. Şifrelemeyi kapatmak için `KALDIR` yazılır; işlem veriyi yeniden yazar ve uzun sürebilir.
+  İlk açılış sihirbazı şifrelemenin varsayılan açık olduğunu söyler.
+- **Parolalı klasör açılışta parola sorar.** Parola yalnız bellekte tutulur, diske yazılmaz. Yanlış denemeler
+  yavaşlatılır (2 hata bedava, sonra 5, 10, 20... sn, en çok 5 dk; sayaç uygulama yeniden başlayınca sıfırlanır:
+  kaba kuvveti durdurmaz, yalnız yavaşlatır). Parolayı unuttuysanız kilit ekranından kurtarma ifadesiyle açabilirsiniz.
+- **Parola ve Claude (MCP) birlikte çalışmaz, bu bilinçli bir karardır.** Claude'un MCP süreci parola giremez;
+  parolayı Claude'un ayar dosyasına (`KIMLIK_PAROLA`) yazmak, aynı Windows hesabındaki her programa parolayı vermek
+  demektir ve parolanın tüm amacını boşa çıkarır. Bu yüzden parolalı klasörde "Claude Desktop'a ekle" kapalıdır ve
+  parola eklemeden önce bu açıkça gösterilir. Claude erişimi istiyorsanız parolasız (Windows hesabına bağlı şifreli)
+  kalın. Gerekçe: [docs/SIFRELEME.md §6](docs/SIFRELEME.md).
+- **Hazır kurulum paketindeki `kimlikmerkezi` komut satırı aracı** (sifrele, parola-ekle...) pakette olmayabilir;
+  artık gerekmez, çünkü hepsi Güvenlik sayfasında. Ancak Güvenlik sayfası gerçek Windows'ta (DPAPI, Inno Setup
+  kurulumu) **denenmedi**; Linux'ta sahte anahtar sağlayıcısıyla sınandı.
 - **Doğrulanmadı:** gerçek Windows DPAPI bu geliştirme ortamında (Linux) denenmedi; Windows'ta paketlenmiş uygulamayla
   şifreleme elle sınanmadı. Güvenli silme (eski düz dosyaları sıfırlayıp silme) SSD ve yedekler yüzünden fiziksel
   silmeyi garanti etmez.

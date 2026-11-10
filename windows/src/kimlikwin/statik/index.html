@@ -78,6 +78,7 @@ details.nedir>summary{cursor:pointer;font-weight:600}
 <script src="/statik/echarts.min.js"></script>
 <script src="/statik/figur.js"></script>
 <script src="/statik/harita.js"></script>
+<script src="/statik/guvenlik.js"></script>
 <script>
 "use strict";
 const JETON=document.querySelector('meta[name=kimlik-jeton]').content;
@@ -145,7 +146,7 @@ function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
     kap.append(h('label',{},c,' ',k.ad,k.hassas?hassasRozet():null));});
   kap.sec=()=>kutular.filter(c=>c.checked).map(c=>c.value);return kap;}
 
-const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
+const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['guvenlik','Güvenlik'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
 let sayfa='harita',AYAR_TEMA='sistem',yoklama=null;
 function menu(){const n=$('#nav');n.textContent='';SAYFALAR.forEach(([id,ad])=>n.append(h('button',{class:id===sayfa?'secili':'',onclick:()=>git(id)},ad)));}
 function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}
@@ -153,6 +154,7 @@ function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null
 function temaUygula(t){document.documentElement.dataset.tema=t;AYAR_TEMA=t;}
 
 const SF={};
+SF.guvenlik=a=>guvenlikSayfasi(a);   // guvenlik.js
 
 // ------------------------------------------------------------------ kişiler
 let KISILER={kisiler:[],secili:null},SECILI_BOLGE=null;
@@ -160,7 +162,7 @@ function haritaSifirla(){if(window.HARITA_DURUM)Object.assign(HARITA_DURUM,{bolg
 async function kisileriYukle(){KISILER=await api('kisiler');kisiSecici();}
 function kisiSecici(){const k=$('#kisi-kutu');k.textContent='';
   const sec=h('select',{'aria-label':'Kişi seç',onchange:async e=>{
-    try{await api('kisi_sec',{kisi_id:e.target.value});SECILI_BOLGE=null;haritaSifirla();await kisileriYukle();bildir('Kişi değişti.');git(sayfa);}catch(x){hataGoster(x);kisileriYukle();}}},
+    try{await gParolaIleDene(p=>api('kisi_sec',{kisi_id:e.target.value,parola:p}),'Bu kişinin veri klasörü parolayla korunuyor.');SECILI_BOLGE=null;haritaSifirla();await kisileriYukle();bildir('Kişi değişti.');git(sayfa);}catch(x){hataGoster(x);kisileriYukle();}}},
     KISILER.kisiler.map(x=>h('option',{value:x.id,selected:x.secili},x.ad)));
   k.append(h('span',{class:'soluk'},'Kişi:'),sec,h('button',{class:'i',onclick:()=>kisiEkle()},'Kişi ekle'));}
 async function kisiEkle(){
@@ -170,7 +172,7 @@ async function kisiEkle(){
   const den=async()=>{const r=await api('sihirbaz_denetle',{yol:yol.value}).catch(()=>null);sonuc.textContent='';if(!r)return;
     sonuc.append(h('div',{class:r.ok?'tamam':'kotu'},r.mesaj),h('div',{},'Bu sürücüdeki boş alan: '+r.bos_alan_metni));olustur.disabled=!r.ok||!ad.value.trim();};
   const olustur=h('button',{class:'d',disabled:true,onclick:async()=>{
-    try{await api('kisi_ekle',{ad:ad.value,yol:yol.value});kapat();SECILI_BOLGE=null;haritaSifirla();await kisileriYukle();bildir('Kişi eklendi ve seçildi. Veri klasörü: '+yol.value);git('harita');}catch(e){hataGoster(e);}}},'Oluştur');
+    try{await gParolaIleDene(p=>api('kisi_ekle',{ad:ad.value,yol:yol.value,parola:p}),'Bu klasör parolayla korunuyor.');kapat();SECILI_BOLGE=null;haritaSifirla();await kisileriYukle();bildir('Kişi eklendi ve seçildi. Veri klasörü: '+yol.value);git('harita');}catch(e){hataGoster(e);}}},'Oluştur');
   ad.addEventListener('input',()=>{oner();});yol.addEventListener('input',den);
   const kapat=pencere('Kişi ekle',h('p',{class:'soluk'},'Her kişinin verisi ayrı bir klasörde durur; anahtarlar, izinler ve erişim kaydı da o klasöre bağlıdır.'),
     h('div',{class:'satir'},ad),h('div',{class:'satir'},yol,h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'klasor'}).catch(hataGoster);if(r&&r.yol){yol.value=r.yol;den();}}},'Seç…')),sonuc,
@@ -343,14 +345,15 @@ function claudeSonucuCiz(k,sn){k.textContent='';const r=sn.r;
     if(r.metin)k.append(h('div',{},h('h4',{},terim('Elle eklenecek ayar metni (MCP)','mcp')),yapistirmaKutusu(r.metin)));}
   k.append(h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{SON_CLAUDE=null;git('erisim');}},'Bu iletiyi kapat')));}
 SF.erisim=async a=>{
-  const [e,l]=await Promise.all([api('erisim'),api('erisim_kaydi',{limit:200})]);KATEGORILER=e.kategoriler;
+  const [e,l,gv]=await Promise.all([api('erisim'),api('erisim_kaydi',{limit:200}),api('guvenlik_durum')]);KATEGORILER=e.kategoriler;
   a.append(h('h2',{},'Erişim'));
   const hassasAd=KATEGORILER.filter(k=>k.hassas).map(k=>k.ad).join(', '),acikSay=KATEGORILER.filter(k=>!k.hassas).length;
   const cd=h('div',{class:'kart'},h('h3',{},'Claude Desktop\'a ekle'),
     h('p',{class:'soluk'},'Ayar dosyasının yedeğini alır, bu uygulama için yeni bir ',terim('anahtar','anahtar'),' üretir ve ',terim('MCP','mcp'),' bağlantı girişini ekler. ',
       h('b',{},`Dikkat: hassas olmayan ${acikSay} kategori (${KATEGORILER.filter(k=>!k.hassas).map(k=>k.ad).join(', ')}) süresiz olarak AÇIK gelir.`),
       ` Hassas kategoriler (${hassasAd}) kapalı kalır; yalnızca ayrı onayla açılır. İstemediklerinizi eklemeden sonra aşağıdaki Claude Desktop kartından kapatabilirsiniz. (Yukarıdaki "Yeni anahtar" ise hiçbir izin vermeden başlar.)`),
-    h('button',{class:'d',onclick:async()=>{const r=await api('claude_ekle').catch(hataGoster);if(!r)return;
+    gv.parola_var?h('div',{class:'uyari',id:'claude-parola-uyari'},gv.mcp_notu,' ',h('button',{class:'i',onclick:()=>git('guvenlik')},'Güvenlik sayfasına git')):null,
+    h('button',{class:'d',disabled:gv.parola_var,onclick:async()=>{const r=await api('claude_ekle').catch(hataGoster);if(!r)return;
       const ok=r.durum==='eklendi'||r.durum==='guncellendi';
       let acik=null;if(r.app_id){try{const e2=await api('erisim');const u=e2.uygulamalar.find(x=>x.id===r.app_id);acik=u?u.izinler.map(i=>i.kategori):[];}catch(_){}}
       if(!ok&&r.app_id)ELLE_BEKLEYEN.add(r.app_id);
@@ -360,7 +363,7 @@ SF.erisim=async a=>{
   const ad=h('input',{type:'text',placeholder:'Uygulama adı (ör. Claude Code)'});
   a.append(h('div',{class:'kart'},h('h3',{},'Yeni anahtar'),h('p',{class:'soluk'},'Hiçbir izin açık olmadan başlar; izinleri sonra siz verirsiniz.'),h('div',{class:'satir'},ad,h('button',{class:'d',onclick:async()=>{
     const r=await api('anahtar_uret',{ad:ad.value}).catch(hataGoster);if(!r)return;const b=await api('baglanti_bilgisi',{anahtar:r.anahtar});
-    const kapat=pencere('Anahtar üretildi',h('p',{class:'uyari'},r.uyari),yapistirmaKutusu(r.anahtar),h('h3',{},terim('MCP bağlantı ayarı','mcp')),yapistirmaKutusu(b.metin),
+    const kapat=pencere('Anahtar üretildi',h('p',{class:'uyari'},r.uyari),b.parola_uyari?h('p',{class:'hata'},b.parola_uyari):null,yapistirmaKutusu(r.anahtar),h('h3',{},terim('MCP bağlantı ayarı','mcp')),yapistirmaKutusu(b.metin),
       h('button',{class:'d',onclick:()=>{kapat();git('erisim');}},'Tamam'));}},'Anahtar üret'))));
   e.uygulamalar.forEach(u=>{
     const kart=h('div',{class:'kart'},h('div',{class:'satir'},h('h3',{style:'margin:0;flex:1'},u.ad+(u.iptal?' (iptal edildi)':'')),
@@ -429,15 +432,16 @@ async function sihirbaz(ac){
       const ileri=h('button',{class:'d',disabled:true,onclick:()=>{adim=2;ciz();}},'İleri');
       icerik=[h('div',{class:'satir'},h('label',{},'Adınız: '),h('input',{type:'text',value:kisiAd,style:'max-width:260px',oninput:e=>{kisiAd=e.target.value;}})),h('p',{},'Kimlik Merkezi verilerinizi tek bir klasörde, bu bilgisayarda tutar. Klasörü seçin (başka bir sürücü de olabilir). Veritabanı ve alt klasörler otomatik oluşturulur.'),
         h('div',{class:'satir'},g,h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'klasor'}).catch(hataGoster);if(r&&r.yol){yol=r.yol;g.value=yol;den();}}},'Seç…')),sonuc,
-        h('div',{class:'soluk'},'Yeni klasör varsayılan olarak şifrelenir (anahtar Windows hesabınıza bağlı; bu uygulamada parola ekranı yok). cikti klasörü ve dışa aktardığınız dosyalar şifrelenmez. Ek önlem: BitLocker/VeraCrypt.'),h('div',{class:'satir'},ileri)];
+        h('div',{class:'soluk'},'Şifreleme varsayılan olarak AÇIK: yeni klasör şifrelenir ve anahtar Windows hesabınıza bağlanır. İsterseniz kurulumdan sonra Güvenlik sayfasından parola ekleyebilirsiniz (önce bir kurtarma ifadesi belirlersiniz). cikti klasörü ve dışa aktardığınız dosyalar şifrelenmez. Ek önlem: BitLocker/VeraCrypt.'),h('div',{class:'satir'},ileri)];
       setTimeout(den,0);}
     else if(adim===2){
       icerik=[h('p',{},'Seçtiğiniz klasör: '+yol),h('label',{},h('input',{type:'checkbox',checked:oto,onchange:e=>{oto=e.target.checked;}}),' Windows açılışında otomatik başlat (tepsi simgesiyle; sonra Ayarlar\'dan kapatılabilir)'),
         h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{adim=1;ciz();}},'Geri'),h('button',{class:'d',onclick:async e=>{e.target.disabled=true;
-          son=await api('sihirbaz_tamamla',{yol,otomatik_baslat:oto,ad:kisiAd}).catch(x=>{hataGoster(x);return null;});if(son){adim=3;ciz();}else e.target.disabled=false;}},'Kur')) ];}
+          son=await gParolaIleDene(p=>api('sihirbaz_tamamla',{yol,otomatik_baslat:oto,ad:kisiAd,parola:p}),'Seçtiğiniz klasörde parolayla korunan bir Kimlik Merkezi verisi var.').catch(x=>{if(!(x&&x.iptal))hataGoster(x);return null;});if(son){adim=3;ciz();}else ciz();}},'Kur')) ];}
     else{icerik=[h('p',{class:'tamam'},'Hazır. Kurulum tamamlandı.'),
         h('ul',{class:'ozet-liste'},h('li',{},'Adınız: '+(kisiAd.trim()||'Ben')),h('li',{},'Veri klasörü: '+yol),h('li',{},'Windows açılışında otomatik başlama: '+(oto?'açık':'kapalı')+' (Ayarlar\'dan değiştirilebilir)'),
-          h('li',{},'Veritabanı ve alt klasörler oluşturuldu'+(son.dosyalar&&son.dosyalar.length?` (${son.dosyalar.length} dosya/klasör)`:'')+'.')),
+          h('li',{},'Veritabanı ve alt klasörler oluşturuldu'+(son.dosyalar&&son.dosyalar.length?` (${son.dosyalar.length} dosya/klasör)`:'')+'.'),
+          son.sifreli?h('li',{id:'sihirbaz-sifreleme'},'Şifreleme AÇIK (varsayılan): verileriniz diskte şifreli, anahtar Windows hesabınıza bağlı. Güvenlik sayfasından parola ekleyebilirsiniz.'):h('li',{id:'sihirbaz-sifreleme',class:'kotu'},'Şifreleme KAPALI: bu sistemde anahtar koruması (Windows DPAPI) yok; veriler diskte düz metin. Ayrıntı: Güvenlik sayfası.')),
         h('h3',{},'Sıradaki adımlar'),
         h('ol',{},h('li',{},'İçe aktar ekranından bir dışa aktarma dosyası (ör. Google Takeout zip) ekleyin.'),
           h('li',{},h('span',{},'Claude gibi bir uygulamanın verinize bağlanmasını istiyorsanız Erişim ekranından "Claude Desktop\'a ekle" düğmesini kullanın ('),terim('MCP','mcp'),'). Bunu şimdi yapmanız gerekmez.')),
@@ -449,6 +453,8 @@ async function sihirbaz(ac){
 async function start(){
   const ac=await api('acilis');temaUygula(ac.tema);
   if(ac.baslangic_hatasi)bildir('Başlangıç hatası: '+ac.baslangic_hatasi,true);
+  if(ac.kilit){$('#nav').textContent='';$('#ana').textContent='';return gKilitEkrani(ac.kilit);}
+  if(ac.mesgul){menu();$('#ana').textContent='';return gDonusumIzle();}
   if(ac.sihirbaz){menu();$('#ana').textContent='';return sihirbaz(ac);}
   await kisileriYukle();
   git('harita');}

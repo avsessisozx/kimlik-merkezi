@@ -103,7 +103,7 @@ def sonuc(tmp_path_factory):
     return json.loads(p.stdout.strip().splitlines()[-1])
 
 
-SAYFALAR = ["Anasayfa", "Harita", "İçe aktar", "Arama", "Zaman çizelgesi", "Persona", "Erişim", "Kaynaklar", "Ayarlar", "Hakkında"]
+SAYFALAR = ["Anasayfa", "Harita", "İçe aktar", "Arama", "Zaman çizelgesi", "Persona", "Erişim", "Kaynaklar", "Güvenlik", "Ayarlar", "Hakkında"]
 
 
 @pytest.mark.parametrize("ad", SAYFALAR)

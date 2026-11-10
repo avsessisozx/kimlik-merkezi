@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, fold
+from kimlikcore import sifreleme as sif
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
 from kimlikserver.access import KeyManager
@@ -19,6 +20,15 @@ from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 from . import claude_ayar, gunluk, harita_kopru
 from .yollar import ayar_dizini
 
+MCP_PAROLA_NOTU = (
+    "Bu veri klasörü parolayla korunuyor. Claude (MCP) parola giremez ve parolayı Claude'un ayar dosyasına "
+    "yazmak korumayı ortadan kaldırır (aynı Windows hesabındaki her program o dosyayı okuyabilir), bu yüzden "
+    "parolalı klasör Claude'a otomatik eklenmez. Claude'un erişmesini istiyorsanız Güvenlik sayfasından "
+    "parolayı kaldırın (veri yine Windows hesabınıza bağlı şifreli kalır).")
+MCP_PAROLA_ONCE_NOTU = (
+    "Parola eklerseniz Claude (MCP) bu klasörü açamaz: parola giremez ve parolayı Claude'un ayar dosyasına "
+    "yazmak korumayı ortadan kaldırırdı (aynı Windows hesabındaki her program o dosyayı okuyabilir). Bu yüzden "
+    "parolalı klasör Claude'a otomatik eklenmez. Claude erişimi istiyorsanız parola eklemeyin ya da sonra kaldırın.")
 SIL_ONAY_METNI = "SİL"
 KATEGORI_ETIKETLERI = {
     "tarama": "Tarama geçmişi", "video": "Video", "sosyal": "Sosyal medya", "muzik": "Müzik",
@@ -78,11 +88,11 @@ class IceAktarmaIsi:
 
 class Uygulama:
     def __init__(self, veri: str | Path, *, ayar_dizin: Path | None = None,
-                 claude_yolu: Callable[[], Path | None] = claude_ayar.bul):
+                 claude_yolu: Callable[[], Path | None] = claude_ayar.bul, parola: str | None = None):
         self.veri = Path(veri)
         self.ayar_dizin = Path(ayar_dizin) if ayar_dizin else ayar_dizini()
         self._claude_yolu = claude_yolu
-        self.hub = Hub.open(self.veri, write=True)   # tek yazan süreç: hub.lock alınır
+        self.hub = Hub.open(self.veri, write=True, parola=parola)   # tek yazan süreç: hub.lock alınır
         self.persona = Persona(self.hub)
         self.anahtarlar = KeyManager(self.hub)
         self.oneriler = OneriYonetici(self.hub, self.veri, persona=self.persona)
@@ -370,12 +380,20 @@ class Uygulama:
                               "kategori": r[3], "sayi": r[4], "sonuc": r[5]} for r in satirlar]}
 
     # ------------------------------------------------------------------ bağlantı ve Claude
+    def parola_var_mi(self) -> bool:
+        z = sif.zarf_oku(self.veri)
+        return bool(z and z.get("parola"))
+
     def baglanti_bilgisi(self, anahtar: str = "<ANAHTAR>") -> dict:
         giris = claude_ayar.giris_olustur(self.veri, anahtar)
         return {"komut": giris["command"], "arguman": giris["args"], "ortam": giris["env"],
-                "metin": claude_ayar.ayar_metni(giris)}
+                "metin": claude_ayar.ayar_metni(giris),
+                "parola_uyari": MCP_PAROLA_NOTU if self.parola_var_mi() else None}
 
     def claude_ekle(self) -> dict:
+        if self.parola_var_mi():
+            # Karar (docs/SIFRELEME.md §6): parolayı Claude ayar dosyasına koymayız; sessizce bozuk giriş de yazmayız.
+            raise IslemHatasi(MCP_PAROLA_NOTU, "parola_mcp")
         yol = self._claude_yolu()
 
         def uret() -> tuple[str, str]:

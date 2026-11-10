@@ -245,7 +245,8 @@ class OneriYonetici:
         self.root = Path(root) if root is not None else hub.root
         self._clock = clock
         self.persona = persona or Persona(hub, clock=clock)
-        self.kuyruk = OneriKuyrugu(self.root, clock=clock)
+        # Açık Hub'ın kendi gelen kutusu: parolayla açılmış klasörde anahtar ortam değişkeni olmadan da çözülür.
+        self.kuyruk = OneriKuyrugu(self.root, clock=clock, gelen=lambda _kok: hub.gelen)
 
     def kuyruk_listele(self, durum: str | None = "bekliyor") -> list[Oneri]:
         self.hub.gelen_birlestir()

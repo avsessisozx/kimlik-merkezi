@@ -11,12 +11,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from kimlikcore import KimlikError
+from kimlikcore import AnahtarGerekli, KimlikError
 
 from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_raporu, saglik, veri_klasoru
 from .ayarlar import Ayarlar
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
+from .guvenlik import DEGERLENDIRICILER, GUVENLIK_API, KILITLI_IZINLI, MESGUL_IZINLI, Guvenlik
 
 # Uygulama'nın dışarıya açılan yöntemleri (ad -> yöntem). Başka hiçbir şey çağrılamaz.
 UYGULAMA_API = frozenset({
@@ -61,6 +62,9 @@ class Yonetici:
         self.son_dogrulama: str | None = None
         self.baslangic_hatasi: str | None = None
         self.cikis_istegi = False
+        self.kilit: dict | None = None        # parolalı klasör açılamadı: kilit ekranı bilgisi
+        self.mesgul: str | None = None        # "donusum": şifreleme dönüşümü sürüyor, veritabanı kapalı
+        self.guvenlik = Guvenlik(self)
         self._api_kilit = threading.RLock()   # kişi değişimi ve sorgular aynı SQLite bağlantısında çakışmasın
 
     # ------------------------------------------------------------------ yaşam döngüsü
@@ -70,7 +74,21 @@ class Yonetici:
             return
         self._kisileri_hazirla()
         k = self._secili_kisi()
-        self.uygulama = Uygulama(k["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+        try:
+            self.uygulama = self.uygulama_olustur(k["klasor"])
+            self.kilit = None
+        except AnahtarGerekli:
+            # Parolalı klasör: arayüz AÇILIŞTA parola sorar (guvenlik.py); başka hata türleri aynen yükselir.
+            kilit = self.guvenlik.kilit_bilgisi(k["klasor"])
+            if kilit is None:
+                raise
+            self.uygulama, self.kilit = None, kilit
+
+    def uygulama_olustur(self, klasor: str, parola: str | None = None) -> Uygulama:
+        """Klasörü yazan olarak açar. Parola verilmediyse bellekteki (bu oturumda girilmiş) parola kullanılır."""
+        if parola is None:
+            parola = self.guvenlik.kayitli_parola(klasor)
+        return Uygulama(klasor, ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu, parola=parola)
 
     # ------------------------------------------------------------------ kişiler (her kişi ayrı veri klasörü)
     def _kisileri_hazirla(self) -> None:
@@ -91,29 +109,32 @@ class Yonetici:
         sec = self.ayarlar["secili_kisi"]
         return {"kisiler": [{**k, "secili": k["id"] == sec} for k in self.ayarlar["kisiler"]], "secili": sec}
 
-    def _gec(self, kisi: dict) -> None:
+    def _gec(self, kisi: dict, parola: str | None = None) -> None:
         """Seçili kişiyi değiştirir: eski Hub kapanır, yenisi açılır; olmazsa eskisi geri açılır."""
         eski = self._secili_kisi() if self.uygulama else None
         self.kapat()
         try:
-            self.uygulama = Uygulama(kisi["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+            self.uygulama = self.guvenlik.parolali(
+                kisi["klasor"], parola, lambda: self.uygulama_olustur(kisi["klasor"], parola))
         except BaseException as e:
             if eski:
-                self.uygulama = Uygulama(eski["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+                self.uygulama = self.uygulama_olustur(eski["klasor"])
+            if isinstance(e, IslemHatasi):
+                raise
             if isinstance(e, KimlikError):
                 raise IslemHatasi(f"{kisi['ad']} açılamadı: {e}", "kisi_acilamadi") from None
             raise
         self.ayarlar.guncelle(secili_kisi=kisi["id"], veri_klasoru=kisi["klasor"])
 
-    def api_kisi_sec(self, kisi_id: str) -> dict:
+    def api_kisi_sec(self, kisi_id: str, parola: str | None = None) -> dict:
         kisi = next((k for k in self.ayarlar["kisiler"] if k["id"] == kisi_id), None)
         if kisi is None:
             raise IslemHatasi("Böyle bir kişi yok.")
         if kisi_id != self.ayarlar["secili_kisi"]:
-            self._gec(kisi)
+            self._gec(kisi, parola)
         return self.api_kisiler()
 
-    def api_kisi_ekle(self, ad: str, yol: str) -> dict:
+    def api_kisi_ekle(self, ad: str, yol: str, parola: str | None = None) -> dict:
         """Yeni kişi = yeni veri klasörü (boş ya da mevcut Kimlik Merkezi klasörü). Eklenince seçilir."""
         ad = (ad or "").strip()
         if not ad or len(ad) > 60:
@@ -123,7 +144,7 @@ class Yonetici:
         yol = str(yol).strip().strip('"')
         if any(os.path.normcase(k["klasor"]) == os.path.normcase(yol) for k in self.ayarlar["kisiler"]):
             raise IslemHatasi("Bu klasör başka bir kişiye ait.")
-        veri_klasoru.olustur(yol)
+        self.guvenlik.parolali(yol, parola, lambda: veri_klasoru.olustur(yol, parola))
         kisi = {"id": uuid.uuid4().hex[:8], "ad": ad, "klasor": yol}
         self.ayarlar.guncelle(kisiler=[*self.ayarlar["kisiler"], kisi])
         self._gec(kisi)
@@ -156,6 +177,15 @@ class Yonetici:
             return self._api(ad, girdi)
 
     def _api(self, ad: str, girdi: dict[str, Any]) -> Any:
+        if self.mesgul and ad not in MESGUL_IZINLI:
+            raise IslemHatasi("Şifreleme dönüşümü sürüyor; bitene kadar bekleyin (uygulamayı kapatmayın).", "mesgul")
+        if self.kilit is not None and ad not in KILITLI_IZINLI:
+            raise IslemHatasi("Veri klasörü parolayla kilitli; önce parolayı girin.", "kilitli_parola")
+        if ad in GUVENLIK_API:
+            if ad.startswith("guvenlik_") and self.uygulama is None and ad != "guvenlik_donusum_durum" \
+                    and ad not in DEGERLENDIRICILER:
+                raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
+            return getattr(self.guvenlik, "api_" + ad)(**girdi)
         yerel = getattr(self, "api_" + ad, None)
         if yerel is not None:
             return yerel(**girdi)
@@ -166,7 +196,9 @@ class Yonetici:
         raise IslemHatasi("Bilinmeyen işlem.", "yok")
 
     def api_acilis(self) -> dict:
-        return {"sihirbaz": self.uygulama is None, "tema": self.ayarlar["tema"], "surum": __version__,
+        return {"sihirbaz": self.uygulama is None and self.kilit is None and not self.mesgul,
+                "kilit": self.kilit, "mesgul": self.mesgul,
+                "tema": self.ayarlar["tema"], "surum": __version__,
                 "ad": APP_AD, "varsayilan_klasor": veri_klasoru.varsayilan_oner(),
                 "otomatik_baslat": self.ayarlar["otomatik_baslat"],
                 "yarim_is": self.uygulama.yarim_kalan_is() if self.uygulama else None,
@@ -186,10 +218,13 @@ class Yonetici:
             raise IslemHatasi("Böyle bir kişi yok.")
         from kimlikcore import Hub
         try:
-            with Hub.open(kisi["klasor"], write=False) as hub:
+            with Hub.open(kisi["klasor"], write=False, parola=self.guvenlik.kayitli_parola(kisi["klasor"])) as hub:
                 return {**harita_kopru.bolge(hub, bolge_id, self.uygulama.hassas_acik, filtre, aralik), "kisi": kisi["ad"]}
         except harita_kopru.HaritaYok as e:
             raise IslemHatasi(str(e), "harita_yok") from None
+        except AnahtarGerekli:
+            raise IslemHatasi(f"{kisi['ad']} parolayla korunuyor; karşılaştırmak için önce Kişi menüsünden o kişiyi "
+                              "seçip parolasını girin.", "kisi_acilamadi") from None
         except KimlikError as e:
             raise IslemHatasi(f"{kisi['ad']} okunamadı: {e}", "kisi_acilamadi") from None
 
@@ -201,15 +236,17 @@ class Yonetici:
     def api_sihirbaz_denetle(self, yol: str) -> dict:
         return veri_klasoru.denetle(yol).to_dict()
 
-    def api_sihirbaz_tamamla(self, yol: str, otomatik_baslat: bool = True, ad: str = "Ben") -> dict:
-        if self.uygulama is not None:
+    def api_sihirbaz_tamamla(self, yol: str, otomatik_baslat: bool = True, ad: str = "Ben",
+                             parola: str | None = None) -> dict:
+        if self.uygulama is not None or self.kilit is not None:
             raise IslemHatasi("Kurulum zaten tamamlanmış.")
-        bilgi = veri_klasoru.olustur(yol)
+        bilgi = self.guvenlik.parolali(yol, parola, lambda: veri_klasoru.olustur(yol, parola))
         kisi = {"id": uuid.uuid4().hex[:8], "ad": (ad or "Ben").strip()[:60] or "Ben", "klasor": bilgi["yol"]}
         self.ayarlar.guncelle(veri_klasoru=bilgi["yol"], ilk_acilis_tamam=True, otomatik_baslat=bool(otomatik_baslat),
                               kisiler=[kisi], secili_kisi=kisi["id"])
         self._otomatik_uygula(bool(otomatik_baslat))
         veri_yolunu_kaydet(bilgi["yol"])
+        self.guvenlik.hatirla(bilgi["yol"], parola)
         self.baslat()
         gunluk.log().info("ilk açılış tamamlandı (şema %s)", bilgi["sema"])
         return {**bilgi, "baglanti": self.uygulama.baglanti_bilgisi() if self.uygulama else None}
@@ -261,11 +298,11 @@ class Yonetici:
                 "lisanslar": ["Python (PSF)", "SQLite (kamu malı)", "mcp SDK (MIT)", "ijson (BSD-3-Clause)",
                               "PyInstaller (GPLv2+, paketlenen uygulama için istisnalı)",
                               "pystray (LGPL-3.0)", "Pillow (HPND)", "Inno Setup (kendi lisansı)"],
-                "sifreleme_notu": "Bu uygulamayla oluşturulan yeni veri klasörü varsayılan olarak şifrelenir "
-                                  "(anahtar Windows hesabınıza bağlıdır; bu hesapta çalışan başka bir program da "
-                                  "anahtarı açtırabilir). Dışa aktardığınız dosyalar ve cikti klasörü şifrelenmez. "
-                                  "Uygulamada parola ya da kurtarma ifadesi ekranı yoktur. Ek önlem olarak veri "
-                                  "klasörünü BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir. "
+                "sifreleme_notu": "Yeni veri klasörü varsayılan olarak şifrelenir (anahtar Windows hesabınıza bağlıdır; "
+                                  "bu hesapta çalışan başka bir program da anahtarı açtırabilir). İsteğe bağlı parola, "
+                                  "kurtarma ifadesi ve şifrelemeyi açıp kapatma Güvenlik sayfasındadır. Dışa "
+                                  "aktardığınız dosyalar ve cikti klasörü şifrelenmez. Ek önlem olarak veri klasörünü "
+                                  "BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir. "
                                   "Ayrıntı: docs/SIFRELEME.md.",
                 "smartscreen_notu": "Uygulama imzasızdır: Windows SmartScreen 'Windows bilgisayarınızı "
                                     "korudu' uyarısı gösterebilir ve bazı antivirüsler yanlış alarm "
