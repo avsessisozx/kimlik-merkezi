@@ -105,6 +105,15 @@ def run(
             lines = "\n".join(f"  - {n}: {d.reason}" for n, d in results)
             raise FormatError("Dosya hiçbir içe aktarıcıyla tanınmadı:\n" + lines)
 
+    try:
+        return _run_with(hub, path, imp, yine_de, notify, progress)
+    finally:
+        close = getattr(imp, "close", None)
+        if close:
+            close()
+
+
+def _run_with(hub, path, imp, yine_de, notify, progress) -> RunResult:
     # 2) verify_format (ok değilse durur, hiçbir şey yazılmaz)
     report = imp.verify_format(path)
     if not report.ok:
@@ -113,7 +122,9 @@ def run(
     # 3) previously_purged
     origins = imp.input_files(path)
     hashes = {o.path: sha256_file(o.path) for o in origins}
-    total_sha = _combined_sha(path, origins, hashes)
+    # Ham arşive kopyalanmayan kaynaklar (ör. yerinde kalan bilgisayar dosyaları) kendi özetini verir.
+    own_sha = getattr(imp, "source_sha", None)
+    total_sha = own_sha(path) if own_sha else _combined_sha(path, origins, hashes)
     if not yine_de:
         for sha in [total_sha, *hashes.values()]:
             prev = hub.previously_purged(sha)
