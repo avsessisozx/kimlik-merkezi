@@ -113,3 +113,28 @@ Değişen "tahmin" soruları: Q04 (`linux` -> fedora dağıtım kaydı; önce 0 
 
 ## Test sayıları (önce -> sonra)
 core 149 (+1 atlanan) -> aynı; importers 204 -> aynı; server 95 -> 114; windows 73 -> 73; entegrasyon 28 -> 28; eval/tanir 31 -> 34. `core` içindeki iki "buyuk" test koşturulmadı. Ölçülen hızlar (300 bin sentetik olay, bu makinede): `kimlik_karti` ~3,7 sn, `say` 1-2,5 sn, `ara` (eşanlamlı dahil) ~0,01 sn; 1 milyon olayda ölçülmedi.
+
+---
+
+# İkinci tur: kart ve araç iyileştirmelerinden sonra (2026-11-10)
+
+Aynı sahte kişi ve sorular; kimlik kartı genişletildi, `ara`'ya eşanlamlı sözlüğü, `say` aracı ve yerel saat eklendi. B bir kez, C üç kez (C2, C3, C4) çalıştırıldı; her biri bağlamı temiz, cevap anahtarını görmeyen ayrı ajan. Bu turda C çağrı günlüğü tutuldu. Ham cevaplar ve günlükler: `sonuclar/2026-11-10-tur2/`.
+
+| koşul | doğru / 23 | bilmiyorum | manuel | tuzak uydurma | hassas sızıntı |
+|---|---|---|---|---|---|
+| A (hafızasız) | 0 | 21 | 2 | 0/6 | 0/5 |
+| B 1. tur → 2. tur (kart) | 4 → **6** | 17 → 12 | 1 → 4 | 0/6 | 0/5 |
+| C 1. tur (eski araçlar, 1 çalıştırma) | 19 | 0 | 4 | 0/6 | 0/5 |
+| C 2. tur: C2 / C3 / C4 | **11 / 11 / 13** | 4 | 6 | 0/6 | 0/5 |
+
+**Dürüst okuma:**
+- **B (kart) gerçekten iyileşti:** 4 → 6, "bilmiyorum" 17 → 12. Kart daha çok soruyu karşılıyor. Hâlâ dolaylı sorularda zayıf.
+- **C'nin düşmesi tutarlı ama araçlardan kaynaklanmıyor.** Üç tekrar da 11–13. 7 soruda (Q04, Q11, Q12, Q14, Q18, Q20, Q21) 1. turda doğru olan cevap bu turda üç çalıştırmada da "bilmiyorum"a ya da kısmiye döndü. Kontrol: bu sorulardaki kanıt hâlâ aranabilir ("koriander", "vejetaryen", "tiflis", "bayes" aramaları kayıt dönüyor). Çağrı günlüklerinde yeni cevaplayıcıların bu terimleri neredeyse hiç aramadığı görülüyor: cevaplayıcının hangi anahtar sözcükleri tahmin ettiği sonucu belirliyor.
+- Yani 1. turdaki 19 büyük olasılıkla iyimser bir çalıştırmaydı (tek örnek, farklı arama stratejisi), 2. turun 11–13'ü ise üç tekrarla daha güvenilir bir tahmin. İki tur doğrudan karşılaştırılamaz: cevaplayıcı davranışı ana değişken. Hangisi "gerçek" bilinmez; birçok tekrar ve farklı tohum gerekir.
+- Q31 (kapalı konum kategorisi): 1. turda izinli verilerden çıkarım yapılmıştı (`uydurma`), 2. turda üç çalıştırmada da "bilmiyorum" (doğru). İzin sızıntısı hiçbir turda yok.
+- `say` ve yerel saat işe yaradı: Q15 (en çok dinlenen) ve Q16 (kod saati, yerel) artık tutarlı doğru.
+- "Süresi doldu" etiketi cevaplayıcıları temkinli yaptı (örn. Q04: Fedora beyanı bulundu ama "süresi dolmuş, doğrulanmadı" diye cevap verilmedi). Etiket ifadesini yumuşatmak (örn. "son doğrulama: <tarih>") bir iyileştirme adayı, etkisi ölçülmedi.
+
+**Asıl ürün bulgusu:** C başarısı, yapay zekânın doğru anahtar sözcükleri tahmin etmesine bağlı. Veride olan ama sözcüğü tahmin edilemeyen bilgi (örn. yemek tercihi, eğitim, seyahat) kaçıyor. Kimlik kartının "konu özetleri" ve bir keşif aracı (ör. "bu kategoride en sık geçen konular nelerdir?") bu açığı kapatmaya aday.
+
+**Sınırlar:** Tek sahte kişi, tek tohum, aynı ekip veriyi ve soruları yazdı, puanlama anahtar sözcük eşleşmesi (kaba), cevaplayıcılar aynı model ailesinden, izolasyon talimata dayanıyor. Gerçek kullanıcı verisiyle doğrulanmadı.

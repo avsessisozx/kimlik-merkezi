@@ -1,0 +1,36 @@
+kategorileri_listele
+persona_getir
+kimlik_karti
+ara --arg sorgu=lizbon --arg limit=30
+ara --arg sorgu=ankara --arg limit=10
+zaman_cizelgesi --arg kategori=sosyal --arg limit=30
+ara --arg sorgu=otel --arg limit=10
+ara --arg sorgu=lizbon --arg limit=30
+zaman_cizelgesi --arg kategori=sosyal --arg limit=40
+ara --arg sorgu=izmir --arg limit=10
+ara --arg sorgu=mekanik --arg limit=10
+ara --arg sorgu=nvim --arg limit=10
+ara --arg sorgu=vscode --arg limit=10
+ara --arg sorgu=bileti --arg limit=8
+ara --arg sorgu=aralık --arg limit=8
+ara --arg sorgu=kahve --arg limit=10
+ara --arg sorgu=demle --arg limit=10
+ara --arg sorgu=kitap --arg limit=10
+ara --arg sorgu=teklif --arg limit=8
+ara --arg sorgu=banka --arg limit=8
+ara --arg sorgu=telefon --arg limit=6
+ara --arg sorgu=kardeş --arg limit=6
+ara --arg sorgu=bisiklet --arg limit=6
+ara --arg sorgu=metro --arg limit=6
+say --arg alan=sanatci --arg en_cok=5
+say --arg alan=saat --arg kategori=kod
+say --arg alan=gun --arg kategori=sosyal
+ara --arg sorgu=satranç --arg limit=6
+ara --arg sorgu=bilimkurgu --arg limit=6
+ara --arg sorgu=dil --arg limit=6
+ara --arg sorgu=takvim --arg limit=6
+ara --arg sorgu=yarış --arg limit=6
+ara --arg sorgu=pazartesi --arg limit=5
+ara --arg sorgu=vegan --arg limit=5
+ara --arg sorgu=gitar --arg limit=5
+ara --arg sorgu=kedi --arg limit=5

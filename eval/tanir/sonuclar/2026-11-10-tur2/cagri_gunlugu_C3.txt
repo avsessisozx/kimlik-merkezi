@@ -1,0 +1,39 @@
+kategorileri_listele
+persona_getir
+kimlik_karti
+ara --arg sorgu=lizbon --arg limit=15
+ara --arg sorgu=editör --arg limit=10
+ara --arg sorgu=nvim --arg limit=10
+ara --arg sorgu=kahve --arg limit=10
+ara --arg sorgu=teklif --arg limit=10
+zaman_cizelgesi --arg kategori=sosyal --arg limit=30
+ara --arg sorgu=lizbon --arg limit=40
+ara --arg sorgu=rezervasyon --arg limit=10
+ara --arg sorgu=aralık --arg limit=15
+ara --arg sorgu=satranç --arg limit=8
+ara --arg sorgu=kitap --arg limit=10
+ara --arg sorgu=yarış --arg limit=10
+say --arg alan=sanatci --arg en_cok=3
+say --arg alan=saat --arg kategori=kod
+ara --arg sorgu=izmir --arg limit=10
+ara --arg sorgu=taşın --arg limit=10
+ara --arg sorgu=metro --arg limit=8
+ara --arg sorgu=bisiklet --arg limit=8
+ara --arg sorgu=klavye --arg limit=8
+ara --arg sorgu=kurs --arg limit=8
+ara --arg sorgu=dil --arg limit=8
+ara --arg sorgu=gitar --arg limit=5
+ara --arg sorgu=2025 --arg limit=5
+ara --arg sorgu=kedi --arg limit=4
+ara --arg sorgu=köpek --arg limit=4
+ara --arg sorgu=vegan --arg limit=4
+ara --arg sorgu=glüten --arg limit=4
+ara --arg sorgu=mama --arg limit=4
+ara --arg sorgu=banka --arg limit=4
+ara --arg sorgu=iphone --arg limit=4
+ara --arg sorgu=otobüs --arg limit=4
+ara --arg sorgu=oyun --arg limit=4
+ara --arg sorgu=salı --arg limit=4
+ara --arg sorgu=seyahat --arg limit=4
+ara --arg sorgu=yurt --arg limit=4
+say --arg alan=tur --arg kategori=sosyal --arg en_cok=10
