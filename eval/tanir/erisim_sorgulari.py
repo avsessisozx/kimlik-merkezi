@@ -42,3 +42,11 @@ ANAHTAR = {
     "Q16": [Z("kod", 200)], "Q17": [A("satranç")], "Q18": [A("bilimkurgu")], "Q19": [A("yarı maraton"), A("sertifika")],
     "Q20": [A("yüksek lisans")], "Q21": [A("tiflis")], "Q22": [A("klavye")], "Q23": [A("masa oyunu")],
 }
+
+# --- Düzeltme turu (İ2) sonrası eklenen araçlar. Öncesinde bu araçlar yoktu; betik araç yoksa atlar.
+S = lambda alan, **kw: ("say", {"alan": alan, **kw})  # noqa: E731
+# Toplulaştırma gerektiren sorular için 'say' ile (tüm kayıtlar üzerinden, yerel saat dilimi):
+SAY = {
+    "Q15": [S("sanatci", en_cok=3)],
+    "Q16": [S("saat", kategori="kod")],
+}

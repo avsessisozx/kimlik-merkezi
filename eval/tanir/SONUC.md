@@ -67,3 +67,49 @@ Ham cevaplar ve puanlama: `sonuclar/2026-11-10/`.
 - C koşulunda 4 cevap `manuel`: cevaplayıcı çoğunda "kesin bilmiyorum, kayıtlar şuna işaret ediyor" gibi temkinli ifadeler kullandı; saatler UTC olduğu için yerel saat sorusunda (Q16) zorlandı. `persona` kategorisi boş döndü.
 
 **Sonuç çıkarılması gereken sınır:** "MCP erişimi %100" ifadesi YANLIŞ okunur; puan tablosundaki 19/23 yalnız bu sahte kişi, bu sorular ve tek çalıştırma için geçerli.
+
+---
+
+# Düzeltme sonrası betikli analiz (2026-11-10, İ2 turu)
+
+**Bu bölüm LLM ölçümü DEĞİLDİR.** İlk LLM ölçümünün bulduğu zayıflıklar giderildi (kullanıcı onayıyla); etkisi yalnız betikle, aynı sahte veri ve aynı sorgularla ölçüldü. LLM yeniden koşusu ayrıca yapılacak. Sorguları ve sözlüğü yazan aynı kişi olduğu için sonuçlar iyimser olabilir; "kanıt döndü" ifadesi bir cevaplayıcının doğru cevaplayacağı anlamına gelmez. Komutlar: `python eval/tanir/tanir.py hepsi`, `erisim`, `referans`, `q31` (PYTHONPATH: `core/src:server/src:importers/src:windows/src`). "Önce" sayıları ana dalın 2051250 sürümünden aynı komutlarla yeniden üretildi (aynı tohum, aynı veri).
+
+## Yapılan değişiklikler (özet)
+1. **Kimlik kartı** (`server/kart.py`): beyanlar `[beyan]`/`[dosyadan]` etiketli; süresi dolanlar AYRI "Süresi doldu - doğrulanmadı" bölümünde; izinli, hassas olmayan kategorilerden `[çıkarım]` etiketli sayım özeti (kod dilleri/depolar, yerel saatle aktif saatler, aranan sözcükler, kanallar, sanatçılar, subredditler, son 90 gün); "Bilinmeyenler" bölümü; boyut üst sınırı 7000 karakter (düşük öncelikli özetler çıkarılır ve kartta adı yazılır). Hassas kategoriler izinli olsa bile kartta özetlenmez (testli).
+2. **`ara` eşanlamlı/ilişkili terim** (`server/esanlam.py`, `veri/esanlamlilar.json`): küçük elle yazılmış sözlük (33 eşanlamlı grup, 25 genel->özel kavram), tek yönlü ("linux" -> dağıtımlar; tersi yok), veri klasöründeki `esanlamlilar.json` ile genişletilebilir; sonuçta `eslesme`/`eslesen_terim`; FTS5 Türkçe katlama değişmedi.
+3. **`say` aracı** (`server/toplulastir.py`): tüm kayıtlar üzerinden sayım/top-N; tür/kategori/kaynak/alan; zaman aralığı; yerel saatte ay/saat/gün; izinli kategorilerle sınırlı; hassas kategorilerde içerik alanı yok. MCP araç sayısı 7 -> 8. `zaman_cizelgesi` zamansız kayıtları (abonelik/kütüphane) ayrı listeler.
+4. **Yerel saat** (`server/yerelsaat.py`): `KIMLIK_SAAT_DILIMI` ya da sunucu yerel saati; çıktıda `zaman` (UTC) yanında `yerel_zaman` ve açık `saat_dilimi` bloğu.
+5. **Q31 (aşağıda): izin sızıntısı bulunmadı.**
+
+## Q31 bulgusu: sızıntı YOK
+`python eval/tanir/tanir.py q31` (yeniden üretilen sahte veriyle):
+- "Kızılay" yalnız izinli kategorilerde geçiyor: `tarama/chrome.ziyaret` 2 (ör. "Kızılay Çevresinde Bisiklet Yolu Haritası"), `tarama/google.arama` 11 (ör. "vejetaryen restoran ankara kızılay"), `sosyal/reddit.yorum` 1 ("Kızılay'a metroyla inmek rahat..."), `sosyal/reddit.gonderi` 1 ("Kızılay çevresinde sessiz çalışılabilecek kafe önerisi..."). "Çankaya" izinli `tarama/google.arama`da 9 kez ("ankara kiralık daire çankaya"); ayrıca kapalı `konum/google.yer_ziyareti`nde 244 kez (gizli yer kaydı adresinde).
+- C anahtarıyla (izinli: tarama, video, sosyal, muzik, kod, persona) tüm okuma araçlarından, konuyla ilgili 12 sorgu ve kategori bazlı çizelgelerle dönen **1222 kayıttan 0'ı kapalı kategoridendi**; izinli kategorilerde GPS alanı taşıyan kayıt yok. Gizli değer "Ümitköy" ve ofis adı hiçbir araçtan dönmedi. Aynı kontrol artık otomatik testtir (`server/tests/test_yeni_yetenekler.py::test_izinsiz_kategori_hicbir_aractan_sizmaz`, `eval/tanir/tests/test_tanir.py::test_q31_...`) ve yeni araçları (`say`, eşanlamlı `ara`, kimlik kartı, kullanıcı sözlüğü ile "semt" -> gizli yer adı denemesi) da kapsar.
+- Sonuç: cevap, izinli kategorilerdeki izlerden çıkarımdı (kullanıcının Ankara'da yaşadığı beyanı + Kızılay/Çankaya aramaları ve gönderisi). Bir kaymayla "Çankaya" gerçek semtin ilçesiyle (Ümitköy, Çankaya) örtüşüyor; ama bu, izinli verinin kendi içeriğinden gelen bir tesadüf/korelasyondur, kapalı veriden değil. Dikkat: izin sistemi kategori sızıntısını önlüyor; izinli veriden kapalı bilginin **çıkarım yoluyla kestirilmesini** (korelasyon) engelleyemez ve bunu iddia etmiyoruz.
+- Doğrulanamayan: ilk koşudaki cevaplayıcının gerçekte hangi araç çağrılarını yaptığı (çağrı günlüğü saklanmadı). Yeniden koşuda çağrı günlüğünü (erişim günlüğü `access_log` + komutlar) saklayın. 
+
+## Betikli erişilebilirlik: önce / sonra (`tanir.py erisim`, 23 cevaplanabilir soru)
+| ölçüt | önce | sonra |
+|---|---|---|
+| "tahmin" sorguları (konuya göre genel sözcük) kanıt döndürüyor | 19/23 | 21/23 |
+| gerçek anahtar sözcükle kanıt döndürüyor | 21/21 sorulan | 21/21 sorulan |
+| `kimlik_karti` çıktısının kendisi kabul ölçütünü sağlıyor (kart kapsama) | 4/23 (Q01, Q02, Q05, Q17) | 13/23 (Q01-Q09, Q15, Q16, Q17, Q22) |
+| kart kapsama: doğrudan / dolaylı / çelişkili | 2/4, 1/15, 1/4 | 4/4, 5/15, 4/4 |
+| toplulaştırma soruları (Q15 en çok dinlenen sanatçı, Q16 yerel kod saatleri) `say` ile doğru | araç yok (örneklemden sayım Q15'te yanlış) | 2/2 (Q15: en çok dinlenen Mavi Dalga, 273 dinleme; Q16: yerel 05-07 payı >= %60) |
+| kart boyutu | 591 karakter | 4,6 bin karakter (üst sınır 7000) |
+
+Değişen "tahmin" soruları: Q04 (`linux` -> fedora dağıtım kaydı; önce 0 kayıt, sonra 48), Q06 (`taşınma` -> "nakliyat": "izmir ankara nakliyat fiyatları"). Q15 ve Q16'nın "tahmin" yöntemi hâlâ `zaman_cizelgesi` örnekleminden sayımdır (Q15 yine "hayır": son 200 dinleme koşu listesinden gelen sanatçıyı öne çıkarıyor); ASIL düzeltme `say` ile gelir ve satırı ayrıdır. Sayıları `tahmin` sütununa karıştırmadım.
+
+`referans` (LLM değil) kart kapsama satırı: önce 4/23 [doğrudan 2/4, dolaylı 1/15, çelişkili 1/4], sonra **13/23** [4/4, 5/15, 4/4] (`ref_kart_kapsama`: kartın kabul ölçütünü kendiliğinden sağladığı sorularda `beklenen`, yoksa "Bilmiyorum" cevabı puanlanır; tanım artık uzun kartı cevap diye vermek yerine bu, çünkü 4 bin karakterlik cevap puanlayıcıda "manuel" etiketlenirdi).
+
+**Kart kapsamasındaki sahte olumlular (dürüstlük):** bu ölçüt literal desen eşleşmesidir. 13'ün içinde zayıf olanlar var: Q06 (eski şehir İzmir) "izmir" yalnız bir subreddit adı olarak geçiyor, kart "orada yaşadı" demiyor; Q07 (editör) kartta hem `vscode-ayarlar` hem `nvim-lazy-ornek` depo adı var, doğru editörü seçmek modele kalmış; Q04 yalnız "Süresi doldu" bölümündeki Fedora beyanına dayanıyor (bilgi doğru ama doğrulanmadı etiketli). Gerçek B koşulu daha düşük çıkabilir.
+
+## Düzeltmelerin bilinen sınırları
+- Sözlük küçüktür (genel geçer, savunulabilir eşleşmeler); ölçüm sorularını bilen biri yazdı, yeni kişilerde etkisi daha az olabilir. Türkçe ek/çekim bulma (kök) yok: yalnız listedeki biçimler ve `taşınma/taşındı` gibi elle yazılmış çekimler.
+- Kartın "aktif saat", "aranan sözcükler" gibi çıkarım satırları ham sayımdır; sahte kişide anlamlı, gerçek verilerde gürültülü olabilir (ör. "durumu", "hava" sözcükleri). Durak sözcük listesi çok kısadır.
+- Zamansız kayıt ayrımı `payload.zaman_kaynagi = dosya_tarihi` işaretine dayanır; bu işareti koymayan içe aktarıcıdan gelen kayıtlar ayrılmaz.
+- Windows'ta IANA saat dilimi adı için `tzdata` gerekir; gerçek Windows'ta denenmedi (yalnız `UTC+03:00` biçimi bağımsızdır). PyInstaller betiği (`windows/paket/kimlikmerkezi.spec`) sözlük dosyası için güncellendi, paket derlenip denenmedi.
+- `kimlik_karti` artık ek olarak izinli kategorilerin özetini içerir; hassas kategorileri hiçbir koşulda içermez. Ama izinli kategorilerin kendi içinde kişisel ayrıntı (arama sorguları gibi) kartta görünebilir: kart, kullanıcının o kategorilere verdiği izin kadar ifşa eder; "kart paylaşıp web yapay zekâsına yapıştırma" yolunda bunu göz önünde bulundurun (kartı oluşturan izinli kategori listesi arayüzde seçilmeli; bu tur arayüzü değiştirmedi).
+
+## Test sayıları (önce -> sonra)
+core 149 (+1 atlanan) -> aynı; importers 204 -> aynı; server 95 -> 114; windows 73 -> 73; entegrasyon 28 -> 28; eval/tanir 31 -> 34. `core` içindeki iki "buyuk" test koşturulmadı. Ölçülen hızlar (300 bin sentetik olay, bu makinede): `kimlik_karti` ~3,7 sn, `say` 1-2,5 sn, `ara` (eşanlamlı dahil) ~0,01 sn; 1 milyon olayda ölçülmedi.

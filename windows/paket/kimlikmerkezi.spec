@@ -13,7 +13,7 @@ gizli = (collect_submodules("mcp", filter=lambda n: not n.startswith("mcp.cli"))
          + ["cryptography.hazmat.primitives.ciphers.aead"]   # şifreleme (docs/SIFRELEME.md)
          + collect_submodules("kimlikcore") + collect_submodules("kimlikserver")
          + collect_submodules("kimlikimport") + collect_submodules("kimlikwin"))
-veri = collect_data_files("mcp") + collect_data_files("kimlikwin")
+veri = collect_data_files("mcp") + collect_data_files("kimlikwin") + collect_data_files("kimlikserver")  # kimlikserver: veri/esanlamlilar.json (ara sözlüğü)
 # Lisans metinleri kurulu pakete girer (_internal/lisanslar/...): MIT/LGPL vb. ikili dağıtımda metin ister.
 kok = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 lisans_dosyalari = [(os.path.join(kok, "LICENSE"), "lisanslar"),

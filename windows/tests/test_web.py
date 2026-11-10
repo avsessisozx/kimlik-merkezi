@@ -221,7 +221,7 @@ def test_mcp_stdio_uygulamanin_urettigi_anahtarla(ist, veri):
         async with Client(p) as c:
             return (await c.list_tools()).tools, await c.call_tool("kimlik_karti", {})
     araclar, kart = asyncio.run(asyncio.wait_for(go(), 60))
-    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle"} and "deneme kullanıcısıyım" in kart.structured_content["veri"]
+    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle", "say"} and "deneme kullanıcısıyım" in kart.structured_content["veri"]
     log = ist.api("erisim_kaydi")["satirlar"]
     assert [s["arac"] for s in log] == ["kimlik_karti"] and log[0]["sonuc"] == "ok"
 

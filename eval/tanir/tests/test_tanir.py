@@ -102,7 +102,9 @@ def test_cevaplayiciya_giden_paketlerde_anahtar_yok(kurulu):
     assert all(set(x) == {"id", "soru"} for x in sor)
     # kartta hassas ve eskimiş bilgi yok
     kart = (kurulu / "paket" / "B" / "kimlik_karti.md").read_text(encoding="utf-8")
-    assert "Nehir Bozkurt" in kart and "İzmir" not in kart and "Fedora" not in kart
+    assert "Nehir Bozkurt" in kart and "İzmir'de yaşıyor" not in kart
+    canli, _, eski = kart.partition("### Süresi doldu")
+    assert "Fedora" not in canli and "Fedora" in eski  # eskiyen beyan sessizce düşmez, ayrı bölümde
 
 
 def test_veri_tasarimi_denetimi_gecer(kurulu):
@@ -116,3 +118,17 @@ def test_referans_puanlama_ve_erisim(kurulu):
     assert "ref_kahin" in md and "ref_bilmiyorum" in md
     e = {r["id"]: r for r in T.erisim(kurulu)}
     assert e["Q01"]["tahmin"] and e["Q10"]["anahtar"]
+
+
+def test_q31_izinli_kategorilerden_cikarim_sizinti_yok(kurulu):
+    """Q31 ('Kızılay / Çankaya') cevabının dayanağı izinli kategorilerdeki izler; kapalı 'konum'dan kayıt dönmez."""
+    r = T.q31(kurulu)
+    assert r["belirtec"]["kizilay"] and all("izinli" in k for k in r["belirtec"]["kizilay"])
+    assert any("KAPALI" in k for k in r["belirtec"]["cankaya"])   # 'Çankaya' kapalı konum kaydında da geçer...
+    assert r["donen_kayit"] > 500 and r["sizinti"] == 0           # ...ama hiçbir araç o kayıtları döndürmedi
+
+
+def test_erisim_say_ve_kart_sutunlari(kurulu):
+    e = {r["id"]: r for r in T.erisim(kurulu)}
+    assert e["Q15"]["say"] is True and e["Q16"]["say"] is True      # toplulaştırma aracı sayımı doğru yapıyor
+    assert sum(1 for r in e.values() if r["kart"]) >= 10            # zengin kart (önce 4)

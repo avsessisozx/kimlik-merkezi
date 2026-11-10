@@ -101,7 +101,7 @@ def test_icealdan_kimlik_kartina(dunya):
 
     araclar, kat, ok, video, eposta, kart, b_ara = _run(go())
 
-    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle"}
+    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle", "say"}
     assert [k["kategori"] for k in kat.structured_content["kategoriler"]] == ["notlar", "persona"]
 
     # yalnız izinli kategori döner; kayıt metni yalnız `veri` alanında, etiketli
