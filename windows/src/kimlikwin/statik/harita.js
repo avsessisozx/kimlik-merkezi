@@ -25,7 +25,9 @@ let GRAFIKLER=[];          // canlı ECharts örnekleri
 let GOZLEM=null;
 
 // ------------------------------------------------------------------ renkler (CSS değişkenlerinden)
-function R(){const cs=getComputedStyle(document.documentElement),g=n=>cs.getPropertyValue(n).trim();
+function hex(c){c=(c||'').trim();if(c[0]==='#')return c.length===4?'#'+[...c.slice(1)].map(x=>x+x).join(''):c.slice(0,7);
+  const m=c.match(/rgba?\(([^)]+)\)/);if(!m)return '#7f95b0';const [r,g,b]=m[1].split(',').map(x=>parseFloat(x));return '#'+[r,g,b].map(x=>Math.round(x).toString(16).padStart(2,'0')).join('');}
+function R(){const cs=getComputedStyle(document.documentElement),g=n=>hex(cs.getPropertyValue(n));
   return {v:g('--vurgu'),v2:g('--vurgu2'),amber:g('--amber'),yazi:g('--yazi'),soluk:g('--soluk'),cizgi:g('--cizgi'),panel:g('--panel'),bg:g('--bg'),
     palet:[g('--c1'),g('--c2'),g('--c3'),g('--c4'),g('--c5'),g('--c6'),g('--c7'),g('--c8')]};}
 function temel(r){return {backgroundColor:'transparent',textStyle:{fontFamily:'"Segoe UI",system-ui,sans-serif',color:r.soluk},
@@ -91,7 +93,7 @@ function grafikKur(g,r,tikla,baz){
   if(g.tur==='saat'){
     const mx=Math.max(1,...g.degerler);
     const veri=g.degerler.map((v,i)=>({value:v,itemStyle:{opacity:sec==null||+sec===i?1:.3,color:v===mx?r.amber:r.v}}));
-    Object.assign(o,{polar:{radius:['20%','82%'],center:['50%','52%']},
+    Object.assign(o,{polar:{radius:['16%','90%'],center:['50%','52%']},
       tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${String(p.dataIndex).padStart(2,'0')}:00 – ${String(p.dataIndex).padStart(2,'0')}:59</b><br>${SAYI(p.value)} kayıt${yuzde(p.value,top)}`},
       angleAxis:{type:'category',data:g.etiketler,startAngle:90,clockwise:true,axisLabel:{color:r.soluk,interval:2,fontSize:10},axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},splitLine:{show:true,lineStyle:{color:hexA(r.cizgi,.4)}}},
       radiusAxis:{show:false,max:mx*1.05},
@@ -150,7 +152,7 @@ async function ekran(a){
   const kok=h('div',{class:'hd'});
   const sol=h('div',{class:'sol'}),sag=h('div',{class:'sag'});
   const figKap=h('div',{class:'figur-kap hud'});
-  const ust=h('div',{class:'ust'}),yol=h('nav',{class:'yol','aria-label':'Konum'}),panel=h('div',{id:'bolge-paneli',class:'bp'});
+  const ust=h('div',{class:'ust'}),yol=h('div',{class:'yol',role:'navigation','aria-label':'Konum'}),panel=h('div',{id:'bolge-paneli',class:'bp'});
   HS.dom={kok,sol,sag,figKap,ust,yol,panel,ad};
   sol.append(figKap,beyanKarti(v));sag.append(ust,yol,panel);kok.append(sol,sag);a.append(kok);
   figurYenile();ustCiz();yolCiz();
@@ -383,5 +385,5 @@ async function karsilastirmaCiz(p){const kk=HS.karsilastir,A=HS.veri;
               {name:etB,type:'bar',data:al(gb),barWidth:9,itemStyle:{color:r.amber,borderRadius:[0,5,5,0]},label:{show:true,position:'right',color:r.soluk,formatter:q=>SAYI(q.value),fontSize:10}}]});isler.push(()=>canliKur(kap,{o}));}
   requestAnimationFrame(()=>isler.forEach(f=>f()));}
 
-window.HARITA={ekran,durum:HS,temizle,yenidenBoyut};
+window.HARITA={ekran,durum:HS,temizle,yenidenBoyut,figurYenile};
 })();

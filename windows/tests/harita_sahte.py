@@ -213,9 +213,9 @@ def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None, filtre=None) -> 
             sec = filtre.get(dim)
             if dim == "terim":
                 g.append(_grafik("agac", "Aranan terimler", [o["ad"] for o in ogeler], [o["sayi"] for o in ogeler], dim, sec))
-            elif len(rows) <= 6 and dim in ("tur", "platform", "kategori"):
+            elif len(rows) <= 8 and dim in ("tur", "platform", "kategori"):
                 g.append(_grafik("pasta", etiket, [o["ad"] for o in ogeler], [o["sayi"] for o in ogeler], dim, sec))
-            else:
+            elif dim == birincil:
                 g.append(_grafik("cubuk", f"En çok: {etiket.lower()}", [o["ad"] for o in ogeler[:10]], [o["sayi"] for o in ogeler[:10]], dim, sec))
             tekil = hub.query_one(f"SELECT count(DISTINCT {_i}) FROM events WHERE {_kosul(bolge_id, aralik, filtre, haric=(dim,))[0]}",
                                   _kosul(bolge_id, aralik, filtre, haric=(dim,))[1])[0]
