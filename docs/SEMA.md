@@ -1,6 +1,6 @@
 # SEMA — Veri şeması ve çekirdek davranışları (sahibi: İ1)
 
-Şema sürümü: **2** (`PRAGMA user_version`). Sözleşme: `docs/INTERFACES.md` (sürüm 1). Kod: `core/src/kimlikcore/`.
+Şema sürümü: **3** (`PRAGMA user_version`). Sözleşme: `docs/INTERFACES.md` (sürüm 1). Kod: `core/src/kimlikcore/`.
 
 ## 1. Veri klasörü
 | Yol | İçerik |
@@ -17,7 +17,7 @@ Bağlantı ayarları: yazan `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_k
 - Sürüm, `PRAGMA user_version`'dır; `schema_migrations(version, applied_at)` kaydı tutar.
 - Göçler yalnız eklemelidir ve her biri tek `BEGIN IMMEDIATE` işleminde uygulanır; hata olursa geri alınır, sürüm değişmez.
 - Yazan açış (`Hub.open(write=True)`) en yeni sürüme göç ettirir. Salt okunur açış göç etmez: eski sürümde `SchemaTooOld`, daha yenide `SchemaTooNew`.
-- v1: çekirdek tablolar. v2: persona/anahtar/izin/cihaz tabloları. `facts.confidence`, `review_queue`, `suppressed` Aşama 9'da göçle gelir (şu an YOK).
+- v1: çekirdek tablolar. v2: persona/anahtar/izin/cihaz tabloları. v3: hassas kategori `sohbet` (`permissions` CHECK kısıtı genişledi; SQLite CHECK değiştiremediği için tablo aynı işlemde yeniden oluşturuldu: yeni tabloya kopya, eskiyi at, yeniden adlandır; satırlar aynen taşınır). `facts.confidence`, `review_queue`, `suppressed` Aşama 9'da göçle gelir (şu an YOK).
 - Yeni sürüm eklemek: `schema.MIGRATIONS`'a bir sonraki numarayı ekle (ifade listesi ya da `fn(conn)`); eski göçleri DEĞİŞTİRME.
 
 ## 3. Tablolar (v2)
@@ -28,7 +28,7 @@ Aynı `kind` + `file_sha256` ve kaldırılmamış kaynak varsa `add_source` onu 
 
 **raw_files** `raw_id` PK, `source_id`, `name`, `path` (`arsiv/<sha256>/<ad>`, `/` ayraçlı), `sha256`, `size`, `stored_at`; `UNIQUE(source_id, sha256, name)`.
 
-**events** (yalnız eklenir): `seq` (iç sıra, FTS rowid'i), `event_id` UNIQUE, `event_key` UNIQUE, `source_id`, `device_id`, `ts`, `kind`, `category`, `payload` (kanonik JSON: anahtarlar sıralı), `text`, `schema_version` (satırın yazıldığı şema), `hidden` (0/1), `ingested_at`. İndeksler: `ts`, `(category, ts)`, `source_id`.
+**events** (yalnız eklenir; `category` üzerinde DB CHECK'i yoktur, kategori kodda `Category.ALL` ile doğrulanır, bu yüzden yeni kategori eklemek bu tabloya dokunmaz): `seq` (iç sıra, FTS rowid'i), `event_id` UNIQUE, `event_key` UNIQUE, `source_id`, `device_id`, `ts`, `kind`, `category`, `payload` (kanonik JSON: anahtarlar sıralı), `text`, `schema_version` (satırın yazıldığı şema), `hidden` (0/1), `ingested_at`. İndeksler: `ts`, `(category, ts)`, `source_id`.
 - `event_key` evrenseldir (kaynaklar arası). Verilmezse `h:` + SHA-256(kaynak türü, kind, category, ts, device_id, payload, text).
 - Gizli kayıt `hidden=1` ile işaretlenir; tek tek gizleme ya da kaynak kaldırma aynı bayrağı kullanır. **Tüm sorgular `hidden=0` süzer.**
 
@@ -41,7 +41,7 @@ Aynı `kind` + `file_sha256` ve kaldırılmamış kaynak varsa `add_source` onu 
 **facts** `fact_id` PK, `statement`, `source_id|NULL`, `date`, `status` ∈ {`beyan_edilen`,`dosyadan_alinan`,`cikarilan`,`eskimis`}, `valid_from`, `valid_until`, `category` ∈ {`kimlik`,`tercihler`,`ilgi`,`diger`,`cihazlar`,`projeler`,`is`}, `fact_key`, `hidden`, `updated`.
 **contradictions** `contradiction_id` PK, `old_fact_id`, `new_fact_id`, `category`, `fact_key`, `opened`, `resolved_at`, `chosen_fact_id`.
 **app_keys** `app_id` PK, `name`, `key_hash` UNIQUE, `created`, `revoked` (0/1).
-**permissions** `(app_id, category)` PK, `granted_at`, `expires_at|NULL`, `confirmed_sensitive` (0/1). CHECK: `eposta`/`mesaj`/`konum` için `confirmed_sensitive=1` olmadan satır yazılamaz.
+**permissions** `(app_id, category)` PK, `granted_at`, `expires_at|NULL`, `confirmed_sensitive` (0/1). CHECK: `eposta`/`mesaj`/`konum`/`sohbet` için `confirmed_sensitive=1` olmadan satır yazılamaz.
 Not: `fact_key` (çelişki tespitinde "aynı category+anahtar"), `facts.hidden` (`delete_fact` = gizleme) ve `updated` INTERFACES §5'in alan listesine eklenmiş ek sütunlardır (bkz. durum/core.md, Müdüre istekler).
 
 **meta**: anahtar-değer (şimdilik boş, ileride kullanım için ayrıldı).

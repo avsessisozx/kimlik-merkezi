@@ -143,7 +143,26 @@ _V2: Statements = [
     )""",
 ]
 
-MIGRATIONS: dict[int, Statements] = {1: _V1, 2: _V2}
+# v3: hassas kategori `sohbet`. CHECK kısıtı değiştirilemediği için `permissions` tablosu
+# yeniden oluşturulur (aynı işlemde: kopyala, eskiyi at, yeniyi adlandır); satırlar aynen kalır.
+# `events.category` üzerinde CHECK yoktur (kategori doğrulaması kodda), o tabloya dokunulmaz.
+_V3: Statements = [
+    """CREATE TABLE permissions_yeni (
+        app_id TEXT NOT NULL REFERENCES app_keys(app_id),
+        category TEXT NOT NULL,
+        granted_at TEXT NOT NULL,
+        expires_at TEXT,
+        confirmed_sensitive INTEGER NOT NULL DEFAULT 0 CHECK (confirmed_sensitive IN (0, 1)),
+        PRIMARY KEY (app_id, category),
+        CHECK (category NOT IN ('eposta', 'mesaj', 'konum', 'sohbet') OR confirmed_sensitive = 1)
+    )""",
+    """INSERT INTO permissions_yeni(app_id, category, granted_at, expires_at, confirmed_sensitive)
+        SELECT app_id, category, granted_at, expires_at, confirmed_sensitive FROM permissions""",
+    "DROP TABLE permissions",
+    "ALTER TABLE permissions_yeni RENAME TO permissions",
+]
+
+MIGRATIONS: dict[int, Statements] = {1: _V1, 2: _V2, 3: _V3}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 
