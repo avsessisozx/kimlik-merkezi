@@ -132,3 +132,74 @@ w("README.md", "# Fixture'lar\n\nHepsi sentetik, uydurma içerik; gerçek kişis
   "- takeout_tr: Türkçe klasör/dosya adları VARSAYIMDIR (gerçek Türkçe Takeout görülmedi); yalnız içerikle tanımayı sınar.\n"
   "- takeout_eski_chrome: eski `BrowserHistory.json` adı. takeout_html: yalnız HTML (desteklenmez).\n"
   "- reddit: hesap veri isteği CSV'leri (sütunlar doğrulanmadı).\n")
+
+
+# ------------------------------------------------------------------ Meta (Instagram / Facebook)
+def moji(s):  # Meta'nın bilinen sorunu: UTF-8 baytları latin-1 sanılıp \u00XX kaçışlanır
+    return s.encode("utf-8").decode("latin-1")
+
+
+def wm(p, obj):  # ensure_ascii=True: kaçışlı dosya (Meta gibi)
+    p = root / p
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(obj, indent=1), encoding="utf-8")
+
+
+IG = "meta_instagram/instagram-ornek-2024/"
+sld = lambda title, href, value, ts: {"title": title, "media_list_data": [],
+                                      "string_list_data": [{"href": href, "value": value, "timestamp": ts}]}
+wm(IG + "your_instagram_activity/likes/liked_posts.json", {"likes_media_likes": [
+    sld("ornekkullanici1", "https://www.instagram.com/p/AAA111/", "❤", 1700000000),
+    sld("ornekkullanici2", "https://www.instagram.com/p/BBB222/", "❤", 1700000100)]})
+wm(IG + "your_instagram_activity/likes/liked_comments.json", {"likes_comment_likes": [
+    sld("ornekkullanici3", "https://www.instagram.com/p/CCC333/", "❤", 1700000200)]})
+wm(IG + "your_instagram_activity/comments/post_comments_1.json", [
+    {"string_map_data": {"Comment": {"value": moji("Güzel şık yorum bir")}, "Media Owner": {"value": "ornekkullanici1"},
+                         "Time": {"timestamp": 1700001000}}},
+    {"string_map_data": {"Comment": {"value": "yorum iki"}, "Media Owner": {"value": "ornekkullanici2"},
+                         "Time": {"timestamp": 1700001100}}}])
+wm(IG + "your_instagram_activity/content/posts_1.json", [
+    {"media": [{"uri": "media/posts/202311/a.jpg", "creation_timestamp": 1700002000,
+                "title": moji("Örnek açıklama şık"), "media_metadata": {"photo_metadata": {"exif_data": []}}}]},
+    {"media": [{"uri": "media/posts/202311/b.jpg", "creation_timestamp": 1700002100, "title": "konumlu gonderi",
+                "media_metadata": {"photo_metadata": {"exif_data": [{"latitude": 41.0123, "longitude": 28.9765}]}}}]}])
+wm(IG + "connections/followers_and_following/following.json", {"relationships_following": [
+    sld("", "https://www.instagram.com/_u/takip1", "takip1", 1700003000),
+    sld("", "https://www.instagram.com/_u/takip2", "takip2", 1700003100),
+    sld("", "https://www.instagram.com/_u/takip3", "takip3", 1700003200)]})
+wm(IG + "connections/followers_and_following/followers_1.json", [
+    sld("", "https://www.instagram.com/_u/takipci1", "takipci1", 1700004000),
+    sld("", "https://www.instagram.com/_u/takipci2", "takipci2", 1700004100)])
+wm(IG + "your_instagram_activity/messages/inbox/ornekarkadas_123/message_1.json", {
+    "participants": [{"name": "ornekarkadas"}, {"name": "ornekkullanici"}],
+    "messages": [
+        {"sender_name": "ornekarkadas", "timestamp_ms": 1700005000000, "content": moji("Merhaba şık mesaj"), "type": "Generic"},
+        {"sender_name": "ornekkullanici", "timestamp_ms": 1700005060000, "content": "Ozel mesaj iki", "type": "Generic",
+         "photos": [{"uri": "x.jpg"}]},
+        {"sender_name": "ornekarkadas", "timestamp_ms": 1700005120000, "content": "Ozel mesaj uc", "type": "Generic",
+         "share": {"link": "https://example.test/p", "share_text": "paylasim"}},
+        {"sender_name": "ornekarkadas", "content": "zamansiz mesaj"}],
+    "title": "ornekarkadas", "thread_path": "inbox/ornekarkadas_123"})
+
+FBD = "meta_facebook/facebook-ornek-2024/"
+wm(FBD + "your_facebook_activity/posts/your_posts__check_ins__photos_and_videos_1.json", [
+    {"timestamp": 1700010000, "data": [{"post": moji("Facebook gönderisi bir")}], "title": ""},
+    {"timestamp": 1700010100, "data": [{"post": "gonderi iki"}], "title": "yer paylasimi",
+     "attachments": [{"data": [{"place": {"name": "Ornek Yer", "coordinate": {"latitude": 40.5, "longitude": 29.5},
+                                          "address": "ornek adres"}}]}]}])
+wm(FBD + "your_facebook_activity/comments_and_reactions/comments.json", {"comments_v2": [
+    {"timestamp": 1700011000, "data": [{"comment": {"timestamp": 1700011000, "comment": moji("Şık yorum"), "author": "Ornek Kisi"}}],
+     "title": "Ornek Kisi yorum yapti"},
+    {"timestamp": 1700011100, "data": [{"comment": {"timestamp": 1700011100, "comment": "yorum iki", "author": "Ornek Kisi"}}],
+     "title": "Ornek Kisi yorum yapti"}]})
+wm(FBD + "your_facebook_activity/comments_and_reactions/likes_and_reactions_1.json", {"reactions_v2": [
+    {"timestamp": 1700012000, "data": [{"reaction": {"reaction": "LIKE", "actor": "Ornek Kisi"}}], "title": "Ornek Kisi begendi"},
+    {"timestamp": 1700012100, "data": [{"reaction": {"reaction": "LOVE", "actor": "Ornek Kisi"}}], "title": "Ornek Kisi sevdi"}]})
+wm(FBD + "connections/friends/friends.json", {"friends_v2": [
+    {"name": "Ornek Arkadas Bir", "timestamp": 1700013000}, {"name": moji("Ornek Arkadaş İki"), "timestamp": 1700013100}]})
+wm(FBD + "your_facebook_activity/messages/inbox/fbarkadas_456/message_1.json", {
+    "participants": [{"name": "Ornek Arkadas"}],
+    "messages": [{"sender_name": "Ornek Arkadas", "timestamp_ms": 1700014000000, "content": "fb mesaj bir", "type": "Generic"},
+                 {"sender_name": "Ornek Kisi", "timestamp_ms": 1700014060000, "content": "fb mesaj iki", "type": "Generic"}],
+    "title": "Ornek Arkadas", "thread_path": "inbox/fbarkadas_456"})
+w("meta_html/instagram-ornek/your_instagram_activity/likes/liked_posts.html", "<html><body>begeniler</body></html>")

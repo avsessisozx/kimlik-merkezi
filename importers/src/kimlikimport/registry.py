@@ -6,14 +6,16 @@ from pathlib import Path
 
 from .base import Importer
 from .google_takeout import factory as _takeout
+from .meta import factory as _meta
 from .reddit import factory as _reddit
 
 _REGISTRY: dict[str, Callable[[], Importer]] = {
     "google_takeout": _takeout,
     "reddit": _reddit,
+    "meta": _meta,
 }
 # CLI'de kısa takma adlar (ice-al --tur takeout)
-ALIASES = {"takeout": "google_takeout", "google": "google_takeout"}
+ALIASES = {"takeout": "google_takeout", "google": "google_takeout", "instagram": "meta", "facebook": "meta"}
 
 
 def register(name: str, factory: Callable[[], Importer]) -> None:

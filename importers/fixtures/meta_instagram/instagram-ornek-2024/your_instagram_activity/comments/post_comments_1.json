@@ -1,0 +1,28 @@
+[
+ {
+  "string_map_data": {
+   "Comment": {
+    "value": "G\u00c3\u00bczel \u00c5\u009f\u00c4\u00b1k yorum bir"
+   },
+   "Media Owner": {
+    "value": "ornekkullanici1"
+   },
+   "Time": {
+    "timestamp": 1700001000
+   }
+  }
+ },
+ {
+  "string_map_data": {
+   "Comment": {
+    "value": "yorum iki"
+   },
+   "Media Owner": {
+    "value": "ornekkullanici2"
+   },
+   "Time": {
+    "timestamp": 1700001100
+   }
+  }
+ }
+]

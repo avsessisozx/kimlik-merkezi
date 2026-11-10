@@ -1,0 +1,37 @@
+{
+ "relationships_following": [
+  {
+   "title": "",
+   "media_list_data": [],
+   "string_list_data": [
+    {
+     "href": "https://www.instagram.com/_u/takip1",
+     "value": "takip1",
+     "timestamp": 1700003000
+    }
+   ]
+  },
+  {
+   "title": "",
+   "media_list_data": [],
+   "string_list_data": [
+    {
+     "href": "https://www.instagram.com/_u/takip2",
+     "value": "takip2",
+     "timestamp": 1700003100
+    }
+   ]
+  },
+  {
+   "title": "",
+   "media_list_data": [],
+   "string_list_data": [
+    {
+     "href": "https://www.instagram.com/_u/takip3",
+     "value": "takip3",
+     "timestamp": 1700003200
+    }
+   ]
+  }
+ ]
+}

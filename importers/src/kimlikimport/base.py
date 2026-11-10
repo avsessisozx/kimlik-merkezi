@@ -305,3 +305,68 @@ def csv_header(entry: Entry) -> list[str] | None:
 
 
 ProgressFn = Callable[[str, int], None]
+
+
+# --------------------------------------------------------------------------- ortak iskelet
+def fix_mojibake(s: str) -> str:
+    """Meta'nın bilinen sorunu: UTF-8 baytları latin-1 sanılıp \\uXXXX kaçışlanmış. Düzeltilebiliyorsa
+    düzeltir, değilse metni olduğu gibi bırakır (gerçek Türkçe/Unicode metne dokunmaz)."""
+    if not s or s.isascii() or max(s) > "ÿ":
+        return s
+    try:
+        return s.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return s
+
+
+def fix_tree(o):
+    if isinstance(o, str):
+        return fix_mojibake(o)
+    if isinstance(o, list):
+        return [fix_tree(x) for x in o]
+    if isinstance(o, dict):
+        return {fix_mojibake(k): fix_tree(v) for k, v in o.items()}
+    return o
+
+
+def epoch_to_iso(v) -> str | None:
+    """Saniye ya da milisaniye cinsinden Unix zamanı -> ISO UTC; olmazsa None."""
+    try:
+        x = float(v)
+        if x > 1e11:  # milisaniye
+            x /= 1000.0
+        if x < 0 or x > 4e9:
+            return None
+        return datetime.fromtimestamp(x, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+class ScanImporter:
+    """Alt sınıflar `_do_scan(arc)` ile tarama sonucunu üretir; sonuç yola göre önbelleğe alınır."""
+
+    name = ""
+    version = "0.1.0"
+
+    def __init__(self) -> None:
+        self._cache: dict[str, tuple[Archive, object]] = {}
+        self._skipped: dict[str, int] = {}
+
+    def _skip(self, why: str, n: int = 1) -> None:
+        self._skipped[why] = self._skipped.get(why, 0) + n
+
+    def skipped_counts(self) -> dict[str, int]:
+        return dict(self._skipped)
+
+    def _scan(self, path: Path):
+        key = str(Path(path).resolve())
+        if key not in self._cache:
+            arc = Archive(Path(path))
+            self._cache = {key: (arc, self._do_scan(arc))}
+        return self._cache[key]
+
+    def _do_scan(self, arc: Archive):  # pragma: no cover - alt sınıf doldurur
+        raise NotImplementedError
+
+    def close(self) -> None:
+        self._cache.clear()

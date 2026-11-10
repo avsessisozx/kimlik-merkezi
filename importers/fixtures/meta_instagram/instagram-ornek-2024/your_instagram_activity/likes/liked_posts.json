@@ -1,0 +1,26 @@
+{
+ "likes_media_likes": [
+  {
+   "title": "ornekkullanici1",
+   "media_list_data": [],
+   "string_list_data": [
+    {
+     "href": "https://www.instagram.com/p/AAA111/",
+     "value": "\u2764",
+     "timestamp": 1700000000
+    }
+   ]
+  },
+  {
+   "title": "ornekkullanici2",
+   "media_list_data": [],
+   "string_list_data": [
+    {
+     "href": "https://www.instagram.com/p/BBB222/",
+     "value": "\u2764",
+     "timestamp": 1700000100
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+[
+ {
+  "media": [
+   {
+    "uri": "media/posts/202311/a.jpg",
+    "creation_timestamp": 1700002000,
+    "title": "\u00c3\u0096rnek a\u00c3\u00a7\u00c4\u00b1klama \u00c5\u009f\u00c4\u00b1k",
+    "media_metadata": {
+     "photo_metadata": {
+      "exif_data": []
+     }
+    }
+   }
+  ]
+ },
+ {
+  "media": [
+   {
+    "uri": "media/posts/202311/b.jpg",
+    "creation_timestamp": 1700002100,
+    "title": "konumlu gonderi",
+    "media_metadata": {
+     "photo_metadata": {
+      "exif_data": [
+       {
+        "latitude": 41.0123,
+        "longitude": 28.9765
+       }
+      ]
+     }
+    }
+   }
+  ]
+ }
+]
