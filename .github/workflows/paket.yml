@@ -69,6 +69,9 @@ jobs:
       - name: Paketle, kur, dene (yalnız 127.0.0.1 bağlantısı izlenir), kaldır
         shell: pwsh
         run: ./windows/paket/ci_paket.ps1 -Surum "${{ steps.surum.outputs.surum }}"
+      - name: Yazılım malzeme listesi (SBOM, CycloneDX) - paketin derlendiği kurulu ortamdan
+        shell: pwsh
+        run: python windows/paket/sbom_uret.py --surum "${{ steps.surum.outputs.surum }}" --ek tepsi --cikti windows/paket/cikti/sbom.cdx.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -76,6 +79,7 @@ jobs:
           path: |
             windows/paket/cikti/*.exe
             windows/paket/cikti/SHA256SUMS
+            windows/paket/cikti/sbom.cdx.json
             windows/paket/cikti/ozet.json
             windows/paket/cikti/ag_sonuc.json
             windows/paket/cikti/kur.log
@@ -108,22 +112,36 @@ jobs:
         with:
           name: kurulum-paketi
           path: indirilen
-      - name: Yeniden adlandır, özeti yeniden hesapla ve doğrula
+      - name: Yeniden adlandır, SBOM'u denetle, özetleri yeniden hesapla ve doğrula
         if: steps.var.outputs.var == 'hayir'
         run: |
           set -euo pipefail
           EXE=$(find indirilen -name 'KimlikMerkezi-*-kurulum.exe' | head -1)
           ESKI_OZET=$(find indirilen -name SHA256SUMS | head -1)
-          test -f "$EXE" && test -f "$ESKI_OZET"
+          SBOM_KAYNAK=$(find indirilen -name sbom.cdx.json | head -1)
+          test -f "$EXE" && test -f "$ESKI_OZET" && test -f "$SBOM_KAYNAK"
           mkdir -p yayin
           AD="KimlikMerkezi-Kurulum-v${SURUM}.exe"
+          SBOM="KimlikMerkezi-v${SURUM}.sbom.cdx.json"
           cp "$EXE" "yayin/$AD"
+          cp "$SBOM_KAYNAK" "yayin/$SBOM"
+          # SBOM geçerli CycloneDX JSON mu, sürüm uyuyor mu, bileşen var mı (şema doğrulaması değil, yapı denetimi)
+          python3 - "yayin/$SBOM" "$SURUM" <<'PY'
+          import json, sys
+          b = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert b["bomFormat"] == "CycloneDX" and b["specVersion"].startswith("1."), "CycloneDX değil"
+          assert b["metadata"]["component"]["version"] == sys.argv[2], "SBOM sürümü uyuşmuyor"
+          ad = {c["name"].lower() for c in b["components"]}
+          assert {"kimlikcore", "kimlikserver", "kimlikimport", "kimlikwin", "mcp"} <= ad, "beklenen bileşenler yok"
+          belirsiz = [c["name"] for c in b["components"] if any("lisans-uyarisi" in p["name"] for p in c.get("properties", []))]
+          print(f"SBOM tamam: {len(b['components'])} bileşen; lisansı belirlenemeyen: {belirsiz or 'yok'}")
+          PY
           # derleme sırasında hesaplanan hash ile indirilen dosya aynı mı
           BEKLENEN=$(awk '{print $1}' "$ESKI_OZET" | head -1)
-          (cd yayin && sha256sum "$AD" > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          YENI=$(awk '{print $1}' yayin/SHA256SUMS.txt)
+          YENI=$(sha256sum "yayin/$AD" | awk '{print $1}')
           [ "$BEKLENEN" = "$YENI" ] || { echo "::error::Hash derleme sırasındakiyle uyuşmuyor ($BEKLENEN != $YENI)"; exit 1; }
-          (cd yayin && sha256sum -c SHA256SUMS.txt)
+          # her yayın dosyası için tek toplamlar dosyası
+          (cd yayin && sha256sum "$AD" "$SBOM" > SHA256SUMS.txt && cat SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - name: Release notu
         if: steps.var.outputs.var == 'hayir'
         run: |
@@ -137,5 +155,13 @@ jobs:
           ON=""
           [ "$ONSURUM" = "true" ] && ON="--prerelease"
           gh release create "v${SURUM}" --target "${{ github.sha }}" --title "Kimlik Merkezi ${SURUM}" --notes-file not.md $ON \
-            "yayin/KimlikMerkezi-Kurulum-v${SURUM}.exe" "yayin/SHA256SUMS.txt"
+            "yayin/KimlikMerkezi-Kurulum-v${SURUM}.exe" "yayin/KimlikMerkezi-v${SURUM}.sbom.cdx.json" "yayin/SHA256SUMS.txt"
           gh release view "v${SURUM}" --json tagName,isPrerelease,assets --jq '{tagName,isPrerelease,dosyalar:[.assets[].name]}'
+      - name: Yayımlanan dosyaları yeniden indirip toplamlarla doğrula
+        if: steps.var.outputs.var == 'hayir'
+        run: |
+          set -euo pipefail
+          mkdir dogrula && cd dogrula
+          gh release download "v${SURUM}" --repo "${GITHUB_REPOSITORY}"
+          ls -l
+          sha256sum -c SHA256SUMS.txt
