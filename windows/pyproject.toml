@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kimlikwin"
+version = "0.1.0"
+description = "Kimlik Merkezi Windows uygulaması: yerel web arayüzü (127.0.0.1), tepsi, kurulum mantığı"
+requires-python = ">=3.12"
+dependencies = ["kimlikcore", "kimlikserver", "kimlikimport"]
+
+[project.optional-dependencies]
+# pystray (LGPL-3.0) ve Pillow yalnız tepsi simgesi için; iş mantığı bunlar olmadan da çalışır/test edilir.
+tepsi = ["pystray==0.19.5", "pillow>=10"]
+test = ["pytest>=8"]
+
+[project.scripts]
+kimlikmerkezi-win = "kimlikwin.uygulama:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+kimlikwin = ["statik/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

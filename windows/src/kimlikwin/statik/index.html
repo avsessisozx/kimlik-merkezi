@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="kimlik-jeton" content="__JETON__">
+<title>Kimlik Merkezi</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--yazi:#1c2430;--soluk:#5d6877;--cizgi:#d9dee5;--vurgu:#214c8c;--vurgu-yazi:#fff;--tehlike:#b3261e;--uyari:#8a5a00;--ok:#1b6e3c;--girdi:#fff}
+:root[data-tema=koyu]{--bg:#12161c;--panel:#1b222b;--yazi:#e6eaf0;--soluk:#9aa6b6;--cizgi:#2e3844;--vurgu:#6ea2f0;--vurgu-yazi:#0b1220;--tehlike:#ff8a80;--uyari:#f0c060;--ok:#6fd49a;--girdi:#12161c}
+@media (prefers-color-scheme:dark){:root[data-tema=sistem]{--bg:#12161c;--panel:#1b222b;--yazi:#e6eaf0;--soluk:#9aa6b6;--cizgi:#2e3844;--vurgu:#6ea2f0;--vurgu-yazi:#0b1220;--tehlike:#ff8a80;--uyari:#f0c060;--ok:#6fd49a;--girdi:#12161c}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--yazi)}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--cizgi)}
+header h1{font-size:18px;margin:0;flex:1}
+.duzen{display:flex;min-height:calc(100vh - 53px)}
+nav{width:190px;background:var(--panel);border-right:1px solid var(--cizgi);padding:8px;flex-shrink:0}
+nav button{display:block;width:100%;text-align:left;margin:2px 0;border:0;background:none;color:var(--yazi);padding:9px 12px;border-radius:6px;font:inherit;cursor:pointer}
+nav button.secili,nav button:hover{background:var(--bg)}
+nav button.secili{font-weight:600;color:var(--vurgu)}
+main{flex:1;padding:18px 22px;max-width:980px;min-width:0}
+h2{margin-top:0}h3{margin-bottom:6px}
+.kart{background:var(--panel);border:1px solid var(--cizgi);border-radius:8px;padding:14px 16px;margin:0 0 14px}
+.izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.sayi{font-size:26px;font-weight:600}.soluk{color:var(--soluk);font-size:13px}
+button.d,a.d{border:1px solid var(--vurgu);background:var(--vurgu);color:var(--vurgu-yazi);padding:7px 14px;border-radius:6px;font:inherit;cursor:pointer}
+button.i{border:1px solid var(--cizgi);background:var(--panel);color:var(--yazi);padding:6px 12px;border-radius:6px;font:inherit;cursor:pointer}
+button.t{border:1px solid var(--tehlike);background:none;color:var(--tehlike);padding:6px 12px;border-radius:6px;font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;color:var(--yazi);background:var(--girdi);border:1px solid var(--cizgi);border-radius:6px;padding:6px 9px;max-width:100%}
+input[type=text],input[type=search],textarea{width:100%}
+textarea{min-height:90px;font-family:Consolas,monospace;font-size:13px}
+label{display:inline-block;margin:4px 12px 4px 0}
+.satir{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.satir>input[type=text]{flex:1;min-width:200px}
+.uyari{border-left:4px solid var(--uyari);padding:8px 12px;background:var(--panel);margin:8px 0}
+.hata{border-left:4px solid var(--tehlike);padding:8px 12px;background:var(--panel);margin:8px 0}
+.tamam{color:var(--ok)}.kotu{color:var(--tehlike)}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--cizgi);vertical-align:top}
+th{font-size:13px;color:var(--soluk)}
+.kayit{border-bottom:1px solid var(--cizgi);padding:8px 2px}.kayit .m{white-space:pre-wrap;word-break:break-word}
+.rozet{display:inline-block;font-size:12px;border:1px solid var(--cizgi);border-radius:10px;padding:0 8px;color:var(--soluk)}
+.rozet.h{border-color:var(--tehlike);color:var(--tehlike)}
+progress{width:100%;height:14px}
+.yer{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:10;padding:12px}
+.pencere{background:var(--panel);border-radius:10px;padding:20px;max-width:620px;width:100%;max-height:92vh;overflow:auto}
+#bildirim{position:fixed;right:14px;bottom:14px;max-width:420px;z-index:20}
+#bildirim div{background:var(--panel);border:1px solid var(--cizgi);border-left:4px solid var(--vurgu);padding:10px 12px;margin-top:8px;border-radius:6px}
+#bildirim div.h{border-left-color:var(--tehlike)}
+pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;font-size:12px}
+@media(max-width:700px){nav{width:100%;display:flex;flex-wrap:wrap;border-right:0}.duzen{flex-direction:column}nav button{width:auto}}
+</style>
+</head>
+<body>
+<header><h1>Kimlik Merkezi</h1><button class="i" id="rapor-dugme">Hata raporunu kopyala</button></header>
+<div class="duzen"><nav id="nav"></nav><main id="ana"></main></div>
+<div id="kok-pencere"></div><div id="bildirim"></div>
+<script>
+"use strict";
+const JETON=document.querySelector('meta[name=kimlik-jeton]').content;
+const $=s=>document.querySelector(s);
+function h(etiket,ozel,...cocuk){const e=document.createElement(etiket);
+  for(const [k,v] of Object.entries(ozel||{})){
+    if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);
+    else if(k==='value'||k==='checked'||k==='disabled'||k==='selected')e[k]=v;else if(v!==false&&v!=null)e.setAttribute(k,v);}
+  for(const c of cocuk.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)));}
+  return e;}
+// Kayıt metinleri güvenilmez veri: yalnızca textContent/createTextNode ile eklenir, innerHTML kullanılmaz.
+let SON_HATA=null,DURUM={},KATEGORILER=[];
+async function api(ad,girdi){
+  let r,j;
+  try{r=await fetch('/api/'+ad,{method:'POST',headers:{'Content-Type':'application/json','X-Kimlik-Jeton':JETON},body:JSON.stringify(girdi||{})});
+      j=await r.json();}
+  catch(e){SON_HATA={adim:ad,mesaj:'Uygulamaya ulaşılamadı: '+e.message};throw SON_HATA;}
+  if(!r.ok){SON_HATA={adim:ad,mesaj:j.hata||('HTTP '+r.status),kod:j.kod,ek:j.ek};throw SON_HATA;}
+  return j;}
+function bildir(metin,hata){const d=h('div',{class:hata?'h':''},metin);
+  if(hata)d.append(h('div',{},h('button',{class:'i',onclick:()=>raporKopyala()},'Hata raporunu kopyala')));
+  $('#bildirim').append(d);setTimeout(()=>d.remove(),hata?15000:5000);}
+async function hataGoster(e){if(e&&e.mesaj)bildir(e.mesaj,true);else{SON_HATA={adim:'arayüz',mesaj:String(e)};bildir(String(e),true);}}
+async function kopyala(metin){
+  try{await navigator.clipboard.writeText(metin);}catch(_){
+    const t=h('textarea',{},'');document.body.append(t);t.value=metin;t.select();document.execCommand('copy');t.remove();}
+  bildir('Panoya kopyalandı.');}
+async function raporKopyala(){
+  const r=await api('hata_raporu',{adim:SON_HATA?SON_HATA.adim:(sayfa||''),mesaj:SON_HATA?SON_HATA.mesaj:'',ek:SON_HATA&&SON_HATA.ek||''}).catch(()=>({metin:'Rapor üretilemedi.'}));
+  kopyala(r.metin);}
+$('#rapor-dugme').onclick=raporKopyala;
+function yapistirmaKutusu(metin){return h('div',{},h('textarea',{readonly:'',onclick:e=>e.target.select()},metin),
+  h('div',{class:'satir'},h('button',{class:'i',onclick:()=>kopyala(metin)},'Kopyala')));}
+function pencere(baslik,...icerik){const k=$('#kok-pencere');k.textContent='';
+  const kapat=()=>{k.textContent='';};
+  k.append(h('div',{class:'yer'},h('div',{class:'pencere',role:'dialog'},h('h2',{},baslik),...icerik)));return kapat;}
+function utc(yerel){return yerel?new Date(yerel).toISOString().slice(0,19)+'Z':null;}
+function tarih(s){return s?s.replace('T',' ').replace('Z',''):'-';}
+function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
+  const kap=h('div',{});KATEGORILER.filter(k=>hassasDahil||!k.hassas).forEach(k=>{
+    const c=h('input',{type:'checkbox',value:k.kimlik,checked:secili?secili.includes(k.kimlik):false});kutular.push(c);
+    kap.append(h('label',{},c,' ',k.ad,k.hassas?h('span',{class:'rozet h'},'hassas'):null));});
+  kap.sec=()=>kutular.filter(c=>c.checked).map(c=>c.value);return kap;}
+
+const SAYFALAR=[['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
+let sayfa='ana',AYAR_TEMA='sistem',yoklama=null;
+function menu(){const n=$('#nav');n.textContent='';SAYFALAR.forEach(([id,ad])=>n.append(h('button',{class:id===sayfa?'secili':'',onclick:()=>git(id)},ad)));}
+function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}
+  const a=$('#ana');a.textContent='';SF[id](a).catch(hataGoster);}
+function temaUygula(t){document.documentElement.dataset.tema=t;AYAR_TEMA=t;}
+
+const SF={};
+// ------------------------------------------------------------------ ana sayfa
+SF.ana=async a=>{
+  const d=await api('durum');DURUM=d;KATEGORILER=d.kategoriler;
+  a.append(h('h2',{},'Ana sayfa'));
+  if(d.eskiyen>0)a.append(h('div',{class:'uyari'},`${d.eskiyen} bilginin süresi doldu ve "eskimiş" yapıldı; Persona ekranından yeniden doğrulayabilirsiniz.`));
+  if(d.acik_celiski>0)a.append(h('div',{class:'uyari'},`${d.acik_celiski} çelişen bilgi seçiminizi bekliyor (Persona).`));
+  const ac=await api('acilis');
+  if(ac.yarim_is)a.append(h('div',{class:'uyari'},'Yarım kalmış bir içe aktarma var: '+ac.yarim_is.yol+' ',
+    h('button',{class:'i',onclick:()=>{git('ice');setTimeout(()=>{const g=$('#ice-yol');if(g)g.value=ac.yarim_is.yol;},50);}},'Kaldığı yerden devam et')));
+  const g=h('div',{class:'izgara'});
+  const say=(ad,n)=>h('div',{class:'kart'},h('div',{class:'sayi'},String(n)),h('div',{class:'soluk'},ad));
+  const c=d.ozet.counts||{};
+  g.append(say('Kayıt',c.event||0),say('Kaynak',d.kaynak_sayisi),say('Persona bilgisi',c.fact||0),say('Uygulama anahtarı',c.app_key||0));
+  a.append(g,h('div',{class:'kart'},h('div',{class:'soluk'},'Veri klasörü'),h('div',{},d.veri_klasoru)));
+  const sk=h('div',{class:'kart'},h('h3',{},'Sağlık denetimi'),h('div',{id:'saglik-sonuc',class:'soluk'},'Henüz çalıştırılmadı.'),
+    h('button',{class:'i',onclick:async()=>{const s=await api('saglik');const k=$('#saglik-sonuc');k.textContent='';
+      s.kontroller.forEach(c=>k.append(h('div',{class:c.ok?'tamam':'kotu'},(c.ok?'✓ ':'✗ ')+c.ad+(c.ayrinti?': '+c.ayrinti:''))));}},'Denetle'));
+  a.append(sk);
+};
+// ------------------------------------------------------------------ içe aktar
+SF.ice=async a=>{
+  const turler=(await api('turler')).turler;
+  const yol=h('input',{type:'text',id:'ice-yol',placeholder:'Zip dosyası ya da klasör yolu'});
+  const tur=h('select',{},h('option',{value:''},'Otomatik tanı'),turler.map(t=>h('option',{value:t},t)));
+  const alan=h('div',{});
+  const sec=async k=>{const r=await api('sec',{tur:k});if(r.yol)yol.value=r.yol;};
+  async function baslat(yineDe){
+    alan.textContent='';
+    await api('ice_aktar_baslat',{yol:yol.value,tur:tur.value||null,yine_de:!!yineDe});yokla();}
+  function yokla(){if(yoklama)clearInterval(yoklama);
+    yoklama=setInterval(async()=>{const s=await api('ice_aktar_durum').catch(()=>null);if(!s)return;ciz(s);
+      if(s.durum!=='calisiyor'){clearInterval(yoklama);yoklama=null;}},700);}
+  function ciz(s){alan.textContent='';
+    if(s.durum==='calisiyor'){const ad={dogrula:'Dosya doğrulanıyor',kopyala:'Ham arşive kopyalanıyor',isle:'Kayıtlar işleniyor'}[s.asama]||s.asama;
+      alan.append(h('div',{class:'kart'},h('div',{},`${ad}… ${s.sayi?s.sayi+' kayıt':''}`),h('progress',{}),h('div',{class:'soluk'},'Kapatırsanız aynı dosyayı yeniden verin: tekrar eden kayıtlar eklenmez, kalan devam eder.')));}
+    else if(s.durum==='bitti')alan.append(h('div',{class:'kart'},h('h3',{class:'tamam'},'Tamamlandı'),h('pre',{},s.sonuc)));
+    else if(s.durum==='hata'){
+      alan.append(h('div',{class:'hata'},s.hata));
+      if(s.bicim_raporu)alan.append(h('div',{class:'kart'},h('h3',{},'Biçim raporu'),yapistirmaKutusu(s.bicim_raporu),
+        h('button',{class:'d',onclick:()=>kopyala(s.bicim_raporu)},'Biçim raporunu kopyala')));
+      if(s.hata_kodu==='daha_once_silinmis')alan.append(h('div',{class:'satir'},h('span',{},'Daha önce kalıcı sildiğiniz bir girdi. Yine de alınsın mı?'),
+        h('button',{class:'d',onclick:()=>baslat(true).catch(hataGoster)},'Evet, yine de al')));
+      SON_HATA={adim:'içe aktar',mesaj:s.hata,ek:s.bicim_raporu||''};}}
+  a.append(h('h2',{},'İçe aktar'),h('div',{class:'kart'},
+    h('p',{},'Google Takeout zip dosyası, Reddit veri dışa aktarımı ya da açılmış bir klasör seçin.'),
+    h('div',{class:'satir'},yol),
+    h('div',{class:'satir'},h('button',{class:'i',onclick:()=>sec('dosya').catch(hataGoster)},'Dosya seç…'),h('button',{class:'i',onclick:()=>sec('klasor').catch(hataGoster)},'Klasör seç…'),tur,
+      h('button',{class:'d',onclick:()=>baslat(false).catch(hataGoster)},'İçe aktarmayı başlat'))),alan);
+  const s=await api('ice_aktar_durum');if(s.durum!=='yok'){ciz(s);if(s.durum==='calisiyor')yokla();}
+};
+// ------------------------------------------------------------------ kayıt listesi
+function kayitListesi(kayitlar,gizle){const k=h('div',{});
+  if(!kayitlar.length)k.append(h('p',{class:'soluk'},'Kayıt yok.'));
+  kayitlar.forEach(r=>k.append(h('div',{class:'kayit'},
+    h('div',{class:'soluk'},tarih(r.zaman)+' · ',h('span',{class:'rozet'},r.kategori),' ',r.tur),
+    h('div',{class:'m'},r.metin||'(metin yok)'),
+    gizle?h('button',{class:'i',onclick:async e=>{if(!confirm('Bu kayıt gizlensin mi?'))return;await api('kayit_gizle',{olay_id:r.id}).catch(hataGoster);e.target.closest('.kayit').remove();}},'Gizle'):null)));
+  return k;}
+SF.ara=async a=>{
+  if(!KATEGORILER.length)KATEGORILER=(await api('durum')).kategoriler;
+  const q=h('input',{type:'search',placeholder:'Ara (Türkçe harf duyarsız)'});const kat=kategoriKutulari(null);const son=h('div',{});
+  const git_=async()=>{son.textContent='';son.append(kayitListesi((await api('ara',{sorgu:q.value,kategoriler:kat.sec()})).kayitlar,true));};
+  q.addEventListener('keydown',e=>{if(e.key==='Enter')git_().catch(hataGoster);});
+  a.append(h('h2',{},'Arama'),h('div',{class:'kart'},h('div',{class:'satir'},q,h('button',{class:'d',onclick:()=>git_().catch(hataGoster)},'Ara')),h('div',{class:'soluk'},'Kategori seçmezseniz hepsinde aranır.'),kat),son);};
+SF.zaman=async a=>{
+  if(!KATEGORILER.length)KATEGORILER=(await api('durum')).kategoriler;
+  const kat=kategoriKutulari(null);const b=h('input',{type:'date'}),e=h('input',{type:'date'});const son=h('div',{});let atla=0;
+  const yukle=async ilk=>{if(ilk){atla=0;son.textContent='';}
+    const r=await api('zaman',{kategoriler:kat.sec(),baslangic:b.value?b.value+'T00:00:00Z':null,bitis:e.value?e.value+'T23:59:59Z':null,limit:100,atla});
+    atla+=r.kayitlar.length;son.querySelector('.daha')?.remove();son.append(kayitListesi(r.kayitlar,true));
+    if(r.kayitlar.length===100)son.append(h('button',{class:'i daha',onclick:()=>yukle(false).catch(hataGoster)},'Daha fazla'));};
+  a.append(h('h2',{},'Zaman çizelgesi'),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç ',b,' Bitiş ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
+  yukle(true).catch(hataGoster);};
+// ------------------------------------------------------------------ persona
+SF.persona=async a=>{
+  const [p,c]=await Promise.all([api('persona_liste'),api('celiskiler')]);
+  const metin=h('input',{type:'text',placeholder:'Örn. Windows 11 bilgisayarım var'});
+  const kat=h('select',{},p.kategoriler.map(k=>h('option',{value:k.kimlik},k.ad)));
+  const kay=h('select',{},h('option',{value:''},'Kendi beyanım'),p.kaynaklar.map(s=>h('option',{value:s.id},'Belgeden: '+s.ad)));
+  a.append(h('h2',{},'Persona'),
+    h('div',{class:'kart'},h('h3',{},'Bilgi ekle'),h('div',{class:'satir'},metin),
+      h('div',{class:'satir'},kat,kay,h('button',{class:'d',onclick:async()=>{await api('persona_ekle',{metin:metin.value,kategori:kat.value,kaynak_id:kay.value||null}).catch(hataGoster);git('persona');}},'Ekle')),
+      h('div',{class:'soluk'},'"Belgeden" seçerseniz bilgi o kaynağa bağlanır ve kimlik kartında kaynak adıyla görünür.')));
+  if(c.celiskiler.length){const k=h('div',{class:'kart'},h('h3',{},'Çelişen bilgiler: hangisi geçerli?'));
+    c.celiskiler.forEach(x=>{const sec=async id=>{await api('celiski_coz',{secilen_id:id}).catch(hataGoster);git('persona');};
+      k.append(h('div',{class:'uyari'},h('div',{class:'soluk'},x.kategori+(x.anahtar?' / '+x.anahtar:'')),
+        h('div',{class:'satir'},h('span',{},'Eski: '+x.eski.metin),h('button',{class:'i',onclick:()=>sec(x.eski.id)},'Bu geçerli')),
+        h('div',{class:'satir'},h('span',{},'Yeni: '+x.yeni.metin),h('button',{class:'i',onclick:()=>sec(x.yeni.id)},'Bu geçerli'))));});
+    a.append(k);}
+  const t=h('table',{},h('tr',{},h('th',{},'Bilgi'),h('th',{},'Kategori'),h('th',{},'Durum'),h('th',{},'Geçerlilik'),h('th',{},'')));
+  const durumAd={beyan_edilen:'Beyan edilen',dosyadan_alinan:'Dosyadan alınan',cikarilan:'Çıkarılan',eskimis:'Eskimiş'};
+  p.bilgiler.forEach(f=>t.append(h('tr',{},h('td',{},f.metin),h('td',{},f.kategori),h('td',{},durumAd[f.durum]||f.durum),h('td',{},f.gecerlilik_bitis?tarih(f.gecerlilik_bitis):'süresiz'),
+    h('td',{},f.durum==='beyan_edilen'||f.durum==='dosyadan_alinan'?h('button',{class:'i',onclick:()=>{
+        const m=h('input',{type:'text',value:f.metin});const kapat=pencere('Bilgiyi düzelt',m,h('div',{class:'satir'},
+          h('button',{class:'d',onclick:async()=>{await api('persona_guncelle',{bilgi_id:f.id,metin:m.value}).catch(hataGoster);kapat();git('persona');}},'Kaydet'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Düzelt'):null,' ',
+      h('button',{class:'t',onclick:async()=>{if(!confirm('Bu bilgi silinsin mi?'))return;await api('persona_sil',{bilgi_id:f.id}).catch(hataGoster);git('persona');}},'Sil')))));
+  a.append(h('div',{class:'kart'},h('h3',{},'Bilgiler'),p.bilgiler.length?t:h('p',{class:'soluk'},'Henüz bilgi yok.'),
+    h('div',{class:'satir'},h('button',{class:'i',onclick:async()=>{const r=await api('persona_sure_kontrol').catch(hataGoster);bildir(`${r.eskiyen} bilginin süresi doldu.`);if(r.eskiyen)git('persona');}},'Süreleri şimdi kontrol et'),
+      h('span',{class:'soluk'},'Cihazlar, projeler ve iş bilgileri 180 gün sonra eskir; açılışta da kontrol edilir.'))));
+  a.append(h('div',{class:'kart'},h('h3',{},'Kimlik kartı'),h('button',{class:'i',onclick:async e=>{const r=await api('kimlik_karti');
+    const yer=e.target.parentElement.querySelector('.kart-yer');yer.textContent='';yer.append(yapistirmaKutusu(r.markdown));}},'Oluştur'),h('div',{class:'kart-yer'})));
+};
+// ------------------------------------------------------------------ erişim
+SF.erisim=async a=>{
+  const [e,l]=await Promise.all([api('erisim'),api('erisim_kaydi',{limit:200})]);KATEGORILER=e.kategoriler;
+  a.append(h('h2',{},'Erişim'));
+  const cd=h('div',{class:'kart'},h('h3',{},'Claude Desktop\'a ekle'),
+    h('p',{class:'soluk'},'Ayar dosyasının yedeğini alır, bu uygulama için yeni anahtar üretir ve girişi ekler. Hassas kategoriler kapalı gelir. Dosya konumu resmî belgeden doğrulanamadı; bulunamazsa kopyalanabilir ayar metni verilir.'),
+    h('button',{class:'d',onclick:async()=>{const r=await api('claude_ekle').catch(hataGoster);if(!r)return;
+      const k=cd.querySelector('.sonuc');k.textContent='';k.append(h('div',{class:r.durum==='eklendi'||r.durum==='guncellendi'?'uyari':'hata'},r.mesaj));
+      if(r.yedek)k.append(h('div',{class:'soluk'},'Yedek: '+r.yedek));if(r.metin)k.append(yapistirmaKutusu(r.metin));setTimeout(()=>git('erisim'),r.metin?60000:1500);}},'Claude\'a ekle'),h('div',{class:'sonuc'}));
+  a.append(cd);
+  const ad=h('input',{type:'text',placeholder:'Uygulama adı (ör. Claude Code)'});
+  a.append(h('div',{class:'kart'},h('h3',{},'Yeni anahtar'),h('div',{class:'satir'},ad,h('button',{class:'d',onclick:async()=>{
+    const r=await api('anahtar_uret',{ad:ad.value}).catch(hataGoster);if(!r)return;const b=await api('baglanti_bilgisi',{anahtar:r.anahtar});
+    const kapat=pencere('Anahtar üretildi',h('p',{class:'uyari'},r.uyari),yapistirmaKutusu(r.anahtar),h('h3',{},'MCP bağlantı ayarı'),yapistirmaKutusu(b.metin),
+      h('button',{class:'d',onclick:()=>{kapat();git('erisim');}},'Tamam'));}},'Anahtar üret'))));
+  e.uygulamalar.forEach(u=>{
+    const kart=h('div',{class:'kart'},h('div',{class:'satir'},h('h3',{style:'margin:0;flex:1'},u.ad+(u.iptal?' (iptal edildi)':'')),
+      u.iptal?null:h('button',{class:'t',onclick:async()=>{if(!confirm('Bu anahtar iptal edilsin mi? Geri alınamaz.'))return;await api('anahtar_iptal',{app_id:u.id}).catch(hataGoster);git('erisim');}},'Anahtarı iptal et')),
+      h('div',{class:'soluk'},'Oluşturma: '+tarih(u.olusturma)));
+    if(!u.iptal){const bitis=h('input',{type:'datetime-local'});
+      const izinli=Object.fromEntries(u.izinler.map(i=>[i.kategori,i]));
+      kart.append(h('div',{class:'satir'},'Süreli izin için bitiş (boşsa süresiz): ',bitis,
+        h('button',{class:'i',onclick:async()=>{await api('izin_toplu',{app_id:u.id,bitis:utc(bitis.value)}).catch(hataGoster);git('erisim');}},'Hassas olmayanların hepsini aç')));
+      KATEGORILER.forEach(k=>{const var_=izinli[k.kimlik];
+        const c=h('input',{type:'checkbox',checked:!!var_,onchange:async ev=>{
+          if(!ev.target.checked){await api('izin_kaldir',{app_id:u.id,kategori:k.kimlik}).catch(hataGoster);git('erisim');return;}
+          if(k.hassas){ev.target.checked=false;hassasOnay(u,k,utc(bitis.value));return;}
+          await api('izin_ver',{app_id:u.id,kategori:k.kimlik,bitis:utc(bitis.value)}).catch(hataGoster);git('erisim');}});
+        kart.append(h('label',{},c,' ',k.ad,k.hassas?h('span',{class:'rozet h'},'hassas'):null,var_&&var_.bitis?h('span',{class:'rozet'},'bitiş '+tarih(var_.bitis)):null));});}
+    a.append(kart);});
+  const t=h('table',{},h('tr',{},['Zaman','Uygulama','Araç','Kategori','Sayı','Sonuç'].map(x=>h('th',{},x))));
+  l.satirlar.forEach(s=>t.append(h('tr',{},h('td',{},tarih(s.zaman)),h('td',{},s.uygulama),h('td',{},s.arac),h('td',{},s.kategori||'-'),h('td',{},String(s.sayi)),h('td',{class:s.sonuc==='ok'?'tamam':'kotu'},s.sonuc))));
+  a.append(h('div',{class:'kart'},h('h3',{},'Erişim kaydı (son 200)'),l.satirlar.length?t:h('p',{class:'soluk'},'Henüz erişim yok.')));
+};
+function hassasOnay(u,k,bitis){
+  const c=h('input',{type:'checkbox'});const dugme=h('button',{class:'t',disabled:true,onclick:async()=>{
+    await api('izin_ver',{app_id:u.id,kategori:k.kimlik,bitis,hassas_onay:true}).catch(hataGoster);kapat();git('erisim');}},'Evet, bu hassas kategoriyi aç');
+  c.onchange=()=>{dugme.disabled=!c.checked;};
+  const kapat=pencere('Hassas kategori onayı',h('p',{},`"${u.ad}" uygulamasına ${k.ad} kategorisini açmak üzeresiniz. Bu kategori özel bilgiler içerir ve "hepsini aç" ile asla açılmaz.`),
+    h('label',{},c,' Ne açtığımı biliyorum ve bu uygulamaya güveniyorum.'),h('div',{class:'satir'},dugme,h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}
+// ------------------------------------------------------------------ kaynaklar
+SF.kaynak=async a=>{
+  const r=await api('kaynaklar');a.append(h('h2',{},'Kaynaklar'),h('p',{class:'soluk'},'"Kaldır" kayıtları gizler (geri alınabilir değildir ama veri diskte kalır). "Kalıcı sil" veriyi ve ham arşivi diskten siler.'));
+  if(!r.kaynaklar.length)a.append(h('p',{class:'soluk'},'Henüz kaynak yok.'));
+  r.kaynaklar.forEach(s=>a.append(h('div',{class:'kart'},h('div',{},h('b',{},s.tur+' '+s.surum),' · '+s.kayit+' kayıt · '+tarih(s.alindi),s.kaldirildi?h('span',{class:'rozet h'},'kaldırıldı '+tarih(s.kaldirildi)):null),
+    h('div',{class:'satir'},s.kaldirildi?null:h('button',{class:'i',onclick:async()=>{if(!confirm('Bu kaynağın kayıtları gizlensin mi?'))return;const x=await api('kaynak_kaldir',{kaynak_id:s.id}).catch(hataGoster);if(x)bildir(x.gizlenen+' kayıt gizlendi.');git('kaynak');}},'Kaldır'),
+      h('button',{class:'t',onclick:()=>{const g=h('input',{type:'text',placeholder:'SİL'});const kapat=pencere('Kalıcı silme',
+        h('p',{class:'hata'},'Bu kaynağın tüm kayıtları ve ham arşiv dosyaları diskten KALICI olarak silinir. Geri alınamaz.'),h('p',{},'Onaylamak için SİL yazın:'),g,
+        h('div',{class:'satir'},h('button',{class:'t',onclick:async()=>{const x=await api('kaynak_sil',{kaynak_id:s.id,onay:g.value}).catch(hataGoster);if(!x)return;kapat();bildir(`${x.silinen_olay} kayıt, ${x.silinen_dosya} dosya silindi.`);git('kaynak');}},'Kalıcı olarak sil'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Kalıcı sil')))));
+};
+// ------------------------------------------------------------------ ayarlar, hakkında
+SF.ayar=async a=>{
+  const s=await api('ayarlar');
+  const tema=h('select',{onchange:async e=>{await api('ayar_yaz',{tema:e.target.value}).catch(hataGoster);temaUygula(e.target.value);}},
+    [['sistem','Sistem'],['acik','Açık'],['koyu','Koyu']].map(([v,ad])=>h('option',{value:v,selected:v===s.tema},ad)));
+  const oto=h('input',{type:'checkbox',checked:s.otomatik_baslat,disabled:!s.otomatik_destek,onchange:async e=>{
+    const r=await api('ayar_yaz',{otomatik_baslat:e.target.checked}).catch(hataGoster);if(r&&r.uyari)bildir(r.uyari,true);}});
+  a.append(h('h2',{},'Ayarlar'),h('div',{class:'kart'},h('div',{class:'satir'},'Tema: ',tema),
+    h('div',{class:'satir'},h('label',{},oto,' Windows açılışında otomatik başlat (tepside)')),
+    h('div',{},'Veri klasörü: ',s.veri_klasoru),h('div',{class:'soluk'},'Veri klasörünü değiştirmek için uygulamayı kapatıp ayar dosyasını silin ya da destek rehberine bakın; veriler taşınmaz.')),
+    h('div',{class:'kart'},h('button',{class:'t',onclick:async()=>{if(!confirm('Uygulama kapatılsın mı? Tepsi simgesi de kalkar.'))return;await api('cikis');document.body.textContent='Kimlik Merkezi kapatıldı. Bu sekmeyi kapatabilirsiniz.';}},'Uygulamadan çık')));
+};
+SF.hakkinda=async a=>{
+  const r=await api('hakkinda');
+  a.append(h('h2',{},'Hakkında'),h('div',{class:'kart'},h('div',{},`${r.ad} ${r.surum} (çekirdek ${r.cekirdek}, Python ${r.python})`),h('div',{},'Veri klasörü: '+r.veri_klasoru)),
+    h('div',{class:'kart'},h('h3',{},'Güvenlik ve gizlilik'),h('p',{},'Arayüz yalnızca bu bilgisayarda (127.0.0.1) çalışır; hiçbir şey internete açılmaz.'),h('p',{},r.sifreleme_notu),h('p',{class:'uyari'},r.smartscreen_notu)),
+    h('div',{class:'kart'},h('h3',{},'Lisanslar'),h('ul',{},r.lisanslar.map(x=>h('li',{},x)))));
+};
+// ------------------------------------------------------------------ ilk açılış sihirbazı
+async function sihirbaz(ac){
+  let adim=1,yol=ac.varsayilan_klasor,oto=true,son=null;
+  const ciz=()=>{
+    const k=$('#kok-pencere');k.textContent='';let icerik;
+    if(adim===1){const g=h('input',{type:'text',value:yol,oninput:e=>{yol=e.target.value;den();}});const sonuc=h('div',{});
+      const den=async()=>{const r=await api('sihirbaz_denetle',{yol}).catch(()=>null);sonuc.textContent='';if(!r)return;
+        sonuc.append(h('div',{class:r.ok?'tamam':'kotu'},r.mesaj),h('div',{class:'soluk'},'Bu sürücüdeki boş alan: '+r.bos_alan_metni));
+        ileri.disabled=!r.ok;};
+      const ileri=h('button',{class:'d',disabled:true,onclick:()=>{adim=2;ciz();}},'İleri');
+      icerik=[h('p',{},'Kimlik Merkezi verilerinizi tek bir klasörde, bu bilgisayarda tutar. Klasörü seçin (başka bir sürücü de olabilir). Veritabanı ve alt klasörler otomatik oluşturulur.'),
+        h('div',{class:'satir'},g,h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'klasor'}).catch(hataGoster);if(r&&r.yol){yol=r.yol;g.value=yol;den();}}},'Seç…')),sonuc,
+        h('div',{class:'soluk'},'İpucu: klasörü BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir; uygulama kendisi şifrelemez.'),h('div',{class:'satir'},ileri)];
+      setTimeout(den,0);}
+    else if(adim===2){
+      icerik=[h('p',{},'Seçtiğiniz klasör: '+yol),h('label',{},h('input',{type:'checkbox',checked:oto,onchange:e=>{oto=e.target.checked;}}),' Windows açılışında otomatik başlat (tepsi simgesiyle; sonra Ayarlar\'dan kapatılabilir)'),
+        h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{adim=1;ciz();}},'Geri'),h('button',{class:'d',onclick:async e=>{e.target.disabled=true;
+          son=await api('sihirbaz_tamamla',{yol,otomatik_baslat:oto}).catch(x=>{hataGoster(x);return null;});if(son){adim=3;ciz();}else e.target.disabled=false;}},'Kur')) ];}
+    else{icerik=[h('p',{class:'tamam'},'Hazır. Veritabanı ve klasörler oluşturuldu.'),h('div',{class:'soluk'},son.dosyalar.join(', ')),
+        h('h3',{},'MCP bağlantı bilgisi'),h('p',{class:'soluk'},'Claude gibi uygulamaların verinize bağlanması için Erişim ekranından anahtar üretin ya da "Claude Desktop\'a ekle" düğmesini kullanın. Ayar şablonu:'),
+        yapistirmaKutusu(son.baglanti.metin),h('div',{class:'satir'},h('button',{class:'d',onclick:()=>{k.textContent='';start();}},'Başla'))];}
+    k.append(h('div',{class:'yer'},h('div',{class:'pencere'},h('h2',{},`İlk açılış (${adim}/3)`),...icerik)));};
+  ciz();}
+async function start(){
+  const ac=await api('acilis');temaUygula(ac.tema);
+  if(ac.baslangic_hatasi)bildir('Başlangıç hatası: '+ac.baslangic_hatasi,true);
+  if(ac.sihirbaz){menu();$('#ana').textContent='';return sihirbaz(ac);}
+  git('ana');}
+menu();start().catch(hataGoster);
+</script>
+</body>
+</html>
