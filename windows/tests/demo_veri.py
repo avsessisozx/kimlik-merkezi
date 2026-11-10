@@ -3,7 +3,7 @@
 2-3 yıllık, mevsimsel ve haftalık desenli, on binlerce olay: YouTube kanalları, aramalar, siteler,
 Reddit, Spotify, GitHub, uygulama kullanımı, dosyalar, notlar + hassas kategoriler (yalnız sayı: içerik üretilmez).
 
-Kullanım:  python demo_veri.py <veri_klasoru> [--tohum N] [--olcek 1.0] [--profil ayse|mehmet]
+Kullanım:  python demo_veri.py <veri_klasoru> [--tohum N] [--olcek 1.0] [--profil ayse|deniz]
 Ekran görüntüsü ve tasarım denemeleri için; testlerde küçük ölçekle (olcek=0.02) kullanılabilir."""
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ BITIS = date(2026, 11, 9)
 KANALLAR = {   # kanal: (ağırlık, [video başlığı şablonları], tür, bitiş/başlangıç tarihi)
     "Kod Mutfağı": (10, ["Python ile {} nasıl yapılır", "SQLite iç yapısı: {}", "Rust öğreniyorum: {}", "Veritabanı tasarımı {}"], "Eğitim", None),
     "Bilim Atölyesi": (8, ["Kuantum fiziği {}", "Evrenin {} sırrı", "Beyin ve {}", "Kara delikler {}"], "Belgesel", None),
-    "Gezgin Mehmet": (7, ["{} şehir turu", "Karadeniz'de {} günü", "Kapadokya {}", "Lizbon'da {} saat"], "Seyahat", None),
+    "Gezgin Deniz": (7, ["{} şehir turu", "Karadeniz'de {} günü", "Kapadokya {}", "Lizbon'da {} saat"], "Seyahat", None),
     "Pratik Yemek": (6, ["{} tarifi", "15 dakikada {}", "Anne usulü {}", "Fırında {}"], "Yemek", None),
     "Tarih Sohbetleri": (6, ["Osmanlı'da {}", "Roma imparatorluğu {}", "{} savaşı", "Anadolu uygarlıkları {}"], "Belgesel", None),
     "Mini Belgesel": (5, ["Okyanusların {}", "Kutup {}", "Orman {}"], "Belgesel", None),
@@ -84,7 +84,7 @@ def _saat_sec(rng, tepeler):
 
 def uret(hub: Hub, *, tohum: int = 7, olcek: float = 1.0, profil: str = "ayse") -> dict:
     rng = random.Random(tohum)
-    P = {"ayse": {"mevsim": 0.28, "buyume": 0.5, "hafta_sonu": 1.5}, "mehmet": {"mevsim": 0.15, "buyume": 0.9, "hafta_sonu": 1.1}}[profil]
+    P = {"ayse": {"mevsim": 0.28, "buyume": 0.5, "hafta_sonu": 1.5}, "deniz": {"mevsim": 0.15, "buyume": 0.9, "hafta_sonu": 1.1}}[profil]
     gunler = [BASLANGIC + timedelta(days=i) for i in range((BITIS - BASLANGIC).days + 1)]
     agirlik = [_gun_agirligi(d, P) for d in gunler]
     sayac = {"n": 0}
@@ -181,7 +181,7 @@ def kisi_bilgileri(persona, profil: str) -> None:
     veri = {"ayse": [("Adım Ayşe Yılmaz", "kimlik", "ad"), ("İstanbul'da yaşıyorum", "kimlik", "sehir"), ("Kahveyi sütsüz içerim", "tercihler", "kahve"),
                      ("Yazılım geliştiriciyim", "is", "meslek"), ("Windows 11 dizüstü bilgisayar kullanıyorum", "cihazlar", "pc"),
                      ("Bilim ve belgesel videoları izlerim", "ilgi", "video"), ("kimlik-merkezi projesini geliştiriyorum", "projeler", "proje")],
-            "mehmet": [("Adım Mehmet Demir", "kimlik", "ad"), ("Ankara'da yaşıyorum", "kimlik", "sehir"), ("Gitar çalarım", "ilgi", "gitar"),
+            "deniz": [("Adım Deniz Aydın", "kimlik", "ad"), ("Ankara'da yaşıyorum", "kimlik", "sehir"), ("Gitar çalarım", "ilgi", "gitar"),
                        ("Çayı şekersiz içerim", "tercihler", "cay"), ("Mühendisim", "is", "meslek")]}[profil]
     for stmt, kat, key in veri:
         persona.add_fact(stmt, kat, fact_key=key)
@@ -193,7 +193,7 @@ def main(argv=None) -> int:
     p.add_argument("klasor", type=Path)
     p.add_argument("--tohum", type=int, default=7)
     p.add_argument("--olcek", type=float, default=1.0)
-    p.add_argument("--profil", choices=["ayse", "mehmet"], default="ayse")
+    p.add_argument("--profil", choices=["ayse", "deniz"], default="ayse")
     a = p.parse_args(argv)
     with Hub.open(a.klasor, write=True) as hub:
         r = uret(hub, tohum=a.tohum, olcek=a.olcek, profil=a.profil)
