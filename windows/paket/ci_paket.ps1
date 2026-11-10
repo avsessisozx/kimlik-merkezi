@@ -1,6 +1,6 @@
 # CI: PyInstaller + Inno Setup ile kurulum paketi üretir, sessiz kurar, dener, kaldırır.
 # Yerelde de çalışır (Windows, Python ortamı kurulu). Çıktılar windows/paket/cikti/ altında.
-param([string]$Surum = '0.1.0')
+param([string]$Surum = '0.1.1')
 $ErrorActionPreference = 'Stop'
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'

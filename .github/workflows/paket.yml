@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       surum:
-        description: "Sürüm numarası (ör. 0.1.0); windows/src/kimlikwin/__init__.py ile aynı olmalı"
+        description: "Sürüm numarası (ör. 0.1.1); windows/src/kimlikwin/__init__.py ile aynı olmalı"
         required: true
-        default: "0.1.0"
+        default: "0.1.1"
         type: string
       onsurum:
         description: "Ön sürüm olarak işaretle"
@@ -47,7 +47,7 @@ jobs:
         run: |
           UYG=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' windows/src/kimlikwin/__init__.py)
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then S="${GITHUB_REF_NAME#v}"; else S="${GIRDI_SURUM:-$UYG}"; fi
-          echo "$S" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Geçersiz sürüm: '$S' (örnek 0.1.0)"; exit 1; }
+          echo "$S" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Geçersiz sürüm: '$S' (örnek 0.1.1)"; exit 1; }
           UYG=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' windows/src/kimlikwin/__init__.py)
           PRJ=$(sed -n 's/^version = "\(.*\)"/\1/p' windows/pyproject.toml | head -1)
           echo "istenen=$S uygulama(Hakkında)=$UYG pyproject=$PRJ"

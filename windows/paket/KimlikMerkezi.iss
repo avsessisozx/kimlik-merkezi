@@ -1,7 +1,7 @@
 ; Kimlik Merkezi kurulum paketi. Kullanıcı bazlı: yönetici izni GEREKMEZ.
-; Derleme: ISCC /DSurum=0.1.0 /DKaynak=<PyInstaller dist\KimlikMerkezi> KimlikMerkezi.iss
+; Derleme: ISCC /DSurum=0.1.1 /DKaynak=<PyInstaller dist\KimlikMerkezi> KimlikMerkezi.iss
 #ifndef Surum
-  #define Surum "0.1.0"
+  #define Surum "0.1.1"
 #endif
 #define AppAd "Kimlik Merkezi"
 
