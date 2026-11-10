@@ -1,0 +1,48 @@
+{
+  "locations": [
+    {
+      "latitudeE7": 410000000,
+      "longitudeE7": 290000000,
+      "accuracy": 18,
+      "source": "WIFI",
+      "deviceTag": -1,
+      "timestamp": "2025-01-10T09:00:00.123Z",
+      "platformType": "ANDROID",
+      "formFactor": "PHONE",
+      "serverTimestamp": "2025-01-10T09:00:05.000Z",
+      "deviceTimestamp": "2025-01-10T09:00:00.000Z",
+      "batteryCharging": false,
+      "osLevel": 33,
+      "deviceDesignation": "PRIMARY"
+    },
+    {
+      "latitudeE7": 410010000,
+      "longitudeE7": 290020000,
+      "accuracy": 30,
+      "source": "CELL",
+      "timestampMs": "1736500000000",
+      "activity": [
+        {
+          "activity": [
+            {
+              "type": "STILL",
+              "confidence": 90
+            }
+          ],
+          "timestamp": "2025-01-10T09:01:00Z"
+        }
+      ]
+    },
+    {
+      "latitudeE7": 999999999999,
+      "longitudeE7": 0,
+      "timestamp": "2025-01-10T09:02:00Z"
+    },
+    {
+      "yeniAlan": "bilinmeyen",
+      "latitudeE7": 410020000,
+      "longitudeE7": 290030000,
+      "timestamp": "2025-01-10T09:03:00Z"
+    }
+  ]
+}

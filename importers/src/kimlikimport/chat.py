@@ -205,8 +205,14 @@ class ChatGPT(_ConvImporter):
         ct = content.get("content_type")
         if ct in ("text", "multimodal_text", None):
             parts = content.get("parts") or []
-            t = "\n".join(p for p in parts if isinstance(p, str)).strip()
-            return t, None
+            texts = []
+            for p in parts if isinstance(parts, list) else []:
+                if isinstance(p, str):
+                    texts.append(p)
+                elif isinstance(p, dict) and isinstance(p.get("text"), str) and (
+                        p.get("content_type") in ("audio_transcription", "text", None)):
+                    texts.append(p["text"])  # sesli sohbet dökümü: parts içinde nesne olarak gelir
+            return "\n".join(texts).strip(), None
         if ct == "code":
             t = str(content.get("text") or "").strip()
             return (f"```\n{t}\n```" if t else ""), None
@@ -251,6 +257,12 @@ class ChatGPT(_ConvImporter):
             if meta.get("is_visually_hidden_from_conversation"):
                 self._skip("chatgpt: gizli mesaj atlandı")
                 continue
+            if role == "assistant" and msg.get("recipient") not in (None, "all"):
+                self._skip("chatgpt: araç çağrısı (alıcı all değil) atlandı")
+                continue
+            if meta.get("is_thinking_preamble_message"):
+                self._skip("chatgpt: düşünme ara notu atlandı")
+                continue
             text, skipped = self._text(msg.get("content"))
             if skipped:
                 self._skip(f"chatgpt: içerik türü atlandı ({skipped})")
@@ -284,6 +296,8 @@ class Claude(_ConvImporter):
     def _text(m: dict) -> str:
         parts = []
         blocks = m.get("content")
+        if isinstance(blocks, str):
+            return blocks.strip()
         if isinstance(blocks, list):
             for b in blocks:
                 if isinstance(b, dict) and b.get("type") == "text" and b.get("text"):
@@ -378,7 +392,7 @@ class GenericChat(ScanImporter):
                 continue
             try:
                 kind = self._sniff(e, ext)
-            except (ijson.JSONError, UnicodeDecodeError, OSError):
+            except (ijson.JSONError, UnicodeDecodeError, OSError, ValueError):  # ValueError: json.JSONDecodeError
                 bad.append(e.name)
                 continue
             if kind:

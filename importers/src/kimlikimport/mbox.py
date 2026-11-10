@@ -6,6 +6,7 @@ Biçim: mbox/mboxrd ("From " ayırıcı satırı; Gmail iletileri `X-Gmail-Label
 """
 from __future__ import annotations
 
+import csv
 import email
 import email.policy
 import re
@@ -141,6 +142,17 @@ def _date(msg, from_line: bytes) -> str | None:
     return None
 
 
+def _labels(v: str) -> list[str]:
+    """`X-Gmail-Labels`: virgülle ayrılmış; virgül içeren etiket tırnaklanır ("A, B",Inbox)."""
+    if not v:
+        return []
+    try:
+        row = next(csv.reader([v], skipinitialspace=True), [])
+    except csv.Error:
+        row = v.split(",")
+    return [x.strip() for x in row if x.strip()]
+
+
 def message_event(from_line: bytes, raw: bytes, truncated: bool) -> EventIn | None:
     """Tek iletiden olay; tarih çözülemezse None (çağıran sayar)."""
     msg = email.message_from_bytes(raw, policy=email.policy.default)
@@ -153,7 +165,7 @@ def message_event(from_line: bytes, raw: bytes, truncated: bool) -> EventIn | No
         text, atts = _body_and_attachments(msg)
     except Exception:
         text, atts = "", []
-    labels = [x.strip() for x in _hdr(msg, "X-Gmail-Labels").split(",") if x.strip()]
+    labels = _labels(_hdr(msg, "X-Gmail-Labels"))
     payload = {
         "konu": subject, "kimden": sender, "kime": _hdr(msg, "To"), "kopya": _hdr(msg, "Cc"),
         "ileti_kimligi": mid, "etiketler": labels, "konusma_kimligi": _hdr(msg, "X-GM-THRID"),

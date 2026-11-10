@@ -30,7 +30,7 @@ NAME = "browser_history"
 WEBKIT_OFFSET_US = 11_644_473_600 * 1_000_000
 SQLITE_MAGIC = b"SQLite format 3\x00"
 _SIDE = ("-wal", "-shm", "-journal")
-_CHROMIUM_NAMES = ("History",)
+_CHROMIUM_NAMES = ("History", "History.db")
 _TRANSITION = {0: "LINK", 1: "TYPED", 2: "AUTO_BOOKMARK", 3: "AUTO_SUBFRAME", 4: "MANUAL_SUBFRAME",
                5: "GENERATED", 6: "START_PAGE", 7: "FORM_SUBMIT", 8: "RELOAD", 9: "KEYWORD",
                10: "KEYWORD_GENERATED"}
@@ -43,7 +43,8 @@ def default_locations(env: Mapping[str, str] | None = None) -> list[Path]:
     out: list[Path] = []
     local, roam = env.get("LOCALAPPDATA"), env.get("APPDATA")
     chromium = (("Google/Chrome", "chrome"), ("Microsoft/Edge", "edge"),
-                ("BraveSoftware/Brave-Browser", "brave"), ("Chromium", "chromium"))
+                ("BraveSoftware/Brave-Browser", "brave"), ("Chromium", "chromium"),
+                ("Vivaldi", "vivaldi"))
     if local:
         for sub, _ in chromium:
             root = Path(local) / sub / "User Data"
@@ -53,6 +54,11 @@ def default_locations(env: Mapping[str, str] | None = None) -> list[Path]:
                     if prof.is_dir() and h.is_file():
                         out.append(h)
     if roam:
+        # Opera profil klasörü yok: History doğrudan sürüm klasöründe (browser-history 0.4 kaynağına göre)
+        for sub in ("Opera Software/Opera Stable", "Opera Software/Opera GX Stable"):
+            h = Path(roam) / sub / "History"
+            if h.is_file():
+                out.append(h)
         prof_root = Path(roam) / "Mozilla" / "Firefox" / "Profiles"
         if prof_root.is_dir():
             for prof in sorted(prof_root.iterdir()):
@@ -145,6 +151,8 @@ def _kind_of_db(snap: Path) -> tuple[str | None, str]:
         if {"moz_places", "moz_historyvisits"} <= tables:
             miss = ({"id", "url", "title"} - cols("moz_places")) | ({"place_id", "visit_date"} - cols("moz_historyvisits"))
             return ("firefox", "") if not miss else (None, "Firefox sütunları eksik: " + ", ".join(sorted(miss)))
+        if {"history_items", "history_visits"} <= tables:
+            return None, "Safari History.db tanındı ama bu sürümde desteklenmiyor (Windows'ta Safari yok)"
         return None, "ne Chromium (urls/visits) ne Firefox (moz_places/moz_historyvisits) tabloları var"
     except sqlite3.Error as e:
         return None, f"şema okunamadı ({type(e).__name__})"
@@ -295,6 +303,8 @@ class BrowserHistory(ScanImporter):
             if not isinstance(vd, int) or vd <= 0 or not url:
                 self._skip("firefox: ziyaret zamanı/url geçersiz")
                 continue
+            if vd < 300_000_000 * 1_000_000:  # çok eski sürümlerde milisaniye (browserexport'taki ayrım)
+                vd *= 1000
             try:
                 ts = datetime.fromtimestamp(vd / 1_000_000, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             except (OverflowError, OSError, ValueError):

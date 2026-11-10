@@ -73,6 +73,8 @@ _SPECS: dict[str, _Spec] = {
         "reddit.abone", Category.SOSYAL, {"subreddit"}, {"subreddit"},
         ["subreddit"], ["subreddit"], None),
 }
+# messages_archive.csv: eski özel mesajlar, messages.csv ile aynı sütunlar (ikincil bilgi, DOĞRULANMADI)
+_SPECS["messages_archive.csv"] = _SPECS["messages.csv"]
 # Bilinen ama bilerek işlenmeyenler (gizlilik/anlamsızlık): rapora yazılır.
 _SKIPPED_BY_DESIGN = {
     "ip_logs.csv": "IP kayıtları, bilerek alınmıyor (gizlilik)",

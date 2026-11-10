@@ -1,0 +1,29 @@
+[
+  {
+    "contentDetails": {
+      "videoId": "CCCCCCCCCCC",
+      "videoPublishedAt": "2024-01-01T00:00:00.000Z"
+    },
+    "etag": "etag1",
+    "id": "pl1",
+    "kind": "youtube#playlistItem",
+    "snippet": {
+      "channelId": "UCuuuuuuuuuuuuuuuuuuuuuu",
+      "channelTitle": "Örnek Hesap",
+      "description": "",
+      "playlistId": "LL",
+      "position": 0,
+      "publishedAt": "2024-05-06T07:08:09.000Z",
+      "resourceId": {
+        "kind": "youtube#video",
+        "videoId": "CCCCCCCCCCC"
+      },
+      "thumbnails": {},
+      "title": "Örnek Beğenilen Video",
+      "videoOwnerChannelTitle": "Örnek Kanal"
+    },
+    "status": {
+      "privacyStatus": "private"
+    }
+  }
+]

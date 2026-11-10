@@ -1,0 +1,26 @@
+[
+  {
+    "header": "Gemini Apps",
+    "title": "Sorulan istem: Örnek bir soru sor",
+    "time": "2025-03-01T12:00:00.000Z",
+    "products": [
+      "Gemini Apps"
+    ],
+    "activityControls": [
+      "Gemini Apps Activity"
+    ],
+    "safeHtmlItem": [
+      {
+        "html": "<p>Örnek <b>yanıt</b> metni.</p>"
+      }
+    ]
+  },
+  {
+    "header": "Gemini Apps",
+    "title": "Prompted Another sample question",
+    "time": "2025-03-02T12:00:00Z",
+    "products": [
+      "Gemini Apps"
+    ]
+  }
+]

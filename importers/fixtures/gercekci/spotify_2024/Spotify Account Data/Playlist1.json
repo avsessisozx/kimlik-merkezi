@@ -1,0 +1,25 @@
+{
+  "playlists": [
+    {
+      "name": "Örnek Liste",
+      "lastModifiedDate": "2025-01-02",
+      "collaborators": [],
+      "numberOfFollowers": 0,
+      "description": null,
+      "items": [
+        {
+          "track": {
+            "trackName": "Örnek Şarkı",
+            "artistName": "Örnek Sanatçı",
+            "albumName": "Örnek Albüm",
+            "trackUri": "spotify:track:0000000000000000000001"
+          },
+          "episode": null,
+          "audioBook": null,
+          "localTrack": null,
+          "addedDate": "2024-12-30"
+        }
+      ]
+    }
+  ]
+}

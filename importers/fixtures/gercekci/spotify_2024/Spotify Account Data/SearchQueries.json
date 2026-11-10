@@ -1,0 +1,16 @@
+[
+  {
+    "platform": "WINDOWS",
+    "searchTime": "2025-01-05T18:20:00.000Z[UTC]",
+    "searchQuery": "örnek",
+    "searchInteractionURIs": []
+  },
+  {
+    "platform": "WINDOWS",
+    "searchTime": "2025-01-05T18:21:00.000Z",
+    "searchQuery": "ornek2",
+    "searchInteractionURIs": [
+      "spotify:track:1"
+    ]
+  }
+]

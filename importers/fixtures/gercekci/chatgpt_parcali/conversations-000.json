@@ -1,0 +1,320 @@
+[
+  {
+    "title": "Örnek çay sohbeti",
+    "create_time": 1738000000.123,
+    "update_time": 1738000500.5,
+    "mapping": {
+      "root": {
+        "id": "root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "sys"
+        ]
+      },
+      "sys": {
+        "id": "sys",
+        "message": {
+          "id": "sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": null,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "root",
+        "children": [
+          "u1"
+        ]
+      },
+      "u1": {
+        "id": "u1",
+        "message": {
+          "id": "u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000010.0,
+          "update_time": 1738000010.0,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Çay nasıl demlenir?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "request_id": "r1"
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "sys",
+        "children": [
+          "a1",
+          "a1b"
+        ]
+      },
+      "a1b": {
+        "id": "a1b",
+        "message": {
+          "id": "a1b",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000020.0,
+          "update_time": 1738000020.0,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "(eski, yeniden üretilen dal)"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "gpt-4o"
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "u1",
+        "children": []
+      },
+      "a1": {
+        "id": "a1",
+        "message": {
+          "id": "a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000030.0,
+          "update_time": 1738000030.0,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Önce suyu kaynatın."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "gpt-4o",
+            "finish_details": {
+              "type": "stop"
+            }
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "u1",
+        "children": [
+          "tc"
+        ]
+      },
+      "tc": {
+        "id": "tc",
+        "message": {
+          "id": "tc",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000040.0,
+          "update_time": 1738000040.0,
+          "content": {
+            "content_type": "code",
+            "parts": [
+              "search('çay')"
+            ],
+            "language": "unknown",
+            "text": "search('çay')"
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "browser",
+          "channel": null
+        },
+        "parent": "a1",
+        "children": [
+          "to"
+        ]
+      },
+      "to": {
+        "id": "to",
+        "message": {
+          "id": "to",
+          "author": {
+            "role": "tool",
+            "name": "browser",
+            "metadata": {}
+          },
+          "create_time": 1738000050.0,
+          "update_time": 1738000050.0,
+          "content": {
+            "content_type": "tether_browsing_display",
+            "parts": [
+              ""
+            ],
+            "result": "x",
+            "summary": null
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "tc",
+        "children": [
+          "u2"
+        ]
+      },
+      "u2": {
+        "id": "u2",
+        "message": {
+          "id": "u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000060.0,
+          "update_time": 1738000060.0,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "Sesli soru: kaç dakika?",
+                "direction": "in",
+                "decoding_id": null
+              },
+              {
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_x",
+                "size_bytes": 10
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "to",
+        "children": [
+          "a2"
+        ]
+      },
+      "a2": {
+        "id": "a2",
+        "message": {
+          "id": "a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000070.0,
+          "update_time": 1738000070.0,
+          "content": {
+            "content_type": "thoughts",
+            "parts": [],
+            "thoughts": [
+              {
+                "summary": "x",
+                "content": "gizli düşünce",
+                "finished": true
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "u2",
+        "children": [
+          "a3"
+        ]
+      },
+      "a3": {
+        "id": "a3",
+        "message": {
+          "id": "a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1738000080.0,
+          "update_time": 1738000080.0,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Üç dakika."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "gpt-4o"
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "a2",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "a3",
+    "conversation_id": "c0000001-0000-4000-8000-000000000001",
+    "default_model_slug": "gpt-4o",
+    "safe_urls": [],
+    "blocked_urls": [],
+    "gizmo_id": null,
+    "is_archived": false,
+    "is_starred": null,
+    "memory_scope": "global_enabled",
+    "yeni_bilinmeyen_alan": {
+      "x": 1
+    }
+  }
+]
