@@ -190,7 +190,17 @@ def uret(surum: str, ekler: set[str]) -> dict:
     return belge
 
 
+def _utf8_akis() -> None:
+    """Windows konsolu (cp1252 vb.) Türkçe harfte çökmesin: çıktı UTF-8, çözülemeyen karakter '?' olur."""
+    for akis in (sys.stdout, sys.stderr):
+        try:
+            akis.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_akis()
     p = argparse.ArgumentParser(description="CycloneDX SBOM (JSON) üretir; yeni bağımlılık gerektirmez.")
     p.add_argument("--cikti", required=True, help="yazılacak dosya (örn. cikti/sbom.cdx.json)")
     p.add_argument("--surum", default=None, help="uygulama sürümü (varsayılan: kimlikwin sürümü)")

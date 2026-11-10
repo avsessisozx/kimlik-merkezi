@@ -31,6 +31,10 @@ jobs:
   paket:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      # Windows konsolu varsayılan olarak cp1252 kullanır; Türkçe çıktı Python'u çökertmesin (tüm adımlar)
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
     outputs:
       surum: ${{ steps.surum.outputs.surum }}
     steps:
@@ -71,6 +75,9 @@ jobs:
         run: ./windows/paket/ci_paket.ps1 -Surum "${{ steps.surum.outputs.surum }}"
       - name: Yazılım malzeme listesi (SBOM, CycloneDX) - paketin derlendiği kurulu ortamdan
         shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
         run: python windows/paket/sbom_uret.py --surum "${{ steps.surum.outputs.surum }}" --ek tepsi --cikti windows/paket/cikti/sbom.cdx.json
       - uses: actions/upload-artifact@v4
         if: always()
