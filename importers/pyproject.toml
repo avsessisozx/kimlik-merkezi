@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Kimlik Merkezi içe aktarıcıları (Google Takeout, Reddit)"
 requires-python = ">=3.12"
 # ijson: BSD-3-Clause ve ISC lisanslı (paket meta verisinden doğrulandı), akışla JSON okur.
-dependencies = ["kimlikcore", "ijson>=3.3"]
+# pypdf: BSD-3-Clause, python-docx: MIT, Pillow: MIT-CMU (HPND); hepsi izin verici lisans.
+dependencies = ["kimlikcore", "ijson>=3.3", "pypdf>=4", "python-docx>=1.1", "Pillow>=10"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
