@@ -12,6 +12,7 @@ from kimlikserver.persona import PersonaReader
 
 BOLGELER = [
     ("bas", "Baş: ilgi ve merak", ["tarama"], False),
+    ("zihin", "Zihin: yapay zekâ sohbetleri (hassas)", ["sohbet"], True),
     ("goz", "Gözler: izledikleri", ["video"], False),
     ("kulak", "Kulaklar: dinledikleri", ["muzik"], False),
     ("agiz", "Ağız: yazdıkları/söyledikleri", ["sosyal"], False),
@@ -77,7 +78,7 @@ def _en_cok(rng, adlar, buyuk=900, ornek=None):
 def harita(hub, *, ac_hassas=frozenset(), now=None) -> dict:
     n = _olay_sayisi(hub)
     pr = PersonaReader(hub)
-    beyan = [{"statement": f.statement, "category": f.category, "status": f.status} for f in pr.list_facts()]
+    beyan = [{"kategori": f.category, "durum": f.status, "kaynak": None, "veri": f.statement} for f in pr.list_facts()]
     bolgeler = []
     for i, (bid, ad, kat, hassas) in enumerate(BOLGELER):
         kilitli = hassas and bid not in ac_hassas
@@ -121,7 +122,7 @@ def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None) -> dict:
     elif bolge_id == "el":
         g = [_pasta(r, "Dosya türleri", DOSYA_TURLERI), _zaman(r, "Aylık üretim", 40), _cubuk(r, "Depo etkinliği", ["kimlik-merkezi", "blog", "dotfiles", "araclar"], 200)]
         e = _en_cok(r, DOSYA_TURLERI, 150)
-    elif bolge_id in ("kalp", "karin"):
+    elif bolge_id in ("kalp", "karin", "zihin"):
         g = [_zaman(r, "Aylık sayı", 30), _hafta(r, "Hafta ısı haritası")]
         notlar.append("Yalnız sayı ve zaman dağılımı; içerik gösterilmez.")
     elif bolge_id == "ayak":

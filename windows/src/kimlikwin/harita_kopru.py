@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-HASSAS = frozenset({"kalp", "karin", "ayak"})
+HASSAS = frozenset({"kalp", "karin", "ayak", "zihin"})   # zihin: yapay zekâ sohbetleri (baş çevresi, §13)
 
 # Testlerde atanır: (harita_fn, bolge_fn). Üretimde None kalır.
 saglayici: tuple[Callable[..., dict], Callable[..., dict]] | None = None

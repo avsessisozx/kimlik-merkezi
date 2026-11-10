@@ -230,3 +230,27 @@ def test_ayarlar_tema_ve_hata_raporu(ist):
     assert "SmartScreen" in h["smartscreen_notu"] and "BitLocker" in h["sifreleme_notu"]
     assert "Kimlik Merkezi hata raporu" in ist.api("hata_raporu", {"adim": "x"})["metin"]
     assert ist.api("acilis")["tema"] == "koyu"
+
+
+def test_tum_kategorilerin_etiketi_var_ve_bilinmeyen_kategori_patlamaz(ist, monkeypatch):
+    from kimlikcore import Category
+
+    from kimlikwin import cekirdek
+    eksik = [k for k in Category.ALL if k not in cekirdek.KATEGORI_ETIKETLERI]
+    assert not eksik, f"etiketi olmayan kategori: {eksik}"
+    assert cekirdek.KATEGORI_ETIKETLERI["sohbet"] == "Yapay zekâ sohbetleri"
+    # çekirdeğe yeni kategori eklenip etiket unutulursa: KeyError değil, kimlik gösterilir
+    monkeypatch.setattr(Category, "ALL", frozenset(Category.ALL | {"yeni_kat"}))
+    kat = {k["kimlik"]: k for k in ist.api("durum")["kategoriler"]}
+    assert kat["yeni_kat"]["ad"] == "yeni_kat" and kat["sohbet"]["ad"] == "Yapay zekâ sohbetleri"
+    assert any(k["kimlik"] == "yeni_kat" for k in ist.api("erisim")["kategoriler"])
+
+
+def test_sohbet_hassas_ayri_onay_ister_ve_toplu_acmaya_girmez(ist):
+    app = ist.api("anahtar_uret", {"ad": "Sohbet deneme"})["id"]
+    k = {x["kimlik"]: x for x in ist.api("erisim")["kategoriler"]}
+    assert k["sohbet"]["hassas"] is True
+    kod, j = ist.post("izin_ver", {"app_id": app, "kategori": "sohbet"})
+    assert kod == 400 and "hassas" in j["hata"]
+    assert "sohbet" not in ist.api("izin_toplu", {"app_id": app})["acilan"]
+    assert ist.post("izin_ver", {"app_id": app, "kategori": "sohbet", "hassas_onay": True})[0] == 200

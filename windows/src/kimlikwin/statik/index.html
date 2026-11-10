@@ -239,10 +239,10 @@ function pastaGrafik(g){const toplam=Math.max(1,g.degerler.reduce((a,b)=>a+b,0))
 const GRAFIK={cubuk:cubukGrafik,zaman:zamanGrafik,saat:saatGrafik,hafta:haftaGrafik,pasta:pastaGrafik};
 function grafikKarti(g){const f=GRAFIK[g.tur];return h('div',{class:'kart'},h('h4',{},g.baslik),f?f(g):h('div',{class:'soluk'},'Desteklenmeyen grafik türü: '+g.tur));}
 // ------------------------------------------------------------------ insan figürü
-const HAP_AD={bas:'Baş',goz:'Gözler',kulak:'Kulaklar',agiz:'Ağız',el:'Eller',kalp:'Kalp',karin:'Karın',ayak:'Ayaklar',ic:'Merkez'};
+const HAP_AD={bas:'Baş',goz:'Gözler',kulak:'Kulaklar',agiz:'Ağız',el:'Eller',kalp:'Kalp',karin:'Karın',ayak:'Ayaklar',ic:'Merkez',zihin:'Zihin'};
 // pill: [taraf, y, ankraj x, ankraj y]
 const HAP_YER={bas:['s',28,246,48],goz:['s',104,262,94],agiz:['s',180,270,132],el:['s',398,150,456],ayak:['s',648,196,704],
-  kulak:['r',54,338,100],kalp:['r',212,332,252],ic:['r',288,298,318],karin:['r',362,330,390]};
+  kulak:['r',62,338,100],zihin:['r',4,398,30],kalp:['r',212,332,252],ic:['r',288,298,318],karin:['r',362,330,390]};
 function kilitSimge(x,y,k=1){return sv('path',{class:'kilit-ik',transform:`translate(${x} ${y}) scale(${k})`,d:'M5 0a5 5 0 0 0-5 5v3H-1v9h12V8h-1V5a5 5 0 0 0-5-5zm0 2.4A2.6 2.6 0 0 1 7.6 5v3H2.4V5A2.6 2.6 0 0 1 5 2.4z'});}
 const KOL_SOL='M206 222 C186 256 176 304 172 352 S168 408 168 430',KOL_SAG='M354 222 C374 256 384 304 388 352 S392 408 392 430';
 const BACAK_SOL='M248 446 L244 560 L242 668',BACAK_SAG='M312 446 L316 560 L318 668';
@@ -274,7 +274,8 @@ function figurCiz(veri,secili,tikla){
     kalp:()=>[sv('path',{class:'yuz',d:'M326 276 C300 258 298 234 314 232 C322 231 326 237 326 241 C326 237 332 231 339 233 C354 237 352 260 326 276 Z'})],
     ic:()=>[sv('circle',{class:'yuz',cx:280,cy:318,r:19}),sv('circle',{cx:280,cy:318,r:6,fill:'var(--vurgu-yazi)',opacity:.9,'pointer-events':'none'})],
     karin:()=>[sv('ellipse',{class:'yuz',cx:280,cy:390,rx:52,ry:38})],
-    ayak:()=>[sv('ellipse',{class:'yuz',cx:232,cy:700,rx:38,ry:16}),sv('ellipse',{class:'yuz',cx:328,cy:700,rx:38,ry:16})]};
+    ayak:()=>[sv('ellipse',{class:'yuz',cx:232,cy:700,rx:38,ry:16}),sv('ellipse',{class:'yuz',cx:328,cy:700,rx:38,ry:16})],
+    zihin:()=>[sv('circle',{class:'yuz',cx:346,cy:62,r:5}),sv('circle',{class:'yuz',cx:355,cy:48,r:7.5}),sv('ellipse',{class:'yuz',cx:374,cy:32,rx:26,ry:15})]};
   const maks=Math.max(1,...veri.bolgeler.filter(b=>!b.kilitli).map(b=>b.olay_sayisi||0));
   veri.bolgeler.forEach(b=>{const yer=HAP_YER[b.id];if(!yer||!sekil[b.id])return;
     const bos=!b.kilitli&&!b.olay_sayisi,[taraf,py,ax,ay]=yer,pw=140,ph=48,px=taraf==='s'?6:414;
@@ -309,7 +310,7 @@ SF.harita=async a=>{
     catch(e){panel.textContent='';hataGoster(e);}}
   function bolgePaneli(b,d){const out=[];const baslik=(d.ad||b.ad||HAP_AD[b.id]);
     out.push(h('div',{class:'panel-baslik'},h('h2',{},baslik),h('span',{class:'etiket-veri'},'veriden sayım'),
-      b.id&&['kalp','karin','ayak'].includes(b.id)&&!d.kilitli?h('button',{class:'i',onclick:async()=>{await api('harita_hassas',{bolge_id:b.id,ac:false}).catch(hataGoster);git('harita');}},'Tekrar kilitle'):null));
+      b.id&&['kalp','karin','ayak','zihin'].includes(b.id)&&!d.kilitli?h('button',{class:'i',onclick:async()=>{await api('harita_hassas',{bolge_id:b.id,ac:false}).catch(hataGoster);git('harita');}},'Tekrar kilitle'):null));
     if(d.kilitli){out.push(h('div',{class:'kart kilit-kutu'},
       sv('svg',{viewBox:'0 0 12 17','aria-hidden':'true'},sv('path',{d:'M6 0a5 5 0 0 0-5 5v3H0v9h12V8h-1V5a5 5 0 0 0-5-5zm0 2.4A2.6 2.6 0 0 1 8.6 5v3H3.4V5A2.6 2.6 0 0 1 6 2.4z'})),
       h('h3',{},'Bu bölge hassas ve kilitli'),h('p',{class:'soluk'},'Kayıtların içeriği hiçbir koşulda gösterilmez. Onaylarsanız yalnızca SAYILAR ve zaman dağılımı görünür; uygulama kapanınca yeniden kilitlenir.'),
@@ -331,7 +332,7 @@ SF.harita=async a=>{
       h('label',{},c,' Ne açtığımı biliyorum.'),h('div',{class:'satir'},dugme,h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}
   // sol: figür; sağ: profil + beyan + bölge paneli
   const beyan=h('div',{class:'kart'},h('h3',{},'Beyan edilen bilgiler'));
-  if(v.beyan&&v.beyan.length){beyan.append(h('ul',{class:'beyan'},v.beyan.slice(0,10).map(f=>h('li',{},f.statement||f.metin||'',' ',h('span',{class:'rozet'},f.category||f.kategori||'')))));
+  if(v.beyan&&v.beyan.length){beyan.append(h('ul',{class:'beyan'},v.beyan.slice(0,10).map(f=>h('li',{},f.veri||f.statement||f.metin||'',' ',h('span',{class:'rozet'},f.category||f.kategori||'')))));
     if(v.beyan.length>10)beyan.append(h('div',{class:'soluk'},`+${v.beyan.length-10} bilgi daha`));}
   else beyan.append(h('div',{class:'soluk'},'Henüz beyan edilen bilgi yok. '),h('button',{class:'i',onclick:()=>git('persona')},'Persona\'ya git'));
   const profil=h('div',{class:'kart profil'},h('h2',{},ad),h('div',{class:'alt'},`${SAYI(v.profil.olay)} kayıt · ${aralikMetni(v.profil)}`));

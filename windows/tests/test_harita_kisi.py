@@ -33,7 +33,7 @@ def test_uretimde_sahteye_dusme_yok(kurulu, monkeypatch):
 
 def test_harita_bicimi_ve_bos_veri(kurulu):
     v = kurulu.api("harita", {})
-    assert {b["id"] for b in v["bolgeler"]} == {"bas", "goz", "kulak", "agiz", "el", "kalp", "karin", "ayak", "ic"}
+    assert {b["id"] for b in v["bolgeler"]} == {"bas", "goz", "kulak", "agiz", "el", "kalp", "karin", "ayak", "ic", "zihin"}
     assert v["profil"]["olay"] == 0 and all(not b["olay_sayisi"] for b in v["bolgeler"] if not b["kilitli"])
     olay_ekle(kurulu)
     v = kurulu.api("harita", {})
@@ -51,7 +51,7 @@ def test_hassas_bolge_kilitli_sayi_ve_icerik_sizmaz(kurulu):
     harita_kopru.saglayici = (gercek_h, bolge_izle)
     v = kurulu.api("harita", {})
     for b in v["bolgeler"]:
-        if b["id"] in ("kalp", "karin", "ayak"):
+        if b["id"] in ("kalp", "karin", "ayak", "zihin"):
             assert b["kilitli"] and b["olay_sayisi"] is None and b["ozet"] == ""
     d = kurulu.api("harita_bolge", {"bolge_id": "kalp"})
     assert d["kilitli"] and d["grafikler"] == [] and "kalp" not in cagrilar     # sağlayıcı hiç çağrılmadı
@@ -152,3 +152,13 @@ def test_eski_kurulum_ben_kisisine_tasinir(yonetici, veri):
 def test_sihirbaz_kisi_adini_alir(yonetici, veri):
     yonetici.api("sihirbaz_tamamla", {"yol": str(veri), "otomatik_baslat": False, "ad": "Deniz"})
     assert yonetici.api("kisiler", {})["kisiler"][0]["ad"] == "Deniz"
+
+
+def test_zihin_bolgesi_hassas_kilitli(kurulu):
+    olay_ekle(kurulu)
+    z = next(b for b in kurulu.api("harita", {})["bolgeler"] if b["id"] == "zihin")
+    assert z["kilitli"] and z["olay_sayisi"] is None
+    assert kurulu.api("harita_bolge", {"bolge_id": "zihin"})["kilitli"]
+    kurulu.api("harita_hassas", {"bolge_id": "zihin", "ac": True, "onay": True})
+    d = kurulu.api("harita_bolge", {"bolge_id": "zihin"})
+    assert not d["kilitli"] and d["en_cok"] == []

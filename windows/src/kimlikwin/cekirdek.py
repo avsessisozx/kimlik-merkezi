@@ -23,8 +23,13 @@ KATEGORI_ETIKETLERI = {
     "tarama": "Tarama geçmişi", "video": "Video", "sosyal": "Sosyal medya", "muzik": "Müzik",
     "kod": "Kod", "notlar": "Notlar ve linkler", "dosyalar": "Dosyalar", "medya_meta": "Fotoğraf/video bilgisi",
     "uygulama": "Uygulama kullanımı", "persona": "Persona", "eposta": "E-posta", "mesaj": "Özel mesajlar",
-    "konum": "Konum",
+    "konum": "Konum", "sohbet": "Yapay zekâ sohbetleri",
 }
+
+
+def kategori_adi(kimlik: str) -> str:
+    """Etiketi olmayan (yeni eklenmiş) kategoride KeyError yerine kimliği gösterir."""
+    return KATEGORI_ETIKETLERI.get(kimlik, kimlik)
 
 
 class IslemHatasi(Exception):
@@ -100,7 +105,7 @@ class Uygulama:
 
     @staticmethod
     def kategoriler() -> list[dict[str, Any]]:
-        return [{"kimlik": k, "ad": KATEGORI_ETIKETLERI[k], "hassas": k in Category.SENSITIVE}
+        return [{"kimlik": k, "ad": kategori_adi(k), "hassas": k in Category.SENSITIVE}
                 for k in sorted(Category.ALL, key=lambda x: (x in Category.SENSITIVE, x))]
 
     # ------------------------------------------------------------------ persona haritası (§12)
