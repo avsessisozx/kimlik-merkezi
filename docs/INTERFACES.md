@@ -121,3 +121,30 @@ Ortak hata sınıfları `kimlikcore.errors`: `HubLockedError`, `PermissionDenied
 - Salt okunur açış göç etmez; eski şemada `SchemaTooOld`. MCP bunu "önce Kimlik Merkezi uygulamasını bir kez açın" iletisine çevirir.
 - Sunucu doğrudan SQL yazarsa `events.hidden=0` koşulunu kendisi ekler; tercihen `Hub.search/timeline` kullanır. `access_log.category` boş olabilir.
 - Python: `>=3.12`. MCP kütüphanesi (öneri, Karar C onayı bekliyor): resmî `mcp==2.3.0`.
+
+## 12. Persona Haritası (sürüm 1.2; kullanıcı isteği: insan figürü + bölge tıklayınca ayrıntılı grafikler)
+Amaç: bir kişinin dijital personasını insan figürü üzerinde göstermek. Her bölge bir veya birkaç kategoriyi temsil eder; tıklayınca o bölgenin ayrıntılı grafikleri açılır. **Yalnız veriden sayım ve dağılım** (en çok izlenen kanal, aylık etkinlik, saat dağılımı gibi); yapay zekâ ya da davranıştan "çıkarım" üretilmez, ekranda "veriden sayım" yazar. Çıkarım üretmek Aşama 9'dur.
+
+API (`kimlikserver.harita`, çekirdeğin `Hub.query` ile; Windows kabuğu aynı fonksiyonları çağırır):
+```python
+def harita(hub, *, ac_hassas: set[str] = frozenset(), now=None) -> dict
+def bolge(hub, bolge_id: str, *, ac_hassas=frozenset(), aralik=None) -> dict
+```
+`harita` çıktısı: `{"profil": {"ad": str, "olay": int, "ilk": ts, "son": ts}, "bolgeler": [Bolge özeti...], "beyan": [persona facts: beyan_edilen+dosyadan_alinan]}`.
+Bölge özeti: `{id, ad, kategoriler, olay_sayisi, ilk, son, kilitli: bool, ozet: "tek cümle sayım"}`.
+`bolge` çıktısı: `{id, ad, kilitli, grafikler: [{tur: "cubuk"|"zaman"|"saat"|"hafta"|"pasta", baslik, etiketler, degerler}], en_cok: [{ad, sayi, ornek?}], notlar}`.
+Bölge → kategori eşlemesi (varsayılan, ayarlanabilir):
+| id | Bölge (figürde) | Kategoriler | İçerik örnekleri |
+|---|---|---|---|
+| bas | Baş: ilgi ve merak | tarama | en çok aranan terimler, en çok gidilen siteler, aylık/saatlik etkinlik |
+| goz | Gözler: izledikleri | video | en çok izlenen kanallar, aylık izleme, gün saati |
+| kulak | Kulaklar: dinledikleri | muzik | en çok sanatçı/şarkı, aylık dinleme |
+| agiz | Ağız: yazdıkları/söyledikleri | sosyal | en çok subreddit, gönderi/yorum sayısı, aylık |
+| el | Eller: üretim ve iş | kod, dosyalar, notlar | repo/yıldız sayıları, dosya türleri, notlar |
+| kalp | Kalp: kişisel (hassas) | mesaj | yalnız sayı ve zaman dağılımı, içerik YOK |
+| karin | Karın: e-posta (hassas) | eposta | yalnız sayı ve zaman dağılımı, içerik YOK |
+| ayak | Ayaklar: konum (hassas) | konum, medya_meta | yalnız yer sayıları ve zaman dağılımı; ham koordinat gösterilmez |
+| ic | Merkez: uygulama kullanımı | uygulama | en çok uygulama, günlük süre |
+Hassas bölgeler (`kalp`, `karin`, `ayak`) varsayılan **kilitli**: yalnız kullanıcı Windows uygulamasında ayrı onayla açarsa (`ac_hassas`) sayılar görünür; içerik hiçbir koşulda görünmez. Tombstone'lu (gizli) kayıtlar sayılmaz. Veri yoksa bölge "Henüz veri yok" der.
+Çoklu kişi: her kişi ayrı veri klasörüdür (ayrı `Hub`). Windows kabuğunda "Kişiler" listesi veri klasörlerini tutar; seçilen kişi haritayı belirler. Anahtar/izin/erişim bu klasöre bağlı kalır.
+Performans: 1 milyon olayda `harita` < 3 sn; ağır sayımlar SQL ile (Python'da döngü yok), isteğe bağlı önbellek tablosu çekirdekte değil `kimlikserver` içinde.
