@@ -6,10 +6,6 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
-    # GECICI-BASLA (doğrulama sonrası kaldırılacak): dispatch main'de yokken denemek için
-    branches: ["iscilik/ci"]
-    paths: [".github/TETIK-tam"]
-    # GECICI-BITIS
 
 concurrency:
   group: tam-${{ github.ref }}
