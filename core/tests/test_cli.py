@@ -1,6 +1,8 @@
+import importlib.util
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -27,9 +29,9 @@ def test_cli_uctan_uca(cli, tmp_path, root):
     f = tmp_path / "gir.jsonl"
     write_jsonl(f)
     assert "Şema sürümü" in cli("baslat").stdout
-    r1 = json.loads(cli("--json", "ice-al", f).stdout)
+    r1 = json.loads(cli("--json", "ice-al", f, "--tur", "jsonl").stdout)
     assert r1["eklenen"] == 15
-    r2 = json.loads(cli("--json", "ice-al", f).stdout)
+    r2 = json.loads(cli("--json", "ice-al", f, "--tur", "jsonl").stdout)
     assert r2["eklenen"] == 0 and r2["tekrar"] == 15 and r2["kaynak"] == r1["kaynak"]
     found = json.loads(cli("--json", "ara", "ISIK", "--limit", "100").stdout)
     assert len(found) == 15
@@ -56,9 +58,9 @@ def test_cli_uctan_uca(cli, tmp_path, root):
     assert denied.returncode == 1 and "--onayla" in denied.stderr
     assert json.loads(cli("--json", "kaynak-sil", sid, "--onayla").stdout)["silinen_kayit"] == 15
     # silinmiş dosyayı yeniden almak onay ister
-    blocked = cli("ice-al", f, ok=False)
+    blocked = cli("ice-al", f, "--tur", "jsonl", ok=False)
     assert blocked.returncode == 1 and "kalıcı sildiniz" in blocked.stderr
-    assert json.loads(cli("--json", "ice-al", f, "--yine-de").stdout)["eklenen"] == 15
+    assert json.loads(cli("--json", "ice-al", f, "--tur", "jsonl", "--yine-de").stdout)["eklenen"] == 15
 
 
 def test_cli_hata_mesajlari(cli, tmp_path):
@@ -68,9 +70,37 @@ def test_cli_hata_mesajlari(cli, tmp_path):
     bad = tmp_path / "bozuk.jsonl"
     bad.write_text('{"ts": "2026-01-01T00:00:00Z", "kind": "k"}\n', encoding="utf-8")
     cli("baslat")
-    r = cli("ice-al", bad, ok=False)
+    r = cli("ice-al", bad, "--tur", "jsonl", ok=False)
     assert r.returncode == 1 and "category" in r.stderr
     r = cli("ice-al", tmp_path / "yok.jsonl", ok=False)
     assert r.returncode == 1
-    r = cli("ice-al", bad, "--tur", "google_takeout", ok=False)
-    assert r.returncode == 1 and "kimlikimport" in r.stderr
+    r = cli("ice-al", bad, "--tur", "yok_boyle_bir_tur", ok=False)
+    assert r.returncode == 1 and r.stderr.startswith("Hata:")
+    # jsonl dizin kabul etmez; diğer türler dizin kabul eder (çalıştırıcıya bırakılır)
+    r = cli("ice-al", tmp_path, "--tur", "jsonl", ok=False)
+    assert r.returncode == 1 and "dosya ister" in r.stderr
+
+
+IMPORTERS = importlib.util.find_spec("kimlikimport") is not None
+FIXTURES = Path(__file__).resolve().parents[2] / "importers" / "fixtures"
+
+
+@pytest.mark.skipif(not IMPORTERS, reason="kimlikimport kurulu değil")
+def test_cli_ice_al_klasor_ve_otomatik_tanima(cli, tmp_path):
+    cli("baslat")
+    klasor = FIXTURES / "reddit"
+    assert klasor.is_dir()
+    a = json.loads(cli("--json", "ice-al", klasor).stdout)  # --tur yok: otomatik
+    assert a["added"] > 0 and a["importer"] == "reddit"
+    b = json.loads(cli("--json", "ice-al", klasor, "--tur", "auto").stdout)
+    assert b["added"] == 0 and b["duplicate"] == a["parsed"] and b["source_id"] == a["source_id"]
+    # kalıcı silinmiş girdi: çalıştırıcı tek yerde sorar
+    cli("kaynak-sil", a["source_id"], "--onayla")
+    blocked = cli("ice-al", klasor, ok=False)
+    assert blocked.returncode == 1 and "kalıcı sildiniz" in blocked.stderr
+    assert json.loads(cli("--json", "ice-al", klasor, "--yine-de").stdout)["added"] == a["added"]
+    # tanınmayan girdi
+    bos = tmp_path / "bos"
+    bos.mkdir()
+    r = cli("ice-al", bos, ok=False)
+    assert r.returncode == 1 and "tanınmadı" in r.stderr

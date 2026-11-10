@@ -63,42 +63,53 @@ def cmd_surum(args):
     _out(args, info, "\n".join(f"{k}: {v}" for k, v in info.items()))
 
 
+def _run_importer(hub: Hub, args: argparse.Namespace, path: Path) -> None:
+    """kimlikimport çalıştırıcısı: tanıma, doğrulama, daha önce silinmiş mi sorgusu ve içe alma
+    orada yapılır (burada ikinci kez kontrol edilmez)."""
+    try:
+        from kimlikimport.run import run
+    except ImportError as e:
+        raise FormatError(
+            f"İçe aktarıcı paketi (kimlikimport) yüklenemedi ({e.name}). "
+            "Dahili 'jsonl' türü için --tur jsonl kullanın."
+        ) from e
+    tur = None if args.tur in (None, "auto") else args.tur
+    result = run(hub, path, tur=tur, yine_de=args.yine_de)
+    data: dict[str, Any] = {"sonuc": str(result)}
+    for name in ("importer", "source_id", "parsed", "added", "duplicate", "skipped"):
+        if hasattr(result, name):
+            data[name] = getattr(result, name)
+    if hasattr(result, "raw_files"):
+        data["raw_files"] = [r.path for r in result.raw_files]
+    _out(args, data, f"İçe alındı:\n{result}")
+
+
+def _run_jsonl(hub: Hub, args: argparse.Namespace, path: Path) -> None:
+    if not path.is_file():
+        raise FormatError(f"'jsonl' türü bir dosya ister: {path}")
+    sha = sha256_file(path)
+    prev = hub.previously_purged(sha)
+    if prev and not args.yine_de:
+        raise FormatError(
+            f"Bu girdiyi {prev.purged_at} tarihinde kalıcı sildiniz ({prev.count} kayıt). "
+            "Yine de almak için --yine-de ekleyin."
+        )
+    sid = hub.add_source("jsonl", "1", sha)
+    raw = hub.store_raw(sid, path)
+    res = hub.add_events(sid, iter_event_jsonl(path))
+    _out(args, {"kaynak": sid, "eklenen": res.added, "tekrar": res.duplicate, "arsiv": raw.path},
+         f"Kaynak: {sid}\nEklenen: {res.added}  Zaten vardı: {res.duplicate}\nHam arşiv: {raw.path}")
+
+
 def cmd_ice_al(args):
     path = Path(args.yol)
-    if not path.is_file():
-        raise FormatError(f"Dosya yok: {path}")
-    sha = sha256_file(path)
+    if not path.exists():
+        raise FormatError(f"Girdi yok: {path}")
     with Hub.open(args.veri, write=True) as hub:
-        prev = hub.previously_purged(sha)
-        if prev and not args.yine_de:
-            raise FormatError(
-                f"Bu dosyayı {prev.purged_at} tarihinde kalıcı sildiniz ({prev.count} kayıt). "
-                "Yine de almak için --yine-de ekleyin."
-            )
         if args.tur == "jsonl":
-            events = iter_event_jsonl(path)
-            version = "1"
+            _run_jsonl(hub, args, path)
         else:
-            run = None
-            try:
-                from kimlikimport import run as _run  # İ3 paketi; isteğe bağlı
-
-                run = getattr(_run, "run", None)
-            except ImportError:
-                pass
-            if run is None:
-                raise FormatError(
-                    "Bu kurulumda yalnız dahili 'jsonl' türü var; diğer türler için içe aktarıcı "
-                    "paketi (kimlikimport) gerekir."
-                )
-            result = run(hub, path, tur=args.tur)
-            _out(args, {"sonuc": str(result)}, f"İçe alındı: {result}")
-            return
-        sid = hub.add_source(args.tur, version, sha)
-        raw = hub.store_raw(sid, path)
-        res = hub.add_events(sid, events)
-        _out(args, {"kaynak": sid, "eklenen": res.added, "tekrar": res.duplicate, "arsiv": raw.path},
-             f"Kaynak: {sid}\nEklenen: {res.added}  Zaten vardı: {res.duplicate}\nHam arşiv: {raw.path}")
+            _run_importer(hub, args, path)
 
 
 def cmd_ara(args):
@@ -191,7 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
     add("surum", cmd_surum, "sürüm bilgisi")
     sp = add("ice-al", cmd_ice_al, "dosyayı içe alır")
     sp.add_argument("yol")
-    sp.add_argument("--tur", default="jsonl")
+    sp.add_argument("--tur", default="auto", help="auto (varsayılan: otomatik tanıma), jsonl (dahili) ya da içe aktarıcı adı")
     sp.add_argument("--yine-de", action="store_true", help="daha önce kalıcı silinmiş dosyayı yine de al")
     sp = add("ara", cmd_ara, "ara")
     sp.add_argument("sorgu")

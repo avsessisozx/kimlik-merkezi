@@ -214,6 +214,45 @@ class Hub:
         else:
             c.execute("COMMIT")
 
+    # ------------------------------------------------------------------ genel SQL erişimi
+    @contextmanager
+    def transaction(self):
+        """Yazma işlemi: `BEGIN IMMEDIATE` ... `COMMIT` (istisnada `ROLLBACK`).
+
+        Bağlam içinde `sqlite3.Connection` döner; yalnız `execute`/`executemany` kullanın,
+        `commit`/`rollback`/`close` çağırmayın. İç içe `transaction()` desteklenmez.
+        Salt okunur hub'da `HubReadOnlyError`. İşlem boyunca hub'ın iç kilidi tutulur
+        (diğer iş parçacıkları bekler). Persona/anahtar/izin tabloları (server) bunu kullanır;
+        `Hub._conn/_tx/_mutex` özel üyeleri yerine geçer.
+        """
+        if not self._write:
+            raise HubReadOnlyError("Hub salt okunur açıldı; yazma işlemi yapılamaz.")
+        with self._mutex:
+            with self._tx() as c:
+                yield c
+
+    def query(self, sql: str, params: Iterable[Any] | dict[str, Any] = ()) -> list[tuple]:
+        """Salt okunur SQL (tek ifade); satırları `tuple` listesi olarak döner.
+
+        Yazan hub'da bağlantı çağrı süresince `query_only` yapılır: INSERT/UPDATE/DDL
+        `sqlite3.OperationalError` verir. Açık bir `transaction()` içinden çağrılırsa
+        o işlemin yazdıklarını da görür. `?` ya da `:ad` parametreleri kullanın.
+        """
+        with self._mutex:
+            c = self._conn
+            if self._write:
+                c.execute("PRAGMA query_only = ON")
+            try:
+                return c.execute(sql, params).fetchall()
+            finally:
+                if self._write:
+                    c.execute("PRAGMA query_only = OFF")
+
+    def query_one(self, sql: str, params: Iterable[Any] | dict[str, Any] = ()) -> tuple | None:
+        """`query` ile aynı; ilk satırı ya da `None` döner."""
+        rows = self.query(sql, params)
+        return rows[0] if rows else None
+
     # ------------------------------------------------------------------ kaynak, ham arşiv
     @_write_only
     def add_source(self, kind: str, version: str, file_sha256: str | None) -> str:

@@ -68,3 +68,12 @@ Sorgu dili: boşlukla ayrılan terimlerin hepsi aranır (VE); `"iki kelime"` tü
 
 ## 8. Akışla okuma ve bellek
 `streaming.iter_lines` dosyayı satır satır okur (tek satır ≤ 64 MiB, aşılırsa `FormatError`). `store_raw` 1 MiB parçalarla kopyalar ve hash'ler. `add_events` üreteçle çalışır, 5000 kayıtta bir işlemi kesinleştirir. Ölçüm: `core/tests/test_buyuk.py` (sonuç durum/core.md'de).
+
+## 9. Genel SQL erişimi (özel üyeler yerine)
+`Hub._conn/_tx/_mutex` özel üyelerdir; sürümler arası korunmaz. Persona/anahtar/izin gibi çekirdeğin dışında yönetilen tablolar için genel API:
+- `with hub.transaction() as c:` yazma işlemi (`BEGIN IMMEDIATE`; çıkışta `COMMIT`, istisnada `ROLLBACK`). `c` bir `sqlite3.Connection`'dır: yalnız `execute`/`executemany`; `commit`/`rollback`/`close` çağırmayın; iç içe kullanmayın. Salt okunur hub'da `HubReadOnlyError`. İşlem boyunca hub'ın iç kilidi tutulur.
+- `hub.query(sql, params=())` salt okunur tek ifade, `list[tuple]` döner; `hub.query_one(...)` ilk satır ya da `None`. Yazan hub'da çağrı süresince `query_only=ON` olur (yazma girişimi `sqlite3.OperationalError`). Açık `transaction()` içinden çağrılırsa o işlemin yazdıklarını görür. Okumalar arasında tek anlık görüntü gerekiyorsa `transaction()` içinde `c.execute` kullanın.
+Gizli kayıt süzmesi bu yöntemlerde otomatik DEĞİLDİR: `events` sorgularında `hidden = 0` ekleyin (ya da `search/timeline` kullanın).
+
+## 10. CLI `ice-al`
+`kimlikmerkezi ice-al <yol> [--tur auto|jsonl|<içe aktarıcı adı>] [--yine-de]`. Yol dosya ya da klasör olabilir. Varsayılan `auto`: `kimlikimport.run.run(hub, yol, tur=None)` ile otomatik tanıma. `jsonl`: dahili, yalnız dosya, her satır bir EventIn. "Daha önce kalıcı silindi" sorgusu tek yerde yapılır: içe aktarıcı yolunda çalıştırıcıda, `jsonl` yolunda `_run_jsonl` içinde.
