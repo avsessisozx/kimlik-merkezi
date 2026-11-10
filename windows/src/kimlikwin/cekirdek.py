@@ -384,6 +384,8 @@ class Uygulama:
             return app_id, duz
 
         s = claude_ayar.ekle(yol, uret, self.veri)
+        if s.durum not in ("eklendi", "guncellendi"):
+            s.aranan = claude_ayar.arama_yerleri()
         gunluk.log().info("claude'a ekle: %s", s.durum)
         return s.to_dict()
 

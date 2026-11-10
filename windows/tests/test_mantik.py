@@ -65,6 +65,7 @@ def test_sihirbaz_tamamla_ayar_ve_otomatik_baslama(yonetici, veri, arka_uc):
 
 def test_otomatik_destek_yoksa_hata_degil_uyari(tmp_path):
     from kimlikwin.ayarlar import Ayarlar
+    from kimlikwin.ayarlar import Ayarlar
     from kimlikwin.yonetici import Yonetici
     if sys.platform == "win32":
         pytest.skip("Windows'ta gerçek kayıt defteri var")
@@ -176,3 +177,45 @@ def test_olustur_yeni_klasor_varsayilan_sifreli_saglayici_varsa(tmp_path, monkey
     assert r["sifreli"] and "anahtar.json" in r["dosyalar"]
     assert b"SQLite format" not in (p / "kimlik.db").read_bytes()
     assert veri_klasoru.olustur(p)["mevcut_idi"]       # yeniden açılır
+
+
+def test_claude_ekle_basarisizsa_aranan_yerleri_soyler_basariliysa_soylemez(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path / "AppData"))
+    from kimlikwin.ayarlar import Ayarlar
+    from kimlikwin.yonetici import Yonetici
+    y = Yonetici(Ayarlar(tmp_path / "a"), Otomatik(None), claude_yolu=lambda: None)
+    try:
+        y.api("sihirbaz_tamamla", {"yol": str(tmp_path / "v"), "otomatik_baslat": False})
+        r = y.api("claude_ekle", {})
+        assert r["durum"] == "bulunamadi" and r["app_id"] and r["metin"]
+        assert any("claude_desktop_config.json" in x and "Claude" in x for x in r["aranan"])
+        assert str(tmp_path / "AppData") in r["aranan"][0]
+        dosya = tmp_path / "c.json"
+        dosya.write_text("{}", encoding="utf-8")
+        y.uygulama._claude_yolu = lambda: dosya
+        r2 = y.api("claude_ekle", {})
+        assert r2["durum"] == "eklendi" and r2["aranan"] == []
+    finally:
+        y.kapat()
+
+
+def test_ana_sayfa_ile_harita_toplami_farki_hassas_ve_gizlenenlerden_gelir(kurulu):
+    """Arayüzdeki açıklamanın dayanağı: durum().event = diskteki TÜM kayıtlar; harita profil toplamı =
+    kilitsiz kategoriler ve gizlenmemiş kayıtlar."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    import demo_veri
+    u = kurulu.uygulama
+    demo_veri.uret(u.hub, olcek=0.02)
+    toplam = u.durum()["ozet"]["counts"]["event"]
+    hassas = u.hub.query("SELECT COUNT(*) FROM events WHERE category IN ('eposta','mesaj','konum','sohbet','medya_meta')")[0][0]
+    assert hassas > 0   # medya_meta hassas değil ama 'Ayaklar' (konum) bölgesine bağlı: o bölge kilitliyken sayılmaz
+    assert u.harita()["profil"]["olay"] == toplam - hassas
+    gizlenen_once = u.harita()["profil"]["olay"]
+    u.hub.query("SELECT 1")  # salt okunur sorgu; gizleme API'si aşağıda
+    ilk = u.ara("a", None, 1)["kayitlar"]
+    if ilk:
+        u.kayit_gizle(ilk[0]["id"])
+        assert u.harita()["profil"]["olay"] == gizlenen_once - 1
+        assert u.durum()["ozet"]["counts"]["event"] == toplam

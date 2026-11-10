@@ -129,7 +129,7 @@ try:
     kontrol(n > 0, f"{n} olay veritabanında")
 
     # yerel grafik kütüphanesi pakete girdi mi (CDN yok, internetsiz çalışır)
-    for ad, asgari in (("echarts.min.js", 500_000), ("harita.js", 5_000), ("figur.js", 3_000), ("harita.css", 3_000), ("ECHARTS-LICENSE.txt", 5_000)):
+    for ad, asgari in (("echarts.min.js", 500_000), ("harita.js", 5_000), ("figur.js", 3_000), ("ortak.js", 200), ("harita.css", 3_000), ("ECHARTS-LICENSE.txt", 5_000)):
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/statik/{ad}", timeout=20) as x:
             boy = len(x.read())
         kontrol(boy >= asgari, f"pakette statik/{ad} var ({boy} bayt)")

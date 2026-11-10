@@ -5,7 +5,6 @@
 const NS='http://www.w3.org/2000/svg';
 function sv(e,o,...c){const n=document.createElementNS(NS,e);for(const [k,v] of Object.entries(o||{}))if(v!=null&&v!==false)n.setAttribute(k,v);
   for(const x of c.flat()){if(x==null||x===false)continue;n.append(x.nodeType?x:document.createTextNode(String(x)));}return n;}
-const SAYI=n=>Number(n).toLocaleString('tr-TR');
 const AD={bas:'BAŞ',goz:'GÖZLER',kulak:'KULAKLAR',agiz:'AĞIZ',el:'ELLER',kalp:'KALP',karin:'KARIN',ayak:'AYAKLAR',ic:'MERKEZ',zihin:'ZİHİN'};
 const AD_ACIK={bas:'Baş',goz:'Gözler',kulak:'Kulaklar',agiz:'Ağız',el:'Eller',kalp:'Kalp',karin:'Karın',ayak:'Ayaklar',ic:'Merkez',zihin:'Zihin'};
 const CX=320,OFF=40,VW=720,VH=730;

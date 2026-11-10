@@ -76,6 +76,34 @@ def _flat_link(tmp: Path, origin: Origin) -> Path:
     return link
 
 
+def _taninmama_mesaji(path: Path) -> str:
+    """Hiçbir içe aktarıcı dosyayı tanımadığında kullanıcıya gösterilen ilk satır: bozuk dosya ile
+    tanınmayan dosya ayrı söylenir (zip ise açılabiliyor mu diye bakılır)."""
+    import zipfile
+
+    if path.is_file():
+        try:
+            with open(path, "rb") as f:
+                zip_gibi = f.read(2) == b"PK" or path.suffix.lower() == ".zip"
+        except OSError:
+            zip_gibi = False
+        if zip_gibi and not zipfile.is_zipfile(path):
+            return ("Bu dosya bozuk görünüyor: zip olarak açılamadı. İndirme yarım kalmış olabilir; "
+                    "dışa aktarma dosyasını yeniden indirip tekrar deneyin.")
+        if zip_gibi:
+            try:
+                with zipfile.ZipFile(path) as z:
+                    if z.testzip() is not None:
+                        return ("Bu dosya bozuk görünüyor: zip içindeki bir dosya okunamadı. "
+                                "İndirme yarım kalmış olabilir; yeniden indirip tekrar deneyin.")
+            except (zipfile.BadZipFile, OSError, NotImplementedError, RuntimeError):
+                return ("Bu dosya bozuk görünüyor: zip olarak açılamadı. İndirme yarım kalmış olabilir; "
+                        "dışa aktarma dosyasını yeniden indirip tekrar deneyin.")
+    return ("Bu dosyayı tanıyamadım. Google Takeout, Reddit, ChatGPT, Claude, Spotify, Instagram/Facebook "
+            "ya da GitHub dışa aktarma dosyası mı? Dosya sağlam ama tanınmıyorsa aşağıdaki teknik ayrıntıyı "
+            "geliştiriciyle paylaşın.")
+
+
 def run(
     hub: Hub,
     path: Path | str,
@@ -104,7 +132,7 @@ def run(
         imp, results = registry.detect_best(path)
         if imp is None:
             lines = "\n".join(f"  - {n}: {d.reason}" for n, d in results)
-            raise FormatError("Dosya hiçbir içe aktarıcıyla tanınmadı:\n" + lines)
+            raise FormatError(f"{_taninmama_mesaji(path)}\n\nTeknik ayrıntı (dosya hiçbir içe aktarıcıyla tanınmadı; her birinin nedeni):\n{lines}")
 
     try:
         return _run_with(hub, path, imp, yine_de, notify, progress)

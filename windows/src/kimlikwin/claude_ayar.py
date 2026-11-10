@@ -34,6 +34,16 @@ def adaylar(env: dict[str, str] | None = None) -> list[Path]:
     return out
 
 
+def arama_yerleri(env: dict[str, str] | None = None) -> list[str]:
+    """Kullanıcıya gösterilecek: `bul`un baktığı yerler (adaylar() ile aynı kalıplar). Ortam değişkeni
+    tanımlıysa gerçek yol, değilse %DEĞİŞKEN% kalıbı yazılır; menü/arayüz adı UYDURULMAZ."""
+    env = os.environ if env is None else env
+    appdata, local = env.get("APPDATA"), env.get("LOCALAPPDATA")
+    return [str(Path(appdata) / "Claude" / DOSYA_AD) if appdata else "%APPDATA%\\Claude\\" + DOSYA_AD,
+            (str(Path(local) / "Packages" / "Claude_*" / "LocalCache" / "Roaming" / "Claude" / DOSYA_AD) if local
+             else "%LOCALAPPDATA%\\Packages\\Claude_*\\LocalCache\\Roaming\\Claude\\" + DOSYA_AD)]
+
+
 def bul(env: dict[str, str] | None = None) -> Path | None:
     for p in adaylar(env):
         if p.is_file():
@@ -68,6 +78,7 @@ class Sonuc:
     metin: str | None = None         # eklenemediyse: kopyalanabilir ayar
     app_id: str | None = None
     uyari: list[str] = field(default_factory=list)
+    aranan: list[str] = field(default_factory=list)   # eklenemediyse: bakılan dosya yolları
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
