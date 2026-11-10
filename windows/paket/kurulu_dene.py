@@ -5,6 +5,13 @@ SAHTE ayar dosyasıyla dener, MCP exe'sini gerçek stdio ile sorgular, uygulamay
 Başarısızlıkta sıfır olmayan kodla çıkar; her adım yazdırılır."""
 from __future__ import annotations
 
+import sys as _sys
+for _akis in (_sys.stdout, _sys.stderr):    # Windows konsolu (cp1252) Türkçe harfte çökmesin
+    try:
+        _akis.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 import asyncio
 import json
 import os

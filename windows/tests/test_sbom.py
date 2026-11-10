@@ -48,3 +48,15 @@ def test_ayni_girdi_ayni_cikti(monkeypatch):
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     m = _modul()
     assert m.uret("1.0.0", set()) == m.uret("1.0.0", set())
+
+
+def test_cp1252_konsolda_cokmez(tmp_path):
+    """Windows CI'da konsol cp1252: Türkçe çıktı UnicodeEncodeError vermemeli (gerçek hata)."""
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    r = subprocess.run([sys.executable, str(YOL), "--cikti", str(tmp_path / "s.json")],
+                       env=env, capture_output=True, timeout=120)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")[-300:]
+    json.loads((tmp_path / "s.json").read_text(encoding="utf-8"))

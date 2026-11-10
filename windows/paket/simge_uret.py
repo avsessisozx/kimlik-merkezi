@@ -1,6 +1,14 @@
 """app.ico üretir (Pillow). Derlemeden önce çalıştırılır."""
 from pathlib import Path
 
+import sys as _sys
+for _akis in (_sys.stdout, _sys.stderr):    # Windows konsolu (cp1252) Türkçe harfte çökmesin
+    try:
+        _akis.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
 from kimlikwin.tepsi import simge_olustur
 
 hedef = Path(__file__).with_name("app.ico")
