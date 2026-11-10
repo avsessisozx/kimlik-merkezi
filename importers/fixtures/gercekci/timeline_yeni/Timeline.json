@@ -1,0 +1,64 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2025-02-01T08:00:00.000+03:00",
+      "endTime": "2025-02-01T09:00:00.000+03:00",
+      "startTimeTimezoneUtcOffsetMinutes": 180,
+      "endTimeTimezoneUtcOffsetMinutes": 180,
+      "visit": {
+        "hierarchyLevel": 0,
+        "probability": 0.9,
+        "topCandidate": {
+          "placeId": "ChIJornek2",
+          "semanticType": "HOME",
+          "probability": 0.8,
+          "placeLocation": {
+            "latLng": "41.0123456°, 29.0123456°"
+          }
+        }
+      }
+    },
+    {
+      "startTime": "2025-02-01T09:00:00.000+03:00",
+      "endTime": "2025-02-01T09:30:00.000+03:00",
+      "activity": {
+        "start": {
+          "latLng": "41.0123456°, 29.0123456°"
+        },
+        "end": {
+          "latLng": "41.0500000°, 29.0500000°"
+        },
+        "distanceMeters": 5000.5,
+        "probability": 0.7,
+        "topCandidate": {
+          "type": "IN_PASSENGER_VEHICLE",
+          "probability": 0.6
+        }
+      }
+    },
+    {
+      "startTime": "2025-02-01T09:30:00.000+03:00",
+      "endTime": "2025-02-01T09:40:00.000+03:00",
+      "timelinePath": [
+        {
+          "point": "41.05°, 29.05°",
+          "time": "2025-02-01T09:31:00.000+03:00"
+        }
+      ]
+    }
+  ],
+  "rawSignals": [
+    {
+      "position": {
+        "LatLng": "41.0°, 29.0°",
+        "accuracyMeters": 20,
+        "altitudeMeters": 10.0,
+        "source": "GPS",
+        "timestamp": "2025-02-01T08:01:00.000+03:00"
+      }
+    }
+  ],
+  "userLocationProfile": {
+    "frequentPlaces": []
+  }
+}

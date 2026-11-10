@@ -1,0 +1,56 @@
+{
+  "timelineObjects": [
+    {
+      "placeVisit": {
+        "location": {
+          "latitudeE7": 410000000,
+          "longitudeE7": 290000000,
+          "placeId": "ChIJornek1",
+          "address": "Örnek Cad. No:1, Örnekşehir",
+          "name": "Örnek Kafe",
+          "semanticType": "TYPE_UNKNOWN",
+          "locationConfidence": 80
+        },
+        "duration": {
+          "startTimestamp": "2025-01-10T09:00:00.000Z",
+          "endTimestamp": "2025-01-10T10:00:00.000Z"
+        },
+        "placeConfidence": "HIGH_CONFIDENCE",
+        "visitConfidence": 90,
+        "placeVisitType": "SINGLE_PLACE",
+        "placeVisitImportance": "MAIN",
+        "editConfirmationStatus": "NOT_CONFIRMED"
+      }
+    },
+    {
+      "activitySegment": {
+        "startLocation": {
+          "latitudeE7": 410000000,
+          "longitudeE7": 290000000
+        },
+        "endLocation": {
+          "latitudeE7": 410100000,
+          "longitudeE7": 290100000
+        },
+        "duration": {
+          "startTimestamp": "2025-01-10T10:00:00Z",
+          "endTimestamp": "2025-01-10T10:20:00Z"
+        },
+        "distance": 4200,
+        "activityType": "IN_PASSENGER_VEHICLE",
+        "confidence": "HIGH",
+        "activities": [
+          {
+            "activityType": "IN_PASSENGER_VEHICLE",
+            "probability": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "yeniTur": {
+        "x": 1
+      }
+    }
+  ]
+}

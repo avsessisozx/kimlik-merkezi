@@ -5,6 +5,7 @@ akışla okunur (zipfile.ZipFile.open). Hiçbir yerde girdi dosyasına yazılmaz
 """
 from __future__ import annotations
 
+import codecs
 import csv
 import hashlib
 import io
@@ -230,30 +231,58 @@ def clear_archive_cache() -> None:
 
 # --------------------------------------------------------------------------- yardımcılar
 def strip_bom(f: IO[bytes]) -> IO[bytes]:
-    """UTF-8 BOM varsa atlar. Okuyucu `peek` desteklemiyorsa sarar."""
+    """UTF-8 BOM varsa atlar; akışı CESU-8 (ayrı kodlanmış vekil yarımları) onarımıyla sarar.
+
+    Bazı dışa aktarmalar emojiyi UTF-16 vekil yarımları olarak ayrı ayrı UTF-8'e kodlar (CESU-8);
+    katı UTF-8 çözücü bunda patlar. Burada yarımlar birleştirilir, eşleşmeyen yarım U+FFFD olur.
+    Geçersiz UTF-8 baytları (ör. latin-1 dosya) yine UnicodeDecodeError verir: sessizce bozulmaz."""
     head = f.read(3)
-    if head == b"\xef\xbb\xbf":
-        return f
-    return _Prepend(head, f)
+    return _Utf8Repair(f, b"" if head == b"\xef\xbb\xbf" else head)
 
 
-class _Prepend(io.RawIOBase):
-    def __init__(self, head: bytes, f: IO[bytes]):
-        self._head, self._f = head, f
+class _Utf8Repair(io.RawIOBase):
+    def __init__(self, f: IO[bytes], head: bytes = b""):
+        self._f = f
+        self._pending = head
+        self._dec = codecs.getincrementaldecoder("utf-8")("surrogatepass")
+        self._carry = ""  # parça sonundaki yüksek vekil yarım
+        self._out = b""
+        self._pos = 0
+        self._eof = False
 
     def readable(self) -> bool:
         return True
 
+    def _fill(self) -> None:
+        chunk, self._pending = self._pending, b""
+        if not chunk:
+            chunk = self._f.read(256 * 1024)
+        final = not chunk
+        s = self._carry + self._dec.decode(chunk, final)
+        self._carry = ""
+        if not s.isascii():
+            if not final and s and "\ud800" <= s[-1] <= "\udbff":
+                self._carry, s = s[-1], s[:-1]
+            try:
+                s.encode("utf-8")
+            except UnicodeEncodeError:
+                s = s.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
+        if final:
+            self._eof = True
+        self._out = self._out[self._pos:] + s.encode("utf-8")
+        self._pos = 0
+
     def read(self, size: int = -1) -> bytes:
-        if self._head:
-            if size < 0:
-                data, self._head = self._head + self._f.read(), b""
-                return data
-            data, self._head = self._head[:size], self._head[size:]
-            if len(data) < size:
-                data += self._f.read(size - len(data))
+        if size is None or size < 0:
+            while not self._eof:
+                self._fill()
+            data, self._out, self._pos = self._out[self._pos:], b"", 0
             return data
-        return self._f.read(size)
+        while len(self._out) - self._pos < size and not self._eof:
+            self._fill()
+        data = self._out[self._pos:self._pos + size]
+        self._pos += len(data)
+        return data
 
     def readinto(self, b) -> int:
         d = self.read(len(b))
@@ -261,8 +290,10 @@ class _Prepend(io.RawIOBase):
         return len(d)
 
     def close(self) -> None:
-        self._f.close()
-        super().close()
+        try:
+            self._f.close()
+        finally:
+            super().close()
 
 
 def peek(entry: Entry, n: int = PEEK_BYTES) -> bytes:
@@ -277,7 +308,8 @@ def iso_utc(value) -> str | None:
         if isinstance(value, datetime):
             dt = value
         else:
-            dt = datetime.fromisoformat(str(value).strip().replace(" UTC", "+00:00"))
+            txt = re.sub(r"\[[^\]]*\]$", "", str(value).strip())  # Java ZonedDateTime eki: ...Z[UTC]
+            dt = datetime.fromisoformat(txt.replace(" UTC", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

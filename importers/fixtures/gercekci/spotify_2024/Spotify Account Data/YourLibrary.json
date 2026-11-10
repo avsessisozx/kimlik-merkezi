@@ -1,0 +1,28 @@
+{
+  "tracks": [
+    {
+      "artist": "Örnek Sanatçı",
+      "album": "Örnek Albüm",
+      "track": "Örnek Şarkı",
+      "uri": "spotify:track:0000000000000000000001"
+    }
+  ],
+  "albums": [],
+  "shows": [
+    {
+      "name": "Örnek Podcast",
+      "publisher": "Örnek",
+      "uri": "spotify:show:1"
+    }
+  ],
+  "episodes": [],
+  "bannedTracks": [],
+  "artists": [
+    {
+      "name": "Örnek Sanatçı",
+      "uri": "spotify:artist:1"
+    }
+  ],
+  "bannedArtists": [],
+  "other": []
+}

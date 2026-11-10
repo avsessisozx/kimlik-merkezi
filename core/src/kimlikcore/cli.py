@@ -112,6 +112,19 @@ def cmd_ice_al(args):
             _run_importer(hub, args, path)
 
 
+def cmd_tanila(args):
+    """Dışa aktarma dosyasının yapısını (içeriksiz) raporlar; ağa bağlanmaz."""
+    path = Path(args.yol)
+    if not path.exists():
+        raise FormatError(f"Girdi yok: {path}")
+    try:
+        from kimlikimport.tanila import tanila
+    except ImportError as e:
+        raise FormatError(f"İçe aktarıcı paketi (kimlikimport) yüklenemedi ({e.name}).") from e
+    text = tanila(path, adlari_goster=args.adlari_goster, ayrinti=args.ayrinti)
+    _out(args, {"rapor": text}, text)
+
+
 def cmd_ara(args):
     with Hub.open(args.veri, write=False) as hub:
         found = hub.search(args.sorgu, categories=args.kategori, limit=args.limit, prefix=args.onek)
@@ -210,6 +223,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("yol")
     sp.add_argument("--tur", default="auto", help="auto (varsayılan: otomatik tanıma), jsonl (dahili) ya da içe aktarıcı adı")
     sp.add_argument("--yine-de", action="store_true", help="daha önce kalıcı silinmiş dosyayı yine de al")
+    sp = add("tanila", cmd_tanila, "dışa aktarma dosyasının yapı raporu (içerik yazmaz; ağa bağlanmaz)")
+    sp.add_argument("yol", help="dışa aktarma dosyası ya da klasörü (zip, tar.gz, json, csv, mbox, sqlite...)")
+    sp.add_argument("--adlari-goster", action="store_true",
+                    help="dosya/klasör adlarını maskelemeden yaz (kişi adı içerebilir; bilerek seç)")
+    sp.add_argument("--ayrinti", action="store_true", help="tüm alan ağacını ve daha çok dosyayı yaz (uzun çıktı)")
     sp = add("ara", cmd_ara, "ara")
     sp.add_argument("sorgu")
     sp.add_argument("--kategori", action="append", choices=sorted(Category.ALL))

@@ -1,0 +1,33 @@
+{
+  "participants": [
+    {
+      "name": "\u00c3\u0096rnek Ki\u00c5\u009fi"
+    },
+    {
+      "name": "Ben"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "\u00c3\u0096rnek Ki\u00c5\u009fi",
+      "timestamp_ms": 1738900000000,
+      "content": "Merhaba, nas\u00c4\u00b1ls\u00c4\u00b1n?",
+      "is_geoblocked_for_viewer": false
+    },
+    {
+      "sender_name": "Ben",
+      "timestamp_ms": 1738900060000,
+      "content": "\u00c4\u00b0yiyim, te\u00c5\u009fekk\u00c3\u00bcrler \u00f0\u009f\u0098\u0080",
+      "reactions": [
+        {
+          "reaction": "\u00e2\u009d\u00a4",
+          "actor": "\u00c3\u0096rnek Ki\u00c5\u009fi"
+        }
+      ]
+    }
+  ],
+  "title": "\u00c3\u0096rnek Ki\u00c5\u009fi",
+  "is_still_participant": true,
+  "thread_path": "inbox/ornekkisi_1234567890",
+  "magic_words": []
+}

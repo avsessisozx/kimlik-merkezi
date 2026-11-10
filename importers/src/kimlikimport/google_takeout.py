@@ -5,6 +5,10 @@ Tanınanlar (dosya adına değil İÇERİĞE bakarak; hesap dili Türkçe olabil
 - Chrome geçmişi: `{"Browser History": [ ... ]}` (`History.json` ya da eski `BrowserHistory.json`)
 - YouTube abonelikleri: CSV (kanal kimliği `UC...` + `youtube.com/channel/...` adresi)
 - Gmail MBOX (`.mbox`, "From " ayırıcılı): `eposta` kategorisi (hassas), akışla; ekler alınmaz.
+- Konum geçmişi (`konum` kategorisi, hassas): `Records.json` (`{"locations": [...]}`), aylık
+  "Semantic Location History" (`{"timelineObjects": [...]}`) ve telefondan dışa aktarılan yeni
+  `Timeline.json` (`semanticSegments`; topluluk kaynaklı, gerçek dosyayla DOĞRULANMADI).
+- YouTube beğenilen videolar (`playlists/likes.json`, `snippet` + `contentDetails`).
 Tanınıp işlenmeyenler rapora yazılır, sessizce atlanmaz: HTML biçimi, eski biçim.
 
 Biçim bilgisinin kaynakları ve doğrulama durumu: durum/importers.md.
@@ -35,6 +39,7 @@ from .base import (
     Origin,
     csv_rows,
     has_coordinates,
+    epoch_to_iso,
     iso_utc,
     peek,
     stable_key,
@@ -51,6 +56,7 @@ _KNOWN_NAMES = {
 }
 
 _ACTIVITY_KNOWN = {
+    "safeHtmlItem", "attachedFiles", "imageFile",  # Gemini Apps / Google Lens ekleri
     "header", "title", "titleUrl", "description", "time", "products", "subtitles",
     "details", "locationInfos", "activityControls",
 }
@@ -58,6 +64,20 @@ _CHROME_KNOWN = {"favicon_url", "page_transition", "title", "url", "client_id", 
 _SAMPLE = 200
 _UC = re.compile(r"^UC[\w-]{20,}$")
 _CHROME_HEAD = re.compile(rb'^\s*\{\s*"Browser History"\s*:')
+_RECORDS_HEAD = re.compile(rb'^\s*\{\s*"locations"\s*:')
+_SEMANTIC_HEAD = re.compile(rb'^\s*\{\s*"timelineObjects"\s*:')
+_TIMELINE_HEAD = re.compile(rb'^\s*\{[^\[]{0,200}"semanticSegments"\s*:')
+_RECORD_KNOWN = {
+    "accuracy", "activeWifiScan", "activity", "altitude", "batteryCharging", "deviceDesignation",
+    "deviceTag", "deviceTimestamp", "formFactor", "heading", "inferredLocation", "latitudeE7",
+    "locationMetadata", "longitudeE7", "osLevel", "placeId", "platformType", "serverTimestamp",
+    "source", "timestamp", "timestampMs", "velocity", "verticalAccuracy",
+}
+_SEMANTIC_KNOWN = {"placeVisit", "activitySegment"}
+_TIMELINE_KNOWN = {"startTime", "endTime", "visit", "activity", "timelinePath", "timelineMemory",
+                   "startTimeTimezoneUtcOffsetMinutes", "endTimeTimezoneUtcOffsetMinutes"}
+_LIKE_KNOWN = {"contentDetails", "etag", "id", "kind", "snippet", "status"}
+_LATLNG = re.compile(r"(-?\d{1,3}(?:\.\d+)?)\s*°?\s*,\s*(-?\d{1,3}(?:\.\d+)?)")
 
 # Ürün adı (İngilizce) -> (kind, kategori). URL'den tanınmayanlar için yedek.
 _PRODUCT = {
@@ -110,12 +130,26 @@ def _classify(entry: Entry, found: _Found) -> None:
                 found.empty.append(entry)
             elif isinstance(rec, dict) and "time" in rec and ("title" in rec or "header" in rec):
                 found.files.append(("activity", entry))
+            elif isinstance(rec, dict) and isinstance(rec.get("snippet"), dict) and (
+                "contentDetails" in rec or str(rec.get("kind", "")).startswith("youtube#")
+            ):
+                found.files.append(("likes", entry))
             elif isinstance(rec, dict) and "snippet" in rec and "publishedAt" in rec:
                 found.unsupported.append(f"{entry.name}: 2017 öncesi eski etkinlik biçimi")
+            elif isinstance(rec, dict) and "startTime" in rec and "endTime" in rec and (
+                {"visit", "activity", "timelinePath"} & set(rec)
+            ):
+                found.files.append(("timeline_arr", entry))
             else:
                 found.ignored += 1
         elif _CHROME_HEAD.match(head):
             found.files.append(("chrome", entry))
+        elif _RECORDS_HEAD.match(head):
+            found.files.append(("records", entry))
+        elif _SEMANTIC_HEAD.match(head):
+            found.files.append(("semantic", entry))
+        elif _TIMELINE_HEAD.match(head):
+            found.files.append(("timeline", entry))
         else:
             found.ignored += 1
     elif ext == "csv":
@@ -242,6 +276,9 @@ class GoogleTakeout:
                         bad += 1
                         continue
                     extra |= set(rec) - _CHROME_KNOWN
+            elif role in ("records", "semantic", "timeline", "timeline_arr", "likes"):
+                self._verify_location(role, e, rep)
+                return
             elif role == "mbox":
                 self._verify_mbox(e, rep)
                 return
@@ -260,6 +297,29 @@ class GoogleTakeout:
             )
         elif bad:
             rep.notes.append(f"{e.name}: ilk {total} kayıttan {bad} tanesi eksik/bozuk alanlı")
+
+    _LOC_PREFIX = {"records": "locations.item", "semantic": "timelineObjects.item",
+                   "timeline": "semanticSegments.item", "timeline_arr": "item", "likes": "item"}
+    _LOC_KNOWN = {"records": _RECORD_KNOWN, "semantic": _SEMANTIC_KNOWN, "timeline": _TIMELINE_KNOWN,
+                  "timeline_arr": _TIMELINE_KNOWN, "likes": _LIKE_KNOWN}
+
+    def _verify_location(self, role: str, e: Entry, rep: FormatReport) -> None:
+        extra: set[str] = set()
+        total = 0
+        try:
+            for rec in self._iter_json(e, self._LOC_PREFIX[role], _SAMPLE):
+                total += 1
+                if isinstance(rec, dict):
+                    extra |= set(rec) - self._LOC_KNOWN[role]
+        except (ijson.JSONError, UnicodeDecodeError):
+            rep.ok = False
+            rep.missing.append(f"{e.name}: JSON baştan okunamadı (bozuk)")
+            return
+        rep.unexpected_fields += [f"{e.name}: {k}" for k in sorted(extra)]
+        if role != "likes":
+            rep.notes.append(f"{e.name}: konum verisi, kategori konum (hassas, ayrı onay ister)")
+        if role in ("timeline", "timeline_arr"):
+            rep.notes.append(f"{e.name}: yeni Timeline.json biçimi topluluk kaynaklarından, gerçek dosyayla doğrulanmadı")
 
     @staticmethod
     def _verify_mbox(e: Entry, rep: FormatReport) -> None:
@@ -311,6 +371,8 @@ class GoogleTakeout:
                 yield from self._parse_subscriptions(e)
             elif role == "mbox":
                 yield from self._parse_mbox(e)
+            elif role in ("records", "semantic", "timeline", "timeline_arr", "likes"):
+                yield from getattr(self, f"_parse_{role}")(e)
 
     def _stream(self, e: Entry, prefix: str):
         n = 0
@@ -382,6 +444,156 @@ class GoogleTakeout:
                     self._skipped["eposta: ileti boyut sınırında kesildi (metin kısmi)"] += 1
                 yield ev
 
+    # --- konum geçmişi
+    def _parse_records(self, e: Entry) -> Iterator[EventIn]:
+        for rec in self._stream(e, "locations.item"):
+            if not isinstance(rec, dict):
+                self._skipped["konum kaydı: kayıt nesne değil"] += 1
+                continue
+            lat, lon = rec.get("latitudeE7"), rec.get("longitudeE7")
+            ts = iso_utc(rec.get("timestamp")) if rec.get("timestamp") else epoch_to_iso(rec.get("timestampMs"))
+            if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)) or ts is None:
+                self._skipped["konum kaydı: koordinat/zaman yok"] += 1
+                continue
+            la, lo = lat / 1e7, lon / 1e7
+            if abs(la) > 90 or abs(lo) > 180:
+                self._skipped["konum kaydı: koordinat aralık dışı"] += 1
+                continue
+            payload = {"enlem": la, "boylam": lo, "dogruluk_m": rec.get("accuracy"),
+                       "kaynak": rec.get("source"), "cihaz_etiketi": rec.get("deviceTag"),
+                       "platform": rec.get("platformType")}
+            yield EventIn(
+                ts=ts, kind="google.konum_kaydi", category=Category.KONUM,
+                payload={k: v for k, v in payload.items() if v is not None},
+                text=f"{la:.5f},{lo:.5f}", event_key=stable_key("gt", "kk", ts, lat, lon),
+            )
+
+    @staticmethod
+    def _coords(loc) -> tuple[float | None, float | None]:
+        if not isinstance(loc, dict):
+            return None, None
+        la, lo = loc.get("latitudeE7"), loc.get("longitudeE7")
+        if isinstance(la, (int, float)) and isinstance(lo, (int, float)):
+            return la / 1e7, lo / 1e7
+        return None, None
+
+    @staticmethod
+    def _dur_ts(d, which: str) -> str | None:
+        if not isinstance(d, dict):
+            return None
+        return iso_utc(d.get(f"{which}Timestamp")) if d.get(f"{which}Timestamp") else epoch_to_iso(d.get(f"{which}TimestampMs"))
+
+    def _parse_semantic(self, e: Entry) -> Iterator[EventIn]:
+        for obj in self._stream(e, "timelineObjects.item"):
+            if not isinstance(obj, dict):
+                self._skipped["yarı anlamlı konum: kayıt nesne değil"] += 1
+                continue
+            pv, seg = obj.get("placeVisit"), obj.get("activitySegment")
+            if isinstance(pv, dict):
+                loc = pv.get("location") or {}
+                ts, end = self._dur_ts(pv.get("duration"), "start"), self._dur_ts(pv.get("duration"), "end")
+                if ts is None:
+                    self._skipped["yer ziyareti: süre/başlangıç zamanı yok"] += 1
+                    continue
+                la, lo = self._coords(loc)
+                name, addr = loc.get("name"), loc.get("address")
+                payload = {"ad": name, "adres": addr, "yer_kimligi": loc.get("placeId"), "enlem": la,
+                           "boylam": lo, "bitis": end, "guven": pv.get("placeConfidence")}
+                yield EventIn(
+                    ts=ts, kind="google.yer_ziyareti", category=Category.KONUM,
+                    payload={k: v for k, v in payload.items() if v is not None},
+                    text=" ".join(str(x) for x in (name, addr) if x),
+                    event_key=stable_key("gt", "yz", ts, loc.get("placeId") or (la, lo)),
+                )
+            elif isinstance(seg, dict):
+                ts, end = self._dur_ts(seg.get("duration"), "start"), self._dur_ts(seg.get("duration"), "end")
+                if ts is None:
+                    self._skipped["hareket parçası: süre/başlangıç zamanı yok"] += 1
+                    continue
+                sla, slo = self._coords(seg.get("startLocation"))
+                ela, elo = self._coords(seg.get("endLocation"))
+                payload = {"tur": seg.get("activityType"), "mesafe_m": seg.get("distance"), "bitis": end,
+                           "baslangic_enlem": sla, "baslangic_boylam": slo, "bitis_enlem": ela,
+                           "bitis_boylam": elo}
+                yield EventIn(
+                    ts=ts, kind="google.hareket", category=Category.KONUM,
+                    payload={k: v for k, v in payload.items() if v is not None},
+                    text=str(seg.get("activityType") or ""),
+                    event_key=stable_key("gt", "hp", ts, sla, slo, ela, elo),
+                )
+            else:
+                self._skipped["yarı anlamlı konum: tanınmayan nesne türü"] += 1
+
+    @staticmethod
+    def _latlng(v) -> tuple[float | None, float | None]:
+        if isinstance(v, dict):
+            v = v.get("latLng") or v.get("point")
+        if isinstance(v, str):
+            m = _LATLNG.search(v.removeprefix("geo:"))
+            if m:
+                return float(m.group(1)), float(m.group(2))
+        return None, None
+
+    def _parse_timeline(self, e: Entry, prefix: str = "semanticSegments.item") -> Iterator[EventIn]:
+        for seg in self._stream(e, prefix):
+            if not isinstance(seg, dict):
+                self._skipped["zaman çizelgesi: kayıt nesne değil"] += 1
+                continue
+            ts, end = iso_utc(seg.get("startTime")), iso_utc(seg.get("endTime"))
+            if ts is None:
+                self._skipped["zaman çizelgesi: startTime yok/okunamadı"] += 1
+                continue
+            visit, act = seg.get("visit"), seg.get("activity")
+            if isinstance(visit, dict):
+                top = visit.get("topCandidate") if isinstance(visit.get("topCandidate"), dict) else {}
+                la, lo = self._latlng(top.get("placeLocation"))
+                payload = {"yer_kimligi": top.get("placeId"), "anlamsal_tur": top.get("semanticType"),
+                           "enlem": la, "boylam": lo, "bitis": end}
+                yield EventIn(
+                    ts=ts, kind="google.yer_ziyareti", category=Category.KONUM,
+                    payload={k: v for k, v in payload.items() if v is not None},
+                    text=str(top.get("semanticType") or ""),
+                    event_key=stable_key("gt", "yz", ts, top.get("placeId") or (la, lo)),
+                )
+            elif isinstance(act, dict):
+                top = act.get("topCandidate") if isinstance(act.get("topCandidate"), dict) else {}
+                sla, slo = self._latlng(act.get("start"))
+                ela, elo = self._latlng(act.get("end"))
+                payload = {"tur": top.get("type"), "mesafe_m": act.get("distanceMeters"), "bitis": end,
+                           "baslangic_enlem": sla, "baslangic_boylam": slo, "bitis_enlem": ela,
+                           "bitis_boylam": elo}
+                yield EventIn(
+                    ts=ts, kind="google.hareket", category=Category.KONUM,
+                    payload={k: v for k, v in payload.items() if v is not None},
+                    text=str(top.get("type") or ""),
+                    event_key=stable_key("gt", "hp", ts, sla, slo, ela, elo),
+                )
+            elif "timelinePath" in seg:
+                self._skipped["zaman çizelgesi: yol noktaları (timelinePath) alınmıyor"] += 1
+            else:
+                self._skipped["zaman çizelgesi: tanınmayan segment türü"] += 1
+
+    def _parse_timeline_arr(self, e: Entry) -> Iterator[EventIn]:
+        return self._parse_timeline(e, "item")
+
+    # --- YouTube beğenilenler
+    def _parse_likes(self, e: Entry) -> Iterator[EventIn]:
+        for rec in self._stream(e, "item"):
+            sn = rec.get("snippet") if isinstance(rec, dict) else None
+            vid = ((rec.get("contentDetails") or {}).get("videoId")
+                   or (sn or {}).get("resourceId", {}).get("videoId")) if isinstance(sn, dict) else None
+            ts = iso_utc((sn or {}).get("publishedAt")) if isinstance(sn, dict) else None
+            if not vid or ts is None:
+                self._skipped["youtube beğeni: videoId/publishedAt yok"] += 1
+                continue
+            title = str(sn.get("title") or "")
+            yield EventIn(
+                ts=ts, kind="youtube.begeni", category=Category.VIDEO,
+                payload={"video_id": vid, "baslik": title, "kanal": sn.get("videoOwnerChannelTitle"),
+                         "zaman_kaynagi": "listeye_eklenme"},
+                text=title, event_key=stable_key("gt", "begeni", vid),
+            )
+
     # --- abonelikler
     def _parse_subscriptions(self, e: Entry) -> Iterator[EventIn]:
         ts = iso_utc(e.mtime)
@@ -410,7 +622,19 @@ def _host(url: str) -> tuple[str, str]:
 
 def _is_gemini(rec: dict) -> bool:
     names = [str(rec.get("header") or "")] + [str(p) for p in (rec.get("products") or [])]
-    return any(n.strip().lower().startswith("gemini") for n in names)
+    return any(n.strip().lower().startswith(("gemini", "bard")) for n in names)
+
+
+_PROMPT_PREFIX = re.compile(r"^(?:[^\W\d_][^\W\d_ ]*[ ]){0,3}[^\W\d_][^\W\d_ ]*:[ ]+(?=\S)", re.U)
+
+
+def _strip_prompt_prefix(title: str) -> str:
+    """İngilizce "Prompted ..." ile yerelleştirilmiş "<Önek>: ..." (ör. Almanca "Eingegebener Prompt: ")
+    önekini atar. Yerelleştirilmiş önek yalnız en çok 4 kelime + iki nokta ise; Türkçe önek DOĞRULANMADI."""
+    if title.startswith("Prompted "):
+        return title[len("Prompted "):].strip()
+    m = _PROMPT_PREFIX.match(title)
+    return title[m.end():].strip() if m else title
 
 
 def _gemini_events(rec: dict, ts: str) -> Iterator[EventIn]:
@@ -418,7 +642,7 @@ def _gemini_events(rec: dict, ts: str) -> Iterator[EventIn]:
     DOĞRULANMADI: alan adları ikincil kaynaklardan/hafızadan; "Prompted " ön eki yalnız İngilizce
     hesapta ayıklanır, başka dillerde başlık olduğu gibi kalır."""
     title = chat.clean(rec.get("title"))
-    prompt = title.removeprefix("Prompted ").strip() if title.startswith("Prompted ") else title
+    prompt = _strip_prompt_prefix(title)
     conv = stable_key("gem", rec.get("time"))  # etkinlik kaydında konuşma kimliği yok: her dönüş ayrı
     if prompt:
         yield chat.message_event(platform="gemini", conv_id=conv, title=prompt[:80], role=chat.USER,

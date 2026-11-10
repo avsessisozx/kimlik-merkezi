@@ -1,0 +1,12 @@
+{
+  "Browser History": [
+    {
+      "favicon_url": "https://example.test/f.ico",
+      "page_transition": "LINK",
+      "title": "Örnek Sayfa",
+      "url": "https://example.test/a",
+      "client_id": "cid",
+      "time_usec": 1738600000000000
+    }
+  ]
+}

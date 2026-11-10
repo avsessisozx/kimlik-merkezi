@@ -35,18 +35,19 @@ NAME = "meta"
 # Üst anahtar -> (şekil, tür kısa adı). Anahtar adları hafızadan; bilinmeyen anahtar için içerik
 # şekli (string_list_data) bakılır.
 _TOP = {
-    "likes_media_likes": ("string_list", "begeni"),
-    "likes_comment_likes": ("string_list", "begeni"),
-    "relationships_following": ("string_list", "takip"),
-    "relationships_followers": ("string_list", "takipci"),
-    "saved_saved_media": ("string_list", "kaydedilen"),
-    "comments_media_comments": ("string_list", "yorum"),
-    "comments_reels_comments": ("string_list", "yorum"),
+    "likes_media_likes": ("string_any", "begeni"),
+    "likes_comment_likes": ("string_any", "begeni"),
+    "relationships_following": ("string_any", "takip"),
+    "relationships_followers": ("string_any", "takipci"),
+    "saved_saved_media": ("string_any", "kaydedilen"),
+    "comments_media_comments": ("string_any", "yorum"),
+    "comments_reels_comments": ("string_any", "yorum"),
     "comments_v2": ("fb_comments", "yorum"),
     "reactions_v2": ("fb_reactions", "tepki"),
     "friends_v2": ("fb_friends", "arkadas"),
 }
 _KNOWN = {
+    "string_any": {"title", "media_list_data", "string_list_data", "string_map_data"},
     "string_list": {"title", "media_list_data", "string_list_data"},
     "string_map": {"string_map_data", "title", "media_list_data"},
     "ig_posts": {"media", "title", "creation_timestamp"},
@@ -109,18 +110,16 @@ def _classify(entry: Entry, sc: "_Scan") -> None:
                 sc.add(shape, entry, key, slug)
             else:
                 rec = _first_item(entry, f"{key}.item")
-                if isinstance(rec, dict) and "string_list_data" in rec:
-                    sc.add("string_list", entry, key, _slug(key))
+                if isinstance(rec, dict) and ("string_list_data" in rec or "string_map_data" in rec):
+                    sc.add("string_any", entry, key, _slug(key))
                 else:
                     sc.ignored += 1
         elif s.startswith(b"["):
             rec = _first_item(entry, "item")
             if rec is None:
                 sc.empty.append(entry)
-            elif isinstance(rec, dict) and "string_list_data" in rec:
-                sc.add("string_list", entry, "", _slug(entry.basename))
-            elif isinstance(rec, dict) and "string_map_data" in rec:
-                sc.add("string_map", entry, "", _slug(entry.basename))
+            elif isinstance(rec, dict) and ("string_list_data" in rec or "string_map_data" in rec):
+                sc.add("string_any", entry, "", _slug(entry.basename))
             elif isinstance(rec, dict) and isinstance(rec.get("media"), list):
                 sc.add("ig_posts", entry, "", "gonderi")
             elif isinstance(rec, dict) and "timestamp" in rec and isinstance(rec.get("data"), list):
@@ -247,6 +246,15 @@ class Meta(ScanImporter):
         fn = getattr(self, f"_ev_{shape}")
         yield from fn(slug, e, rec)
 
+    # --- aynı üst anahtar altında iki şekil de görülebilir (kaydedilen/yorum yeni sürümlerde string_map_data)
+    def _ev_string_any(self, slug, e, rec):
+        if "string_list_data" in rec:
+            yield from self._ev_string_list(slug, e, rec)
+        elif "string_map_data" in rec:
+            yield from self._ev_string_map(slug, e, rec)
+        else:
+            self._skip("string_any: string_list_data/string_map_data yok")
+
     # --- string_list_data (beğeni, takip, takipçi, kaydedilen, eski yorum)
     def _ev_string_list(self, slug, e, rec):
         title = rec.get("title") or ""
@@ -276,12 +284,17 @@ class Meta(ScanImporter):
         if ts is None:
             self._skip("string_map_data: zaman yok")
             return
-        vals = {k: (v.get("value") if isinstance(v, dict) else None) for k, v in m.items()}
-        plat = _platform(e.name) or "instagram"
+        vals = {k: ((v.get("value") or v.get("href")) if isinstance(v, dict) else None) for k, v in m.items()}
+        title = rec.get("title") or ""
+        href = next((v.get("href") for v in m.values() if isinstance(v, dict) and v.get("href")), None)
+        plat = _platform(e.name, href or "") or "instagram"
         kind = f"{plat}.{slug}"
-        text = vals.get("Comment") or " ".join(str(x) for x in vals.values() if x)
-        yield EventIn(ts=ts, kind=kind, category=Category.SOSYAL, payload={"alanlar": vals}, text=text,
-                      event_key=stable_key("meta", kind, ts, *sorted((k, str(v)) for k, v in vals.items())))
+        text = vals.get("Comment") or " ".join(str(x) for x in [title, *vals.values()] if x)
+        payload = {"alanlar": vals}
+        if title:
+            payload["baslik"] = title
+        yield EventIn(ts=ts, kind=kind, category=Category.SOSYAL, payload=payload, text=text,
+                      event_key=stable_key("meta", kind, ts, title, *sorted((k, str(v)) for k, v in vals.items())))
 
     # --- Instagram gönderileri
     def _ev_ig_posts(self, slug, e, rec):
