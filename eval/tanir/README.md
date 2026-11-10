@@ -23,8 +23,8 @@ Hassas sorular yalnız izni KAPALI kategorilerde (`eposta`, `konum`, `mesaj`, `s
 | Koşul | Cevaplayıcıya verilen |
 |---|---|
 | A | yalnız `sorular.json` |
-| B | `sorular.json` + `kimlik_karti.md` (kişinin beyanlarından üretilen kart; eskiyen beyanlar kartta yok) |
-| C | `sorular.json` + `mcp.json` (kimlik-merkezi MCP sunucusu). İzinli: `tarama, video, sosyal, muzik, kod, persona`. Kapalı: `eposta, mesaj, konum, sohbet` |
+| B | `sorular.json` + `kimlik_karti.md` (beyanlar + izinli kategorilerden `[çıkarım]` özet + süresi dolanlar AYRI bölümde + bilinmeyenler; 2026-11-10 düzeltme turundan beri; önceki sürümde yalnız beyanlardı) |
+| C | `sorular.json` + `mcp.json` (kimlik-merkezi MCP sunucusu; `KIMLIK_SAAT_DILIMI=Europe/Istanbul` ortamıyla). İzinli: `tarama, video, sosyal, muzik, kod, persona`. Kapalı: `eposta, mesaj, konum, sohbet` |
 Üç koşulda da aynı kurallar yazılıdır (uydurma, "bilmiyorum" de, izin yoksa söyle): bkz. `paket/*/TALIMAT.md`.
 Veri gerçek içe aktarıcılarla (`kimlikimport.run`) ve çekirdekle (`Hub`) içe alınır; izinler `KeyManager` ile verilir.
 
@@ -33,7 +33,8 @@ Depo kökünden (çıktılar `cikti/tanir/` altına yazılır, `.gitignore`'da):
 ```
 export PYTHONPATH=core/src:server/src:importers/src:windows/src
 python eval/tanir/tanir.py hepsi          # uret + kur + dogrula (veri tasarımı ve MCP koruması denetimi)
-python eval/tanir/tanir.py erisim         # betikli erişilebilirlik analizi (LLM değil)
+python eval/tanir/tanir.py erisim         # betikli erişilebilirlik analizi (LLM değil): tahmin/anahtar/say/kart sütunları
+python eval/tanir/tanir.py q31            # Q31 cevabının dayanağı: kapalı kategoriden sızıntı var mı?
 python eval/tanir/tanir.py referans       # LLM olmayan referanslarla puanlama hattını doğrula
 python -m pytest eval/tanir -q            # düzenek testleri
 ```
@@ -52,7 +53,7 @@ Paket: `cikti/tanir/paket/C/` (`TALIMAT.md`, `sorular.json`, `mcp.json`) + `mcp_
 python mcp_cagri.py --yapilandirma mcp.json kategorileri_listele
 python mcp_cagri.py --yapilandirma mcp.json ara --arg sorgu=v60 --arg limit=5
 ```
-Yardımcı gerçek MCP stdio protokolüyle sunucuyu başlatır, yalnız altı izinli aracı çağırır (`persona_oner` ve bilinmeyenler
+Yardımcı gerçek MCP stdio protokolüyle sunucuyu başlatır, yalnız yedi izinli aracı çağırır (`persona_oner` ve bilinmeyenler
 Türkçe hatayla reddedilir), `mcp.json` ortam değerlerini (anahtar) çıktıdan siler, kendisi ağa bağlanmaz. Kapalı kategoriler
 sunucuda hâlâ reddedilir (testli: `tests/test_mcp_cagri.py`).
 **Dürüst sınır:** `mcp.json` sunucunun başlatılabilmesi için anahtarı düz metin taşır ve cevaplayıcının Bash'i kısıtlanamıyorsa

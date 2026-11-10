@@ -9,7 +9,7 @@ sunucuyu kapatır.
   python mcp_cagri.py --yapilandirma mcp.json ara --arg sorgu=v60 --arg limit=5
   python mcp_cagri.py --yapilandirma mcp.json ara '{"sorgu": "kahve", "kategori": "tarama"}'
 
-Güvenlik: yalnız altı salt-okur araç izinlidir (`persona_oner` ve bilinmeyenler reddedilir).
+Güvenlik: yalnız yedi salt-okur araç izinlidir (`persona_oner` ve bilinmeyenler reddedilir).
 Yapılandırmadaki ortam değişkeni değerleri (anahtar dahil) çıktıdan SİLİNİR; betik bunları
 yazmaz. Betik kendisi ağa bağlanmaz (yalnız çocuk sürece stdio ile konuşur). Bu bir ERİŞİM
 KISITI DEĞİL, kolaylık ve kaza önleyicidir: Bash'i olan bir ajan yine de dosyaları açabilir.
@@ -23,7 +23,9 @@ import os
 import sys
 from pathlib import Path
 
-IZINLI = ("kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "ornekle")
+IZINLI = ("kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "ornekle", "say")
+# Gizli OLMAYAN ortam değişkenleri (çıktıda ayıklanmaz: yoksa saat dilimi adı [GİZLİ] olur)
+GIZLI_DEGIL = ("KIMLIK_SAAT_DILIMI",)
 SUNUCU_ADI = "kimlik-merkezi"
 ZAMAN_ASIMI = 90
 
@@ -123,7 +125,7 @@ def ana(argv: list[str] | None = None) -> int:
                        + (" 'persona_oner' bu ölçümde kullanılamaz." if a.arac == "persona_oner" else ""))
         sunucu = yapilandirma_oku(a.yapilandirma)
         arg = argumanlar(a.json_arguman, a.arg)
-        gizli = [str(v) for v in (sunucu.get("env") or {}).values() if len(str(v)) >= 6]
+        gizli = [str(v) for k, v in (sunucu.get("env") or {}).items() if k not in GIZLI_DEGIL and len(str(v)) >= 6]
         try:
             cikti, hata = asyncio.run(asyncio.wait_for(cagir(sunucu, a.arac, arg, gizli), ZAMAN_ASIMI))
         except Hata:

@@ -167,38 +167,19 @@ class PersonaReader:
                               self.get_fact(r[1]), self.get_fact(r[2])) for r in rows]
 
     # ---------------------------------------------------------------- kimlik kartı
-    def export_identity_card(self, categories: Iterable[str] | None = None) -> str:
-        """Düz Markdown kimlik kartı. `categories=None`: tüm persona kategorileri.
-        Yalnız beyan_edilen + dosyadan_alinan; `cikarilan` ve `eskimis` hiçbir koşulda girmez."""
-        cats = list(FACT_CATEGORIES) if categories is None else list(categories)
-        facts = self.list_facts(cats)
-        by_cat: dict[str, list[Fact]] = {}
-        for f in facts:
-            by_cat.setdefault(f.category, []).append(f)
-        labels: dict[str, str | None] = {}
-        out = ["# Kimlik Kartı", "", "## Bu kişi hakkında bilinenler", "",
-               "Kişinin kendi beyanı ya da bir kaynağa bağlı bilgiler; tahmin içermez. "
-               f"Oluşturulma: {self._now()}", ""]
-        bos = len(out)
-        for cat in FACT_CATEGORIES:
-            items = by_cat.get(cat)
-            if not items:
-                continue
-            out += [f"### {CATEGORY_TITLES[cat]}", ""]
-            for f in items:
-                notlar = []
-                if f.status == "dosyadan_alinan":
-                    if f.source_id not in labels:
-                        labels[f.source_id] = self.source_label(f.source_id)
-                    notlar.append(f"kaynak: {_line(labels[f.source_id] or 'bilinmeyen')}")
-                dogr = son_dogrulama(f)
-                if dogr:
-                    notlar.append(f"son doğrulama: {dogr}")
-                out.append(f"- {_line(f.statement)}" + (f" ({', '.join(notlar)})" if notlar else ""))
-            out.append("")
-        if len(out) == bos:
-            out += ["Seçilen kategorilerde bilgi yok.", ""]
-        return "\n".join(out)
+    def export_identity_card(self, categories: Iterable[str] | None = None, *,
+                             veri_kategorileri: Iterable[str] | None = None,
+                             saat_dilimi=None) -> str:
+        """Düz Markdown kimlik kartı (ayrıntı ve bölümler: kart.py, INTERFACES Ek 1.6).
+        `categories=None`: tüm persona kategorileri. Canlı bölümde yalnız beyan_edilen +
+        dosyadan_alinan; süresi dolanlar AYRI "Süresi doldu - doğrulanmadı" bölümünde (güncel
+        diye sunulmaz); `cikarilan` ve çelişkiyle yerini yenisine bırakmış bilgi hiçbir koşulda girmez.
+        `veri_kategorileri` (varsayılan boş = özet yok): hangi izinli veri kategorilerinden SAYIM
+        özeti üretileceği; hassas kategoriler (eposta, mesaj, konum, sohbet) verilse bile yok sayılır.
+        `saat_dilimi`: `YerelSaat` (varsayılan UTC)."""
+        from . import kart
+        cats = list(FACT_CATEGORIES) if categories is None else [_check_category(c) for c in categories]
+        return kart.uret(self, cats, veri_kategorileri=veri_kategorileri, saat_dilimi=saat_dilimi)
 
 
 class Persona(PersonaReader):

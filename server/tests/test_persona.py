@@ -32,7 +32,7 @@ def test_elle_eklenen_beyan_kartta(persona):
     f = persona.get_fact(fid)
     assert f.status == "beyan_edilen" and f.source_id is None and f.valid_until is None
     card = persona.export_identity_card(["kimlik"])
-    assert "### Kimlik" in card and "- Adım Deneme Kişi (son doğrulama: 2026-11-09)" in card
+    assert "### Kimlik" in card and "- Adım Deneme Kişi (beyan, son doğrulama: 2026-11-09)" in card
     assert "## Bu kişi hakkında bilinenler" in card
     assert "kaynak:" not in card
 
@@ -60,7 +60,7 @@ def test_dosyadan_alinan_kaynak_adiyla(persona, hub, tmp_path):
     f = persona.list_facts(["ilgi"])[0]
     assert f.status == "dosyadan_alinan" and f.source_id == sid
     card = persona.export_identity_card(["ilgi"])
-    assert "- Python biliyor (kaynak: belge: ozgecmis.txt, son doğrulama: 2026-11-09)" in card
+    assert "- Python biliyor (dosyadan, kaynak: belge: ozgecmis.txt, son doğrulama: 2026-11-09)" in card
 
 
 def test_kaynaksiz_veya_yok_kaynak_reddedilir(persona):
@@ -126,8 +126,12 @@ def test_sure_dolumu_sahte_saatle(persona, clock):
     assert persona.check_expiry() == 0
     assert "Dizüstü" in persona.export_identity_card()
     clock.advance(days=2)
-    # check_expiry çağrılmadan da süresi dolan bilgi kartta yok (okuma anında süzülür)
-    assert "Dizüstü" not in persona.export_identity_card()
+    # check_expiry çağrılmadan da süresi dolan bilgi CANLI bölümde yok (okuma anında süzülür);
+    # ama sessizce düşmez: AYRI "Süresi doldu - doğrulanmadı" bölümünde görünür.
+    kart = persona.export_identity_card()
+    canli = kart.split("### Süresi doldu")[0]
+    assert "Dizüstü" not in canli and "### Süresi doldu - doğrulanmadı" in kart
+    assert "[Cihazlar] Dizüstü bilgisayar: X (beyan" in kart.split("### Süresi doldu")[1]
     assert persona.get_fact(cihaz).status == "beyan_edilen"
     assert persona.check_expiry() == 1
     assert persona.get_fact(cihaz).status == "eskimis"

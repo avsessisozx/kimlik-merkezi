@@ -20,3 +20,6 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+
+[tool.setuptools.package-data]
+kimlikserver = ["veri/*.json"]

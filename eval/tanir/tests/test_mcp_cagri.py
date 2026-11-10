@@ -58,7 +58,7 @@ def test_yasak_ve_bilinmeyen_arac_reddedilir(kurulu):
 def test_ciktida_anahtar_ve_ortam_yok(kurulu):
     k = anahtar(kurulu)
     cfg = json.loads((kurulu / "paket" / "C" / "mcp.json").read_text(encoding="utf-8"))
-    degerler = [v for v in cfg["mcpServers"]["kimlik-merkezi"]["env"].values() if len(v) >= 6]
+    degerler = [v for k, v in cfg["mcpServers"]["kimlik-merkezi"]["env"].items() if k not in M.GIZLI_DEGIL and len(v) >= 6]
     assert k in degerler
     for args in (("kategorileri_listele",), ("kimlik_karti",), ("ara", "--arg", "sorgu=v60"),
                  ("persona_oner",), ("ara", "--arg", "sorgu=x", "--arg", "kategori=eposta")):
@@ -84,3 +84,12 @@ def test_hatali_yapilandirma_turkce_hata(tmp_path):
     p = subprocess.run([sys.executable, str(YARDIMCI), "--yapilandirma", str(tmp_path / "yok.json"), "ara"],
                        capture_output=True, text=True, timeout=30)
     assert p.returncode == 2 and "bulunamadı" in json.loads(p.stdout)["hata"]
+
+
+def test_say_araci_ve_saat_dilimi_cikti_ayiklanmaz(kurulu):
+    p = cagir(kurulu, "say", "--arg", "alan=sanatci", "--arg", "en_cok=1")
+    assert p.returncode == 0, p.stderr
+    j = json.loads(p.stdout)
+    assert j["satirlar"][0]["veri"] == "Mavi Dalga" and j["saat_dilimi"]["ad"] == "Europe/Istanbul"
+    p = cagir(kurulu, "say", "--arg", "alan=tur", "--arg", "kategori=konum")   # kapalı kategori
+    assert p.returncode == 1 and "reddedildi" in json.loads(p.stdout)["hata"]

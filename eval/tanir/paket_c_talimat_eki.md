@@ -11,8 +11,8 @@ python mcp_cagri.py --yapilandirma mcp.json <arac_adi> '{"anahtar": "deger"}'
 ```
 Sayılar (ör. `limit`) araç şemasına göre otomatik çevrilir.
 
-## İzinli altı araç
-`kategorileri_listele`, `ara`, `zaman_cizelgesi`, `persona_getir`, `kimlik_karti`, `ornekle`.
+## İzinli yedi araç
+`kategorileri_listele`, `ara`, `zaman_cizelgesi`, `persona_getir`, `kimlik_karti`, `ornekle`, `say`.
 `persona_oner` ve diğer her şey reddedilir; kullanma.
 
 ## Örnek komutlar
@@ -23,6 +23,8 @@ python mcp_cagri.py --yapilandirma mcp.json ara --arg sorgu=bisiklet --arg kateg
 python mcp_cagri.py --yapilandirma mcp.json zaman_cizelgesi --arg kategori=kod --arg limit=20
 python mcp_cagri.py --yapilandirma mcp.json persona_getir
 python mcp_cagri.py --yapilandirma mcp.json kimlik_karti
+python mcp_cagri.py --yapilandirma mcp.json say --arg alan=sanatci --arg en_cok=5
+python mcp_cagri.py --yapilandirma mcp.json say --arg alan=saat --arg kategori=kod
 ```
 Önce `kategorileri_listele` ile hangi kategorilere izin verildiğine bak. İzin verilmeyen bir kategori
 `reddedildi` hatası döner (çıkış kodu 1); bu, o bilginin sana kapalı olduğu demektir: cevap verme,
