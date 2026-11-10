@@ -13,6 +13,8 @@ VARSAYILAN: dict[str, Any] = {
     "ilk_acilis_tamam": False,
     "tema": "sistem",            # sistem | acik | koyu
     "otomatik_baslat": True,     # kurulumda açık; Ayarlar'dan kapatılır
+    "kisiler": [],               # [{"id","ad","klasor"}]: her kişi ayrı veri klasörü
+    "secili_kisi": None,
     "port": 47821,               # tercih edilen yerel port; doluysa boş bir port seçilir
 }
 TEMALAR = ("sistem", "acik", "koyu")
