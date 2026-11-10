@@ -56,8 +56,7 @@ def test_baslat_varsayilan_sifreli_ve_durum(calistir, root):
 
 def test_baslat_saglayici_yoksa_sifresiz_ve_uyarir(calistir, root, monkeypatch):
     monkeypatch.delenv(sif.ENV_SAHTE)
-    if sys.platform == "win32":
-        pytest.skip("Windows'ta DPAPI vardır")
+    monkeypatch.setattr(sif, "varsayilan_saglayici", lambda: None)   # sağlayıcı AÇIKÇA yok (Windows'ta DPAPI olsa da)
     c = calistir("baslat")
     assert "ŞİFRESİZ oluşturuldu" in c.out
     assert not (root / "anahtar.json").exists()

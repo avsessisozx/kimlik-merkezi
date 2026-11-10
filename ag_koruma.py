@@ -173,3 +173,38 @@ def ag_korumasi():
         IHLALLER.clear()
     if bulunan:
         pytest.fail("AĞ İHLALİ: " + "; ".join(bulunan), pytrace=False)
+
+
+@pytest.fixture(autouse=True)
+def sifreleme_saglayici_yalitimi(monkeypatch):
+    """Testler platformdan bağımsız olsun: gerçek Windows DPAPI'si testlerde ASLA kendiliğinden devreye girmez.
+
+    `varsayilan_saglayici` Linux davranışını verir (saglayici_ayarla ile verilen, yoksa KIMLIK_SAHTE_SAGLAYICI,
+    yoksa YOK). Gerçek DPAPI'yi deneyen testler `DpapiSaglayici()`yi doğrudan kurar (yalnız win32'de çalışır).
+    Not: testin başlattığı ALT SÜREÇLER bu yalıtımı görmez (Windows'ta orada gerçek DPAPI vardır)."""
+    try:
+        from kimlikcore import sifreleme as sif
+    except ImportError:  # çekirdek kurulu değilse yapılacak bir şey yok
+        yield
+        return
+
+    def varsayilan():
+        if sif._ozel_saglayici is not None:
+            return sif._ozel_saglayici
+        gizli = os.environ.get(sif.ENV_SAHTE)
+        return sif.SahteSaglayici(gizli) if gizli else None
+    monkeypatch.setattr(sif, "varsayilan_saglayici", varsayilan)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def girisde_baslatma_yalitimi(monkeypatch):
+    """Testler gerçek kayıt defterine (Windows "girişte başlat" anahtarı) dokunmasın: `Otomatik(None)` arka uç
+    bulamasın. Arka uç isteyen test `Otomatik(sahte_arka_uc)` verir."""
+    try:
+        from kimlikwin import baslangic
+    except ImportError:
+        yield
+        return
+    monkeypatch.setattr(baslangic, "varsayilan_arka_uc", lambda: None)
+    yield
