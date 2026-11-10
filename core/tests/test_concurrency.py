@@ -144,33 +144,15 @@ def test_bozuk_ve_baska_pid_kilidi(root):
         Hub.open(root, write=True)  # başka bilgisayarın kilidi doğrulanamaz: canlı sayılır
 
 
-def test_erisim_db_bos_sema_ve_cok_surecli_yazim(root, child_env):
+def test_hub_artik_erisim_db_olusturmaz_eski_yardimci_calisir(root):
     with Hub.open(root, write=True):
         pass
-    db = root / "erisim.db"
-    assert db.exists()
+    assert not (root / "erisim.db").exists() and not (root / "oneri.db").exists()
+    # Eski dosyayı okuyabilmek için yardımcılar geriye dönük olarak duruyor.
+    init_erisim_db(root)
     c = connect_erisim(root)
-    cols = [r[1] for r in c.execute("PRAGMA table_info(access_log)")]
-    assert cols == ["id", "ts", "app_id", "tool", "category", "result_count", "outcome"]
-    assert c.execute("SELECT count(*) FROM access_log").fetchone()[0] == 0
-    assert c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
-    assert c.execute("PRAGMA busy_timeout").fetchone()[0] >= 5000
-    init_erisim_db(root)  # ikinci çağrı zararsız
-    code = r"""
-import sys
-from kimlikcore import connect_erisim
-c = connect_erisim(sys.argv[1])
-for i in range(300):
-    c.execute("INSERT INTO access_log(ts, app_id, tool, category, result_count, outcome) VALUES (?,?,?,?,?,?)",
-              ("2026-01-01T00:00:00Z", sys.argv[2], "ara", "notlar", 1, "ok"))
-print("tamam")
-"""
-    procs = [subprocess.Popen([sys.executable, "-c", code, str(root), f"app{i}"], env=child_env,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8") for i in range(4)]
-    for p in procs:
-        out, err = p.communicate(timeout=60)
-        assert p.returncode == 0 and out.strip() == "tamam", err
-    assert c.execute("SELECT count(*) FROM access_log").fetchone()[0] == 1200
-    with pytest.raises(Exception):
-        c.execute("INSERT INTO access_log(ts, app_id, tool, outcome) VALUES ('t','a','t','belirsiz')")
-    c.close()
+    try:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(access_log)")]
+        assert cols == ["id", "ts", "app_id", "tool", "category", "result_count", "outcome"]
+    finally:
+        c.close()

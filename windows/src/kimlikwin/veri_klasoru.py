@@ -86,7 +86,7 @@ def denetle(yol: str | Path) -> Denetim:
 
 
 def olustur(yol: str | Path) -> dict:
-    """Veritabanını ve klasör yapısını (kimlik.db, erisim.db, arsiv/, cikti/) kendisi oluşturur."""
+    """Veritabanını ve klasör yapısını (kimlik.db, arsiv/, cikti/) kendisi oluşturur."""
     d = denetle(yol)
     if not d.ok:
         raise ValueError(d.mesaj)

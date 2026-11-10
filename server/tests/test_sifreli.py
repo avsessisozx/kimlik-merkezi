@@ -91,3 +91,34 @@ def test_mcp_stdio_sifreli_veri(sifreli_world):
         h.add_events(h.add_source("sahte", "1", None), [])
         ok2 = run({sif.ENV_SAHTE: "mcp-testi"})
         assert not ok2.is_error
+
+
+def test_oneri_ve_erisim_kaydi_sifreli_klasorde_diskte_duz_metin_yok(sifreli_world):
+    """oneri.db / erisim.db artık yok: kişi hakkındaki öneri cümlesi ve erişim örüntüsü şifreli
+    gelen dosyalarında, birleştirilince şifreli kimlik.db içinde durur."""
+    from kimlikserver.oneri import OneriKuyrugu, OneriYonetici
+    root = sifreli_world["root"]
+    ifade = "benzersizoneriifadesi kisi hakkinda cumle"
+    s = QueryService(root, sifreli_world["a_key"])
+    kid = s.ara("kahve", "notlar")["kayitlar"][0]["id"]
+    r = s.persona_oner([{"ifade": ifade, "kategori": "diger", "kanit": [kid], "guven": 0.5}])
+    assert r["eklenen"] == 1
+
+    def tara():
+        for dp, _d, fs in os.walk(root):
+            for f in fs:
+                b = open(os.path.join(dp, f), "rb").read()
+                for x in (ifade.encode(), b"persona_oner", sifreli_world["a_id"].encode(), b"SQLite format"):
+                    assert x not in b, (f, x)
+    tara()
+    assert not (root / "oneri.db").exists() and not (root / "erisim.db").exists()
+    assert [o.statement for o in OneriKuyrugu(root).listele()] == [ifade]       # gelen kutusundan görünür
+    assert any(x[2] == "persona_oner" for x in AccessLog(root).read_all())
+    with Hub.open(root, write=True) as h:                                        # yazan Hub işler
+        y = OneriYonetici(h)
+        (o,) = y.kuyruk_listele()
+        assert o.statement == ifade
+        y.onayla(o.oneri_id)
+        assert h.query_one("SELECT COUNT(*) FROM facts WHERE statement = ?", (ifade,))[0] == 1
+    assert list((root / "gelen").glob("*.gelen")) == []
+    tara()

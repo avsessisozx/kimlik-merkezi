@@ -744,6 +744,10 @@ def durum(root: Path | str, db_adi: str = "kimlik.db") -> dict[str, Any]:
                         else:
                             duz_ham += 1
     kalintilar = sorted(x.name for x in root.glob("kimlik.db.duz-eski*"))
+    eski = sorted(a for a in ("oneri.db", "erisim.db") if (root / a).exists())
+    gelen = root / "gelen"
+    bekleyen_gelen = (sum(1 for x in gelen.iterdir() if x.is_file() and x.name.endswith(".gelen"))
+                      if gelen.is_dir() else 0)
     return {
         "veritabani": db,
         "sifreli": db == "sifreli",
@@ -756,4 +760,6 @@ def durum(root: Path | str, db_adi: str = "kimlik.db") -> dict[str, Any]:
         "ham_dosya_sifreli": sifreli_ham,
         "ham_dosya_duz": duz_ham,
         "duz_kalintilar": kalintilar,
+        "eski_sifresiz_dosyalar": eski,     # oneri.db / erisim.db: yazan Hub açılınca göç eder
+        "bekleyen_gelen_kayit": bekleyen_gelen,
     }

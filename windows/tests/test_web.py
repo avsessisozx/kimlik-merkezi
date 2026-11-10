@@ -1,5 +1,6 @@
 """Gerçek yerel HTTP sunucusu üzerinden uçtan uca ekran mantığı (tarayıcısız)."""
 import json
+import os
 import socket
 import time
 import urllib.error
@@ -211,8 +212,10 @@ def test_mcp_stdio_uygulamanin_urettigi_anahtarla(ist, veri):
     ist.api("persona_ekle", {"metin": "Ben deneme kullanıcısıyım", "kategori": "kimlik"})
     r = ist.api("anahtar_uret", {"ad": "MCP deneme"})
     ist.api("izin_ver", {"app_id": r["id"], "kategori": "persona"})
-    p = StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"],
-                              env={"KIMLIK_VERI": str(veri), "KIMLIK_ANAHTAR": r["anahtar"]})
+    env = {"KIMLIK_VERI": str(veri), "KIMLIK_ANAHTAR": r["anahtar"]}
+    if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
+        env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    p = StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
     async def go():
         async with Client(p) as c:

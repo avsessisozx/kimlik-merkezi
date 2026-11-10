@@ -96,13 +96,14 @@ def test_eski_semadan_yeniye_goc(root):
     with pytest.raises(SchemaTooOld):
         Hub.open(root, write=False)
     with Hub.open(root, write=True) as h:
-        assert h.schema_version == SCHEMA_VERSION == 3
+        assert h.schema_version == SCHEMA_VERSION == 4
         names = {r[0] for r in h._conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"facts", "contradictions", "app_keys", "permissions", "devices"} <= names
+        assert {"facts", "contradictions", "app_keys", "permissions", "devices", "access_log",
+                "oneriler", "bastirilan"} <= names
         assert not {"review_queue", "suppressed"} & names
         facts_cols = {r[1] for r in h._conn.execute("PRAGMA table_info(facts)")}
         assert "confidence" not in facts_cols
-        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3]
+        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3, 4]
         # eski veri bozulmadan açılır ve aranır
         assert h.summary()["counts"]["event"] == 10
         assert len(h.search("ISIK", limit=50)) == 10
@@ -112,14 +113,14 @@ def test_eski_semadan_yeniye_goc(root):
             "INSERT INTO facts(fact_id, statement, date, status, category) VALUES ('f1','x','2026-01-01','cikarilan','is')"
         )
     with Hub.open(root, write=False) as r:  # artık salt okunur da açılır
-        assert r.schema_version == 3
+        assert r.schema_version == 4
 
 
 def test_goc_idempotent_ve_yeniden_acilis(root):
     with Hub.open(root, write=True):
         pass
     with Hub.open(root, write=True) as h:
-        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3]
+        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3, 4]
 
 
 def test_daha_yeni_sema_reddedilir(root):
@@ -139,15 +140,15 @@ def test_daha_yeni_sema_reddedilir(root):
 def test_basarisiz_goc_geri_alinir(tmp_path):
     c = sqlite3.connect(tmp_path / "x.db", isolation_level=None)
     schema.migrate(c)
-    assert schema.current_version(c) == 3
+    assert schema.current_version(c) == 4
 
     def bozuk(conn):
         conn.execute("CREATE TABLE yeni_tablo (a INTEGER)")
         raise RuntimeError("göç patladı")
 
     with pytest.raises(RuntimeError):
-        schema.migrate(c, migrations={**schema.MIGRATIONS, 4: bozuk})
-    assert schema.current_version(c) == 3
+        schema.migrate(c, migrations={**schema.MIGRATIONS, 5: bozuk})
+    assert schema.current_version(c) == 4
     assert c.execute("SELECT 1 FROM sqlite_master WHERE name='yeni_tablo'").fetchone() is None
 
 
@@ -173,8 +174,8 @@ def test_v2den_v3e_sohbet_gocu(root):
     make_v1(root, upto=2)
     # eski şemada 'sohbet' hassas sayılmaz: onaysız yazılabilirdi (v3 bunu kapatır)
     with Hub.open(root, write=True) as h:
-        assert h.schema_version == 3
-        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3]
+        assert h.schema_version == 4
+        assert [r[0] for r in h._conn.execute("SELECT version FROM schema_migrations ORDER BY 1")] == [1, 2, 3, 4]
         # mevcut veri bozulmadan taşındı
         assert h.query("SELECT app_id, category, expires_at, confirmed_sensitive FROM permissions ORDER BY category") == [
             ("a1", "eposta", "2027-01-01T00:00:00Z", 1), ("a1", "notlar", None, 0)]

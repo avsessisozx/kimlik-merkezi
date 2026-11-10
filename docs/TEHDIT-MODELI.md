@@ -11,8 +11,8 @@ belirtilir. Bir şeyin "sınandığı" yalnızca ilgili testi varsa yazılır. A
 |---|---|
 | İçe aktarılmış kişisel veri (arama/izleme geçmişi, sohbetler, e-posta, mesaj, konum...) | veri klasöründe `kimlik.db` (SQLite) |
 | Ham arşiv: içe aktarılan dosyaların kopyaları | veri klasöründe `arsiv/<sha256>/` |
-| Persona bilgileri ve öneri kuyruğu | `kimlik.db`, öneri kuyruğu ayrı bir SQLite dosyası |
-| Erişim kaydı (hangi uygulama, hangi araç, hangi kategori, kaç kayıt, sonuç) | `erisim.db` (sorgu metni ya da kayıt içeriği yazılmaz) |
+| Persona bilgileri ve öneri kuyruğu | `kimlik.db` (öneri kuyruğu da; yazım için geçici, şifreli `gelen/` dosyaları) |
+| Erişim kaydı (hangi uygulama, hangi araç, hangi kategori, kaç kayıt, sonuç) | `kimlik.db` içindeki `access_log` (sorgu metni ya da kayıt içeriği yazılmaz) |
 | Uygulama anahtarları | veritabanında yalnızca SHA-256 özeti; düz anahtar bir kez gösterilir ve yapay zekâ uygulamasının ayar dosyasına konur |
 | Uygulama ayarları, günlük | kullanıcı ayar klasörü (`ayarlar.json`, `gunluk.log`); günlüğe kayıt içeriği yazılmaz |
 | Yerel web arayüzü oturum jetonu | süreç belleği ve açık tarayıcı sayfası |
@@ -22,9 +22,11 @@ belirtilir. Bir şeyin "sınandığı" yalnızca ilgili testi varsa yazılır. A
 
 ### 2.1 Bilgisayarı ya da diski kopyalayan biri
 Kayıp/çalıntı bilgisayar, yedek diski, paylaşılan bilgisayarda başka bir Windows kullanıcısı.
-- **Önlem:** Yok sayılır derecede. Bu sürümde veri **şifrelenmez**; veritabanı ve ham arşiv düz dosyadır.
-  Uygulamanın "Hakkında" ekranı da bunu söyler ve BitLocker/VeraCrypt gibi şifreli bir birim önerir.
-- **Kalan risk: yüksek** (bu aktör için). Kullanıcı tarafında tam disk şifrelemesi tek gerçek önlemdir.
+- **Önlem:** Veritabanı (öneri kuyruğu ve erişim günlüğü dahil) ve ham arşiv varsayılan olarak AES-256-GCM ile
+  şifrelidir (Windows'ta anahtar hesaba bağlı; ayrıntı ve sınırlar docs/SIFRELEME.md). Şifrelenmeyenler: `cikti/` ve
+  kullanıcının dışa aktardığı dosyalar, Linux/sağlayıcısız ortamda oluşturulan klasörler, şifrelemeden önce
+  oluşturulmuş ve henüz `sifrele` ile dönüştürülmemiş klasörler.
+- **Kalan risk:** şifrelenmeyen yukarıdaki parçalar için yüksek; ek olarak tam disk şifrelemesi önerilir.
   Uygulama kaldırılırken veriyi de silmek isteyip istemediğiniz sorulur (varsayılan: silmez; sessiz kaldırmada da silmez).
 
 ### 2.2 Kötü niyetli ya da özensiz bir yapay zekâ istemcisi (MCP)
@@ -140,7 +142,7 @@ sistem iletişim penceresi ya da tek kullanımlık, ekranda gösterilen bir onay
 - Veri klasörünü bulut eşitleme/yedekleme servisine koymanızın sonuçları.
 - Üçüncü taraf bileşenlerdeki açıklar (ilgili projeye bildirin; sürümler SBOM'da).
 - Hizmet reddi (bilgisayarınızı yavaşlatan büyük dosya vb.) tek başına güvenlik açığı sayılmaz.
-- Şifreleme, parola koruması, kurtarma yolu: bu sürümde **yok**.
+- Aynı Windows hesabında çalışan kötü amaçlı yazılım (anahtar hesaba bağlıdır; yalnız parola katmanı bunu aşar). Kurtarma ve parola yönetimi ayrıntıları ve sınırları: docs/SIFRELEME.md.
 
 ## 5. Bu belgenin sınırları
 

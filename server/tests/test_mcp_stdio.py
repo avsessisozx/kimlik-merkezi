@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+import os
 import sys
 
 from kimlikcore import Hub
@@ -18,6 +19,8 @@ def params(root, key):
     env = {"KIMLIK_VERI": str(root)}
     if key:
         env["KIMLIK_ANAHTAR"] = key
+    if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
+        env["PYTHONPATH"] = os.environ["PYTHONPATH"]
     return StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
 

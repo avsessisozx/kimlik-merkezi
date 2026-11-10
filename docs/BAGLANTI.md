@@ -97,5 +97,5 @@ Tarayıcıdaki ChatGPT/Gemini/Claude yerel stdio MCP'ye bağlanamaz. Yedek yol: 
 ## Sorun giderme
 
 - Araç çağrısı "reddedildi" dönüyorsa: anahtar yanlış/iptal, kategori izni yok ya da süresi dolmuş,
-  ya da erişim kaydı (`erisim.db`) yazılamıyor (kayıtsız erişim verilmez).
+  ya da erişim kaydı yazılamıyor (veri klasöründeki `gelen/` kutusu) (kayıtsız erişim verilmez).
 - "Önce Kimlik Merkezi uygulamasını bir kez açın": veritabanı yok ya da şeması eski.

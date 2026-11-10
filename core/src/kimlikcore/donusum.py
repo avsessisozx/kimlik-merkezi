@@ -16,7 +16,8 @@ from typing import Any
 
 from . import sifreleme as sif
 from .errors import FormatError, SifrelemeHatasi
-from .hub import DB_NAME
+from .gelen import KLASOR as GELEN, UZANTI as GELEN_UZANTI
+from .hub import DB_NAME, Hub
 from .lock import HubLock
 
 
@@ -28,6 +29,14 @@ def _ham_dosyalar(root: Path):
                 for f in sorted(d.iterdir()):
                     if f.is_file() and not f.name.startswith("."):
                         yield f
+
+
+def _gelen_dosyalar(root: Path):
+    d = root / GELEN
+    if d.is_dir():
+        for f in sorted(d.iterdir()):
+            if f.is_file() and f.name.endswith(GELEN_UZANTI):
+                yield f
 
 
 def _duz_db_serilestir(db: Path) -> bytes:
@@ -119,10 +128,33 @@ def sifrele(root: Path | str, saglayici: sif.AnahtarSaglayici | None = None,
             os.chmod(f, 0o444)
             sif.guvenli_sil(eski)
             n += 1
+        g = 0
+        for f in _gelen_dosyalar(root):   # henüz veritabanına işlenmemiş erişim/öneri kayıtları
+            if sif.sifreli_mi(f):
+                continue
+            veri = f.read_bytes()
+            yeni = f.with_name(f.name + ".sifreli-yeni")
+            sif.bayt_sifrele_yaz(dek, veri, yeni)
+            if sif.bayt_coz_oku(dek, yeni) != veri:
+                yeni.unlink(missing_ok=True)
+                raise SifrelemeHatasi(f"Gelen kutusu dosyası doğrulanamadı, dokunulmadı: {f.name}")
+            eski = f.with_name(f.name + ".duz-eski")
+            os.replace(f, eski)
+            sif.yerine_koy(yeni, f)
+            sif.guvenli_sil(eski)
+            g += 1
     finally:
         lock.release()
+    # Eski ayrı oneri.db / erisim.db varsa şimdi (anahtar kuruldu) ana veritabanına taşınır,
+    # doğrulanır ve sıfırlanıp silinir. Kilit yukarıda bırakıldı; Hub kendisi alır.
+    uyarilar: list[str] = []
+    if any((root / a).exists() for a in ("oneri.db", "erisim.db")):
+        with Hub.open(root, write=True, saglayici=saglayici) as h:
+            uyarilar = list(h.goc_uyarilari)
     return {"veritabani_sifrelendi": durum == "duz", "ham_dosya_sifrelendi": n,
-            "uyari": "cikti/ klasörü, erisim.db ve oneri.db bu işlemle şifrelenmez (bkz. docs/SIFRELEME.md)."}
+            "gelen_dosya_sifrelendi": g, "goc_uyarilari": uyarilar,
+            "uyari": "cikti/ klasörü ve dışa aktarılan dosyalar bu işlemle şifrelenmez "
+                     "(bkz. docs/SIFRELEME.md)."}
 
 
 def sifreyi_kaldir(root: Path | str, parola: str | None = None,
@@ -181,6 +213,16 @@ def sifreyi_kaldir(root: Path | str, parola: str | None = None,
             finally:
                 yeni.unlink(missing_ok=True)
             n += 1
+        for f in _gelen_dosyalar(root):
+            if not sif.sifreli_mi(f):
+                continue
+            veri = sif.bayt_coz_oku(dek, f)
+            yeni = f.with_name(f.name + ".duz-yeni")
+            try:
+                yeni.write_bytes(veri)
+                sif.yerine_koy(yeni, f)
+            finally:
+                yeni.unlink(missing_ok=True)
         # Her şey düz olduktan sonra (karma durum kalmadıysa) anahtarı at.
         if not any(sif.sifreli_mi(f) for f in _ham_dosyalar(root)) and sif.db_durumu(db) == "duz":
             sif.anahtari_sil(root)

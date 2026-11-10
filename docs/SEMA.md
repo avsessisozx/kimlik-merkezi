@@ -1,23 +1,24 @@
 # SEMA — Veri şeması ve çekirdek davranışları (sahibi: İ1)
 
-Şema sürümü: **3** (`PRAGMA user_version`). Sözleşme: `docs/INTERFACES.md` (sürüm 1). Kod: `core/src/kimlikcore/`.
+Şema sürümü: **4** (`PRAGMA user_version`). Sözleşme: `docs/INTERFACES.md` (sürüm 1). Kod: `core/src/kimlikcore/`.
 
 ## 1. Veri klasörü
 | Yol | İçerik |
 |---|---|
-| `kimlik.db` | ana SQLite (WAL). Olaylar, kaynaklar, persona, anahtar/izin, tombstone |
-| `erisim.db` | yalnız `access_log` (ayrı SQLite, WAL). Boş şemayı çekirdek hazırlar, yazan taraf İ2 |
+| `kimlik.db` | ana SQLite (WAL; şifreliyse şifreli kapsayıcı). Olaylar, kaynaklar, persona, anahtar/izin, tombstone, `access_log`, `oneriler`, `bastirilan` |
+| `gelen/` | MCP süreçlerinin bıraktığı, henüz işlenmemiş erişim/öneri kayıtları (her biri kendi dosyası; şifreliyse şifreli). Yazan Hub işleyip siler. `gelen/bozuk/`: okunamayanlar |
+| `erisim.db`, `oneri.db` | **v4 ile kaldırıldı**; eski klasörlerde bulunursa yazan Hub açılırken göç ettirilip silinir (INTERFACES Ek 1.5) |
 | `arsiv/<sha256>/<ad>` | ham dosyalar; salt okunur, değiştirilmez |
 | `hub.lock` | yazan sürecin kilit dosyası (JSON: pid, bilgisayar, belirteç) |
 | `cikti/` | dışa aktarım vb. çıktılar için boş klasör |
 
-Bağlantı ayarları: yazan `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`. Okuyucu `file:...?mode=ro` + `query_only=ON`. `erisim.db`: WAL, `busy_timeout=5000` (`kimlikcore.connect_erisim`).
+Bağlantı ayarları: yazan `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`. Okuyucu `file:...?mode=ro` + `query_only=ON`. Eski `erisim.db` yardımcıları (`connect_erisim`, `init_erisim_db`) yalnız geriye dönük uyumluluk içindir.
 
 ## 2. Göç kuralları
 - Sürüm, `PRAGMA user_version`'dır; `schema_migrations(version, applied_at)` kaydı tutar.
 - Göçler yalnız eklemelidir ve her biri tek `BEGIN IMMEDIATE` işleminde uygulanır; hata olursa geri alınır, sürüm değişmez.
 - Yazan açış (`Hub.open(write=True)`) en yeni sürüme göç ettirir. Salt okunur açış göç etmez: eski sürümde `SchemaTooOld`, daha yenide `SchemaTooNew`.
-- v1: çekirdek tablolar. v2: persona/anahtar/izin/cihaz tabloları. v3: hassas kategori `sohbet` (`permissions` CHECK kısıtı genişledi; SQLite CHECK değiştiremediği için tablo aynı işlemde yeniden oluşturuldu: yeni tabloya kopya, eskiyi at, yeniden adlandır; satırlar aynen taşınır). `facts.confidence`, `review_queue`, `suppressed` Aşama 9'da göçle gelir (şu an YOK).
+- v1: çekirdek tablolar. v2: persona/anahtar/izin/cihaz tabloları. v3: hassas kategori `sohbet` (`permissions` CHECK kısıtı genişledi; SQLite CHECK değiştiremediği için tablo aynı işlemde yeniden oluşturuldu: yeni tabloya kopya, eskiyi at, yeniden adlandır; satırlar aynen taşınır). v4: `access_log`, `oneriler`, `bastirilan` tabloları (eskiden ayrı, şifresiz `erisim.db`/`oneri.db`). Eski dosyaların içeriği tablolar oluştuktan sonra, yazan Hub açılışında KOD ile taşınır (`Hub._eski_dosyalari_goc`: kopyala, satır satır doğrula, sıfırlayıp sil; yarım kalırsa güvenle tekrarlanır). `facts.confidence`, `review_queue`, `suppressed` Aşama 9'da göçle gelir (şu an YOK).
 - Yeni sürüm eklemek: `schema.MIGRATIONS`'a bir sonraki numarayı ekle (ifade listesi ya da `fn(conn)`); eski göçleri DEĞİŞTİRME.
 
 ## 3. Tablolar (v2)
@@ -44,7 +45,11 @@ Aynı `kind` + `file_sha256` ve kaldırılmamış kaynak varsa `add_source` onu 
 **permissions** `(app_id, category)` PK, `granted_at`, `expires_at|NULL`, `confirmed_sensitive` (0/1). CHECK: `eposta`/`mesaj`/`konum`/`sohbet` için `confirmed_sensitive=1` olmadan satır yazılamaz.
 Not: `fact_key` (çelişki tespitinde "aynı category+anahtar"), `facts.hidden` (`delete_fact` = gizleme) ve `updated` INTERFACES §5'in alan listesine eklenmiş ek sütunlardır (bkz. durum/core.md, Müdüre istekler).
 
-**meta**: anahtar-değer (şimdilik boş, ileride kullanım için ayrıldı).
+**access_log** (v4) `id` AUTOINCREMENT PK, `ts`, `app_id`, `tool`, `category|NULL`, `result_count`, `outcome` ∈ {`ok`,`reddedildi`,`hata`}. İçerik ve sorgu metni yazılmaz. İndeksler `ts`, `(app_id, ts)`.
+**oneriler** (v4) `oneri_id` PK, `ts`, `app_id`, `statement`, `category`, `fact_key`, `kanit_event_ids` (JSON listesi), `guven` (0..1), `durum` ∈ {`bekliyor`,`onaylandi`,`duzeltildi`,`reddedildi`,`hic_dogru_degil`}, `ifade_hash`, `karar_ts`, `duzeltilmis_ifade`, `fact_id`. **bastirilan** `ifade_hash` PK, `ts`, `category`.
+Bu tablolara MCP süreçleri doğrudan yazmaz; kayıtlar `gelen/` kutusundan `Hub.gelen_birlestir()` ile gelir (bölüm 12).
+
+**meta**: anahtar-değer. Kullanılan anahtar: `goc_erisim_db` (eski `erisim.db` göçü tamamlandı işareti).
 
 ## 4. Türkçe katlama (arama)
 `turkish.fold(metin)`: `İ`,`I`,`ı` → `i`; Unicode ayrıştırma (NFKD) ile aksanlar atılır (ç→c, ğ→g, ş→s, ö→o, ü→u, â→a ...); `casefold`. Hem kayıt metni FTS'e girerken hem sorgu aynı işlemden geçer. Sonuç: "ışık", "Işık", "ISIK", "isik" aynı; "İstanbul" = "istanbul"; "çğşöü" = "CGSOU". Bedel: aksan duyarsız arama (ASCII yazılmış "isik", "ışık"ı da bulur). Ayrıntı: sorgu dili `turkish.build_fts_query`.
@@ -80,3 +85,6 @@ Gizli kayıt süzmesi bu yöntemlerde otomatik DEĞİLDİR: `events` sorguların
 
 ## 11. Şifreli veri klasörü (şema sürümü değişmedi)
 `kimlik.db` şifreliyse (başlık `KMSIFRE1`) düz SQLite dosyası değil, şifreli kapsayıcıdır; şema bellekteki kopyada aynen çalışır, göçler aynı yolla uygulanır ve kapsayıcıya yazılır. Salt okunur açılış bellekte anlık görüntü alır (WAL yok). Ayrıntı ve sınırlar: `docs/SIFRELEME.md`. `arsiv/` dosyaları şifreliyse `Hub.raw_parcalari` ile okunmalıdır.
+
+## 12. Gelen kutusu (v4)
+Birden çok MCP süreci erişim günlüğüne ve öneri kuyruğuna aynı anda yazmak ister; `kimlik.db` ise tek yazan süreçtir (şifreliyse bellek içi kapsayıcı, her yazımda dosyanın tamamı yeniden yazılır). Süreçlerin kapsayıcıyı kendi aralarında "oku-değiştir-yaz" yapması güncelleme kaybettirir, ayrı SQLite dosyası ise şifrelenemez. Bu yüzden: `GelenKutusu.yaz` her kaydı `gelen/` altında benzersiz adlı kendi dosyasına (geçici dosya + `fsync` + `os.replace`; şifreliyse aynı AES-GCM biçimi) bırakır; hiçbir iki yazar aynı dosyaya dokunmaz, kilit gerekmez. Yazan Hub `gelen_birlestir` ile tek işlemde tabloya işler (`synchronous=FULL`, şifreliyse kapsayıcı yazıldıktan sonra), sonra dosyaları siler; yarıda kalırsa öneri `oneri_id` ile yinelenmez, ama erişim satırı çökme anında bir kez çift yazılabilir (dosya silinmeden önce süreç ölürse). Okuyucular tablo + bekleyen dosyaları birlikte görür. Yazan Hub açık olsa da MCP yazabilir (kilit gerekmez).

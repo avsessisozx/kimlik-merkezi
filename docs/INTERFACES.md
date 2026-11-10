@@ -1,6 +1,6 @@
 # INTERFACES — Sözleşmeler (sahibi: müdür)
 
-Sürüm: 1.3. Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
+Sürüm: 1.5 (Ek 1.5: erişim günlüğü ve öneri kuyruğu ana veritabanına taşındı; kullanıcı onaylı sözleşme değişikliği). Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
 
 ## 1. Genel kurallar
 - Dil: Python 3.12+ (Python sürümü Karar B sonrası sabitlenir). Paketler: `core` → `kimlikcore`, `server` → `kimlikserver`, `importers` → `kimlikimport`. Her klasörün altında `src/<paket>/` ve `tests/` bulunur.
@@ -59,9 +59,9 @@ class Hub:                                  # bir veri klasörünü temsil eder
 `EventIn`: `event_key` (içe aktarıcının ürettiği kararlı anahtar; yoksa kaynak+yük hash'i), `ts` (UTC), `kind` (ör. `youtube.izleme`), `category`, `payload` (dict), `text` (aranabilir düz metin), `device_id` (isteğe bağlı).
 `Event` = `EventIn` + `event_id`, `source_id`, `schema_version`, `hidden`.
 
-Eşzamanlılık (bkz. GOREV 5.6): yazan tek süreç (`write=True`, `hub.lock`); okuyucular `mode=ro`, WAL. Kilit sahibi süreç ölmüşse bayat kilit güvenle devralınır (pid denetimi). `access_log` ayrı `erisim.db`'dedir (bkz. §6).
+Eşzamanlılık (bkz. GOREV 5.6): yazan tek süreç (`write=True`, `hub.lock`); okuyucular `mode=ro`, WAL. Kilit sahibi süreç ölmüşse bayat kilit güvenle devralınır (pid denetimi). `access_log` şema v4'ten beri `kimlik.db` içindedir; MCP süreçleri ona `gelen/` kutusu üzerinden yazar (bkz. §6 ve Ek 1.5).
 
-Veri klasörü yerleşimi: `kimlik.db`, `erisim.db`, `arsiv/` (ham dosyalar, `<sha256>/<ad>`), `hub.lock`, `cikti/`.
+Veri klasörü yerleşimi: `kimlik.db`, `arsiv/` (ham dosyalar, `<sha256>/<ad>`), `gelen/` (henüz veritabanına işlenmemiş erişim/öneri kayıtları, geçici), `anahtar.json` (şifreliyse), `hub.lock`, `cikti/`. `erisim.db` ve `oneri.db` v4 ile KALDIRILDI (Ek 1.5).
 
 Komut satırı (`kimlikmerkezi`): `baslat` (hub oluştur), `ice-al <yol> [--tur ..]`, `ara <sorgu>`, `zaman`, `disa-aktar <dosya>`, `ice-aktar <dosya>`, `kaynak-kaldir`, `kaynak-sil`, `kayit-gizle`, `surum`. Çıktı Türkçe; `--json` ile makine okur.
 
@@ -86,7 +86,7 @@ Kimlik kartı: `export_identity_card(categories) -> str` düz Markdown; yalnız 
 - `app_keys(app_id, name, key_hash, created, revoked)`; anahtar 32 bayt rastgele, `kim_` önekli, yalnızca SHA-256 hash'i saklanır, düz hâli bir kez gösterilir.
 - `permissions(app_id, category, granted_at, expires_at|null)`; varsayılan boş. Hassas kategori izni `confirmed_sensitive=1` olmadan yazılamaz.
 - Her sorguda: anahtar geçerli mi, iptal edilmemiş mi, kategori izinli mi, süre dolmamış mı. Hepsi her çağrıda yeniden okunur (önbellek yok).
-- `erisim.db` (`access_log`): `ts`, `app_id`, `tool`, `category`, `result_count`, `outcome` (`ok`/`reddedildi`/`hata`). SQLite WAL, `busy_timeout` ≥ 5000 ms. Yazma başarısızsa sorgu **reddedilir**, veri dönmez.
+- `access_log` (`kimlik.db` içinde, şema v4): `ts`, `app_id`, `tool`, `category`, `result_count`, `outcome` (`ok`/`reddedildi`/`hata`). MCP süreçleri kaydı `gelen/` altında kendi dosyasına (fsync'li, şifreli klasörde şifreli) bırakır; yazan Hub tabloya işler. Yazma başarısızsa sorgu **reddedilir**, veri dönmez. (Eski `erisim.db`: Ek 1.5.)
 - Gizli (tombstone) kayıtlar hiçbir sorguda dönmez.
 
 ## 7. MCP araç listesi (stdio; kütüphane Karar C'ye göre)
@@ -118,7 +118,7 @@ Ortak hata sınıfları `kimlikcore.errors`: `HubLockedError`, `PermissionDenied
 - `purge_source`: API onay parametresi almaz; **onay çağıranın sorumluluğudur** (CLI `--onayla`; Windows arayüzü kendi onay ekranını gösterir).
 - İçe aktarıcı çalıştırıcısı (`kimlikimport.run`), `add_source` öncesi `hub.previously_purged(sha256)` sorar; true ise kullanıcıya "daha önce kalıcı sildin, yine de alınsın mı" der (CLI: `--yine-de`). İmza: `run(hub, path, tur=None, *, yine_de=False, progress=None) -> RunResult`; `ice-al --tur X` bunu çağırır (İ3 yazar).
 - Kalıcı silinen kaynağın `facts` satırları silinmez: `source_id=NULL`, `status='eskimis'`.
-- Çekirdekte eklenen geri uyumlu yöntemler geçerlidir (ayrıntı `docs/SEMA.md`): `Hub.sources/raw_files/get_event/verify_archive/summary/previously_purged/compact`, `timeline(ascending=)`, `search(prefix=)`, `add_events(batch_size=)`, `import_jsonl(progress=)`; hata sınıfları `SchemaTooOld`, `HubNotFoundError`, `HubReadOnlyError`, `HubNotEmptyError`, `NotFoundError`; yardımcılar `init_erisim_db`, `connect_erisim`.
+- Çekirdekte eklenen geri uyumlu yöntemler geçerlidir (ayrıntı `docs/SEMA.md`): `Hub.sources/raw_files/get_event/verify_archive/summary/previously_purged/compact`, `timeline(ascending=)`, `search(prefix=)`, `add_events(batch_size=)`, `import_jsonl(progress=)`; hata sınıfları `SchemaTooOld`, `HubNotFoundError`, `HubReadOnlyError`, `HubNotEmptyError`, `NotFoundError`; yardımcılar `init_erisim_db`, `connect_erisim` (v4'ten beri YALNIZ eski `erisim.db`yi okumak için; Hub artık dosyayı oluşturmaz).
 - Salt okunur açış göç etmez; eski şemada `SchemaTooOld`. MCP bunu "önce Kimlik Merkezi uygulamasını bir kez açın" iletisine çevirir.
 - Sunucu doğrudan SQL yazarsa `events.hidden=0` koşulunu kendisi ekler; tercihen `Hub.search/timeline` kullanır. `access_log.category` boş olabilir.
 - Python: `>=3.12`. MCP kütüphanesi (öneri, Karar C onayı bekliyor): resmî `mcp==2.3.0`.
@@ -156,4 +156,13 @@ Performans: 1 milyon olayda `harita` < 3 sn; ağır sayımlar SQL ile (Python'da
 ## 14. Ek 1.4 (Harita derinleşme ve persona kuyruğu; kod ve test: server/harita.py, server/oneri*.py)
 - `bolge(hub, bolge_id, *, ac_hassas, aralik=None, filtre=None, utc_kaydirma=0, bolgeler=None)`, `kayitlar(...)`, `ayrinti(...)`, `karsilastir(...)`. Her `en_cok` satırı ve grafik noktası `anahtar` (alan+değer) taşır; istemci bunu `filtre` olarak geri gönderir. Hassas bölgelerde içerik yok.
 - Bölge `zihin` (kategori `sohbet`, hassas, varsayılan kilitli); yalnız sayı, zaman, platform dağılımı.
-- Persona çıkarım kuyruğu: ayrı `oneri.db` (WAL); MCP `persona_oner` yalnız öneri yazar, `ornekle` izinli kategoriden örnek verir; onay/düzelt/reddet/"hiç doğru değil" servis fonksiyonları Windows uygulamasında çalışır; onaylananlar `facts`'e `beyan_edilen` olarak yazılır. Onaylanmamış öneri persona/kimlik kartına girmez.
+- Persona çıkarım kuyruğu: (v4'ten önce ayrı `oneri.db`; şimdi `kimlik.db` içinde, bkz. Ek 1.5) MCP `persona_oner` yalnız öneri yazar, `ornekle` izinli kategoriden örnek verir; onay/düzelt/reddet/"hiç doğru değil" servis fonksiyonları Windows uygulamasında çalışır; onaylananlar `facts`'e `beyan_edilen` olarak yazılır. Onaylanmamış öneri persona/kimlik kartına girmez.
+
+## 15. Ek 1.5 (kullanıcı onaylı sözleşme değişikliği: erişim günlüğü ve öneri kuyruğu ana veritabanında)
+Gerekçe: `oneri.db` kişi hakkında cümle taşıyabilir, `erisim.db` hangi yapay zekânın hangi kategoriye baktığını gösterir; ikisi de ayrı, ŞİFRESİZ SQLite dosyasıydı (docs/SIFRELEME.md §8, önceki sürüm). Şifreli `kimlik.db` bellek içi kapsayıcı olduğundan birden çok MCP sürecinin ona doğrudan yazması kayıp güncellemeye yol açar; bu yüzden yazım gelen kutusu üzerinden yapılır.
+- **Şema v4** (`kimlikcore.schema`): `kimlik.db` içinde `access_log` (eski `erisim.db` ile aynı sütunlar), `oneriler`, `bastirilan` (eski `oneri.db` ile aynı sütunlar). `kimlikcore.SCHEMA_VERSION == 4`. Eski sürüm programlar v4 veritabanını `SchemaTooNew` ile reddeder.
+- **Gelen kutusu** (`kimlikcore.gelen.GelenKutusu`, `Hub.gelen`): `gelen/<tür>-<ns>-<rastgele>.gelen`, her kayıt kendi dosyası, geçici dosya + `fsync` + atomik `os.replace`; şifreli klasörde `KMSIFRE1` biçimiyle şifreli. `GelenKutusu.ac(root)` anahtarı `Hub.open` ile aynı yoldan alır (DPAPI / `KIMLIK_PAROLA`). Yöntemler: `yaz(tur, kayit)`, `listele(tur)`, `oku`, `sil`, `karantina`. Türler: `erisim`, `oneri`.
+- **Birleştirme**: `Hub.gelen_birlestir()` (yalnız yazan Hub) kayıtları tabloya işler, kalıcı yazımdan SONRA dosyaları siler; yinelenen öneri (`oneri_id` ya da `ifade_hash` zaten var/bastırılmış) atılır; okunamayan/geçersiz dosya `gelen/bozuk/`a taşınır. `Hub.open(write=True)` açılışta otomatik çağırır; `OneriYonetici` ve Windows `erisim_kaydi` her çağrıda yeniden çağırır. `Hub.goc_uyarilari`: açılıştaki göç/birleştirme uyarıları.
+- **Okuyucular**: `AccessLog.record/read_all` (kurucu: `gelen=` enjekte edilebilir; eski `connect=` kalktı), `OneriKuyrugu(root).on_kontrol(onermeler, hub=None) / ekle / listele(durum, hub=None)` tablo + bekleyen gelen kayıtlarını birlikte görür. `OneriYonetici(hub)` tabloyu yönetir. `kimlikserver.oneri.connect_oneri`, `ONERI_DB`, `ONERI_SCHEMA_VERSION` KALDIRILDI.
+- **Sınır**: yazma anındaki yineleme/doluluk denetimi, tam aynı anda gelen iki süreç için kesin değildir (ikisi de "eklendi" görebilir; birleştirmede çift kayıt atılır, kuyruk sınırı `MAX_BEKLEYEN` en fazla süreç sayısı kadar aşılabilir). Yazan Hub hiç açılmazsa gelen dosyaları birikir (okuyucular yine görür).
+- **Geçiş notu (eski veri klasörleri)**: yazan Hub ilk açılışta (uygulama, `kimlikmerkezi baslat`, `kimlikmerkezi sifrele`) v4'e göç eder; varsa `oneri.db` ve `erisim.db` içeriğini kopyalar, her satırı yeni tabloda karşılaştırarak doğrular (şifreliyse diskteki kapsayıcıyı geri çözüp bütünlüğünü de denetler), SONRA eski dosyaları (-wal/-shm dahil) sıfırlayıp siler. Doğrulama tutmazsa dosya SİLİNMEZ ve `goc_uyarilari` ile `kimlikmerkezi baslat` çıktısında uyarı verilir. Göç tekrarlanabilirdir (öneriler anahtarla, erişim satırları `meta.goc_erisim_db` işaretiyle çiftlenmez). Eski sürüm MCP süreçleri (ya da eski sürüm uygulama) göçten sonra çalışmaya devam ederse yeniden `erisim.db`/`oneri.db` oluşturur ve v4 veritabanını açamaz; göçten önce hepsini kapatın.

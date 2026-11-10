@@ -41,9 +41,10 @@ def _cli(root, *args):
 
 
 def _mcp(root, key):
-    return StdioServerParameters(
-        command=sys.executable, args=["-m", "kimlikserver.mcp"],
-        env={"KIMLIK_VERI": str(root), "KIMLIK_ANAHTAR": key})
+    env = {"KIMLIK_VERI": str(root), "KIMLIK_ANAHTAR": key}
+    if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
+        env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    return StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
 
 def _run(coro):
