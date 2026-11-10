@@ -2,6 +2,8 @@
 # Yerelde de çalışır (Windows, Python ortamı kurulu). Çıktılar windows/paket/cikti/ altında.
 param([string]$Surum = '0.1.0')
 $ErrorActionPreference = 'Stop'
+$env:PYTHONIOENCODING = 'utf-8'
+$env:PYTHONUTF8 = '1'
 $k = $PSScriptRoot
 Set-Location $k
 $ozet = [ordered]@{ surum = $Surum; python = (python --version) }
