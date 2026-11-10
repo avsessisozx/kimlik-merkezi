@@ -15,7 +15,7 @@ from kimlikimport.run import run as ice_aktar_calistir
 from kimlikserver.access import KeyManager
 from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 
-from . import claude_ayar, gunluk
+from . import claude_ayar, gunluk, harita_kopru
 from .yollar import ayar_dizini
 
 SIL_ONAY_METNI = "SİL"
@@ -80,6 +80,7 @@ class Uygulama:
         self.persona = Persona(self.hub)
         self.anahtarlar = KeyManager(self.hub)
         self.is_: IceAktarmaIsi | None = None
+        self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Lock()
         self.eskiyen = self.persona.check_expiry()   # açılışta süre kontrolü
         gunluk.log().info("hub açıldı; süresi dolan bilgi: %d", self.eskiyen)
@@ -101,6 +102,31 @@ class Uygulama:
     def kategoriler() -> list[dict[str, Any]]:
         return [{"kimlik": k, "ad": KATEGORI_ETIKETLERI[k], "hassas": k in Category.SENSITIVE}
                 for k in sorted(Category.ALL, key=lambda x: (x in Category.SENSITIVE, x))]
+
+    # ------------------------------------------------------------------ persona haritası (§12)
+    def harita(self) -> dict[str, Any]:
+        try:
+            return harita_kopru.harita(self.hub, self.hassas_acik)
+        except harita_kopru.HaritaYok as e:
+            raise IslemHatasi(str(e), "harita_yok") from None
+
+    def harita_bolge(self, bolge_id: str) -> dict[str, Any]:
+        try:
+            return harita_kopru.bolge(self.hub, bolge_id, self.hassas_acik)
+        except harita_kopru.HaritaYok as e:
+            raise IslemHatasi(str(e), "harita_yok") from None
+
+    def harita_hassas(self, bolge_id: str, ac: bool, onay: bool = False) -> dict[str, Any]:
+        """Hassas bölgenin SAYILARINI açar/kapatır; açmak için ayrı onay şart, içerik hiçbir zaman gösterilmez."""
+        if bolge_id not in harita_kopru.HASSAS:
+            raise IslemHatasi("Bu bölge hassas değil.")
+        if ac:
+            if not onay:
+                raise IslemHatasi("Hassas bölgeyi açmak için onay gerekir.", "onay_yok")
+            self.hassas_acik.add(bolge_id)
+        else:
+            self.hassas_acik.discard(bolge_id)
+        return {"acik": sorted(self.hassas_acik)}
 
     # ------------------------------------------------------------------ arama ve zaman çizelgesi
     def ara(self, sorgu: str, kategoriler: list[str] | None = None, limit: int = 50) -> dict[str, Any]:

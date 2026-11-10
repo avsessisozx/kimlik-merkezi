@@ -2,8 +2,10 @@
 Web katmanı yalnızca `api(ad, girdi)` çağırır; kabuk değişirse bu sınıf aynen kalır."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -21,7 +23,7 @@ UYGULAMA_API = frozenset({
     "ice_aktar_baslat", "ice_aktar_durum", "persona_liste", "persona_ekle", "persona_guncelle",
     "persona_sil", "persona_sure_kontrol", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "izin_toplu", "erisim_kaydi",
-    "baglanti_bilgisi", "claude_ekle",
+    "baglanti_bilgisi", "claude_ekle", "harita", "harita_bolge", "harita_hassas",
 })
 
 
@@ -61,10 +63,83 @@ class Yonetici:
 
     # ------------------------------------------------------------------ yaşam döngüsü
     def baslat(self) -> None:
-        """Kurulum tamamlanmışsa Hub'ı yazan olarak açar. Kilitliyse hata verir (çağıran ele alır)."""
-        if self.ayarlar["ilk_acilis_tamam"] and self.ayarlar["veri_klasoru"]:
-            self.uygulama = Uygulama(self.ayarlar["veri_klasoru"], ayar_dizin=self.ayarlar.dizin,
-                                     claude_yolu=self.claude_yolu)
+        """Kurulum tamamlanmışsa seçili kişinin Hub'ını yazan olarak açar. Kilitliyse hata verir."""
+        if not (self.ayarlar["ilk_acilis_tamam"] and self.ayarlar["veri_klasoru"]):
+            return
+        self._kisileri_hazirla()
+        k = self._secili_kisi()
+        self.uygulama = Uygulama(k["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+
+    # ------------------------------------------------------------------ kişiler (her kişi ayrı veri klasörü)
+    def _kisileri_hazirla(self) -> None:
+        """Eski kurulumlarda (tek veri klasörü) otomatik "Ben" kişisi oluşturur."""
+        kisiler = list(self.ayarlar["kisiler"])
+        klasor = self.ayarlar["veri_klasoru"]
+        if not kisiler and klasor:
+            kisiler = [{"id": uuid.uuid4().hex[:8], "ad": "Ben", "klasor": klasor}]
+            self.ayarlar.guncelle(kisiler=kisiler, secili_kisi=kisiler[0]["id"])
+        elif kisiler and not any(k["id"] == self.ayarlar["secili_kisi"] for k in kisiler):
+            self.ayarlar.guncelle(secili_kisi=kisiler[0]["id"], veri_klasoru=kisiler[0]["klasor"])
+
+    def _secili_kisi(self) -> dict:
+        return next(k for k in self.ayarlar["kisiler"] if k["id"] == self.ayarlar["secili_kisi"])
+
+    def api_kisiler(self) -> dict:
+        self._kisileri_hazirla()
+        sec = self.ayarlar["secili_kisi"]
+        return {"kisiler": [{**k, "secili": k["id"] == sec} for k in self.ayarlar["kisiler"]], "secili": sec}
+
+    def _gec(self, kisi: dict) -> None:
+        """Seçili kişiyi değiştirir: eski Hub kapanır, yenisi açılır; olmazsa eskisi geri açılır."""
+        eski = self._secili_kisi() if self.uygulama else None
+        self.kapat()
+        try:
+            self.uygulama = Uygulama(kisi["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+        except BaseException as e:
+            if eski:
+                self.uygulama = Uygulama(eski["klasor"], ayar_dizin=self.ayarlar.dizin, claude_yolu=self.claude_yolu)
+            if isinstance(e, KimlikError):
+                raise IslemHatasi(f"{kisi['ad']} açılamadı: {e}", "kisi_acilamadi") from None
+            raise
+        self.ayarlar.guncelle(secili_kisi=kisi["id"], veri_klasoru=kisi["klasor"])
+
+    def api_kisi_sec(self, kisi_id: str) -> dict:
+        kisi = next((k for k in self.ayarlar["kisiler"] if k["id"] == kisi_id), None)
+        if kisi is None:
+            raise IslemHatasi("Böyle bir kişi yok.")
+        if kisi_id != self.ayarlar["secili_kisi"]:
+            self._gec(kisi)
+        return self.api_kisiler()
+
+    def api_kisi_ekle(self, ad: str, yol: str) -> dict:
+        """Yeni kişi = yeni veri klasörü (boş ya da mevcut Kimlik Merkezi klasörü). Eklenince seçilir."""
+        ad = (ad or "").strip()
+        if not ad or len(ad) > 60:
+            raise IslemHatasi("Kişi adı 1-60 karakter olmalı.")
+        if any(k["ad"].casefold() == ad.casefold() for k in self.ayarlar["kisiler"]):
+            raise IslemHatasi("Bu adda bir kişi zaten var.")
+        yol = str(yol).strip().strip('"')
+        if any(os.path.normcase(k["klasor"]) == os.path.normcase(yol) for k in self.ayarlar["kisiler"]):
+            raise IslemHatasi("Bu klasör başka bir kişiye ait.")
+        veri_klasoru.olustur(yol)
+        kisi = {"id": uuid.uuid4().hex[:8], "ad": ad, "klasor": yol}
+        self.ayarlar.guncelle(kisiler=[*self.ayarlar["kisiler"], kisi])
+        self._gec(kisi)
+        return self.api_kisiler()
+
+    def api_kisi_kaldir(self, kisi_id: str) -> dict:
+        """Kişiyi listeden çıkarır; veri klasörüne DOKUNMAZ."""
+        if kisi_id == self.ayarlar["secili_kisi"]:
+            raise IslemHatasi("Seçili kişi kaldırılamaz; önce başka bir kişiyi seçin.")
+        self.ayarlar.guncelle(kisiler=[k for k in self.ayarlar["kisiler"] if k["id"] != kisi_id])
+        return self.api_kisiler()
+
+    def api_kisi_yeniden_adlandir(self, kisi_id: str, ad: str) -> dict:
+        ad = (ad or "").strip()
+        if not ad or len(ad) > 60:
+            raise IslemHatasi("Kişi adı 1-60 karakter olmalı.")
+        self.ayarlar.guncelle(kisiler=[{**k, "ad": ad} if k["id"] == kisi_id else k for k in self.ayarlar["kisiler"]])
+        return self.api_kisiler()
 
     def kapat(self) -> None:
         if self.uygulama:
@@ -98,11 +173,13 @@ class Yonetici:
     def api_sihirbaz_denetle(self, yol: str) -> dict:
         return veri_klasoru.denetle(yol).to_dict()
 
-    def api_sihirbaz_tamamla(self, yol: str, otomatik_baslat: bool = True) -> dict:
+    def api_sihirbaz_tamamla(self, yol: str, otomatik_baslat: bool = True, ad: str = "Ben") -> dict:
         if self.uygulama is not None:
             raise IslemHatasi("Kurulum zaten tamamlanmış.")
         bilgi = veri_klasoru.olustur(yol)
-        self.ayarlar.guncelle(veri_klasoru=bilgi["yol"], ilk_acilis_tamam=True, otomatik_baslat=bool(otomatik_baslat))
+        kisi = {"id": uuid.uuid4().hex[:8], "ad": (ad or "Ben").strip()[:60] or "Ben", "klasor": bilgi["yol"]}
+        self.ayarlar.guncelle(veri_klasoru=bilgi["yol"], ilk_acilis_tamam=True, otomatik_baslat=bool(otomatik_baslat),
+                              kisiler=[kisi], secili_kisi=kisi["id"])
         self._otomatik_uygula(bool(otomatik_baslat))
         veri_yolunu_kaydet(bilgi["yol"])
         self.baslat()
