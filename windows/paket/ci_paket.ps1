@@ -56,6 +56,7 @@ $ozet['kurulum_cikis'] = Kur
 Dene 'kurulum çıkış kodu 0' { $ozet['kurulum_cikis'] -eq 0 }
 Dene 'kullanıcı klasörüne kuruldu (yönetici izni gerekmedi)' { (Test-Path "$hedef\KimlikMerkezi.exe") -and (Test-Path "$hedef\kimlikmerkezi-mcp.exe") -and -not (Test-Path "$env:ProgramFiles\KimlikMerkezi") }
 Dene 'girişte başlama kaydı (HKCU Run) yazıldı' { [bool](Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name KimlikMerkezi -ErrorAction SilentlyContinue) }
+Dene 'kurulum kaydındaki sürüm (Inno) = istenen sürüm' { (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object { $_.DisplayName -eq 'Kimlik Merkezi' } | Select-Object -First 1).DisplayVersion -eq $Surum }
 Dene 'başlat menüsü kısayolu var' { Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Kimlik Merkezi.lnk" }
 
 Adim 'Kurulu uygulamayı dene (açılış, sihirbaz, içe aktarma, Claude ekle, MCP stdio, sağlık)'
@@ -64,7 +65,7 @@ if (-not $env:RUNNER_TEMP) { $calisma = Join-Path $env:TEMP 'km_dene' }
 Remove-Item $calisma -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $calisma | Out-Null
 $fixture = (Resolve-Path "$k\..\..\importers\fixtures\takeout_tr").Path
-python kurulu_dene.py $hedef $calisma $fixture
+python kurulu_dene.py $hedef $calisma $fixture $Surum
 if ($LASTEXITCODE) { throw 'kurulu_dene' }
 
 # ekransız sağlık komutu (konsol exe)

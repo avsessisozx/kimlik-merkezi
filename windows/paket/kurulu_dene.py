@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 kurulum, calisma, fixture = (Path(a) for a in sys.argv[1:4])
+BEKLENEN_SURUM = sys.argv[4] if len(sys.argv) > 4 else None
 APP = kurulum / "KimlikMerkezi.exe"
 MCP = kurulum / "kimlikmerkezi-mcp.exe"
 ayar = calisma / "ayar"
@@ -42,6 +43,8 @@ def kontrol(kosul, m):
 # ---- konsol exe: sürüm (ijson C uzantısı) ve sağlık komutu
 r = subprocess.run([str(MCP), "surum"], capture_output=True, text=True, encoding="utf-8", timeout=60)
 adim(r.stdout.strip())
+if BEKLENEN_SURUM:
+    kontrol(f"Kimlik Merkezi {BEKLENEN_SURUM}\n" in r.stdout.replace("\r\n", "\n"), f"exe sürümü {BEKLENEN_SURUM} (Release sürümüyle eşleşiyor)")
 kontrol(r.returncode == 0 and "ijson arka ucu: yajl2_c" in r.stdout, "pakette ijson C uzantısı (yajl2_c) var")
 
 # ---- uygulamayı başlat
@@ -82,6 +85,8 @@ def api(ad, girdi=None):
 
 
 try:
+    if BEKLENEN_SURUM:
+        kontrol(api("hakkinda")["surum"] == BEKLENEN_SURUM, f"Hakkında ekranı sürümü {BEKLENEN_SURUM}")
     kontrol(api("acilis")["sihirbaz"] is True, "ilk açılışta sihirbaz isteniyor")
     d = api("sihirbaz_denetle", {"yol": str(veri)})
     kontrol(d["ok"] and d["bos_alan"] > 0, f"veri klasörü denetimi geçti, boş alan: {d['bos_alan_metni']}")

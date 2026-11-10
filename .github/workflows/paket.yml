@@ -2,9 +2,21 @@ name: paket
 
 # Windows kurulum paketi: PyInstaller + Inno Setup, sessiz kurulum, açılış, sağlık, MCP stdio, kaldırma.
 # Pahalı (Windows): yalnızca elle (workflow_dispatch) ve v* etiketinde. Her push'ta çalışmaz.
+# Paket işi yeşilse `yayin` işi GitHub Release'i kendisi açar (git etiketi proxy'den itilemediği için).
 # Varsayılan kabuk (Python + yerel web + tepsi) Karar B için GEÇİCİ varsayımdır.
 on:
   workflow_dispatch:
+    inputs:
+      surum:
+        description: "Sürüm numarası (ör. 0.1.0); windows/src/kimlikwin/__init__.py ile aynı olmalı"
+        required: true
+        default: "0.1.0"
+        type: string
+      onsurum:
+        description: "Ön sürüm olarak işaretle"
+        required: false
+        default: true
+        type: boolean
   push:
     tags: ["v*"]
 
@@ -19,8 +31,23 @@ jobs:
   paket:
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      surum: ${{ steps.surum.outputs.surum }}
     steps:
       - uses: actions/checkout@v4
+      - name: Sürümü belirle ve uygulamadaki sürümle eşle
+        id: surum
+        shell: bash
+        env:
+          GIRDI_SURUM: ${{ inputs.surum }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then S="${GITHUB_REF_NAME#v}"; else S="${GIRDI_SURUM}"; fi
+          echo "$S" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Geçersiz sürüm: '$S' (örnek 0.1.0)"; exit 1; }
+          UYG=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' windows/src/kimlikwin/__init__.py)
+          PRJ=$(sed -n 's/^version = "\(.*\)"/\1/p' windows/pyproject.toml | head -1)
+          echo "istenen=$S uygulama(Hakkında)=$UYG pyproject=$PRJ"
+          [ "$S" = "$UYG" ] && [ "$S" = "$PRJ" ] || { echo "::error::Sürüm uyuşmuyor: istenen $S, uygulama $UYG, pyproject $PRJ. Önce koddaki sürümü güncelleyin."; exit 1; }
+          echo "surum=$S" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -40,7 +67,7 @@ jobs:
         run: python -m pytest windows
       - name: Paketle, kur, dene, kaldır
         shell: pwsh
-        run: ./windows/paket/ci_paket.ps1
+        run: ./windows/paket/ci_paket.ps1 -Surum "${{ steps.surum.outputs.surum }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -50,3 +77,63 @@ jobs:
             windows/paket/cikti/SHA256SUMS
             windows/paket/cikti/ozet.json
             windows/paket/cikti/kur.log
+
+  yayin:
+    # Paket yeşilse Release'i bu iş açar. Etiket zaten varsa (ya da etiket tetiğinde Release varsa) hata vermeden durur.
+    needs: paket
+    if: needs.paket.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SURUM: ${{ needs.paket.outputs.surum }}
+      ONSURUM: ${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.onsurum) || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Etiket ya da Release var mı?
+        id: var
+        run: |
+          VAR=hayir
+          if gh release view "v${SURUM}" >/dev/null 2>&1; then VAR=evet; echo "v${SURUM} için Release zaten var."; fi
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] && gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${SURUM}" >/dev/null 2>&1; then VAR=evet; echo "v${SURUM} etiketi zaten var."; fi
+          echo "var=$VAR" >> "$GITHUB_OUTPUT"
+          [ "$VAR" = "evet" ] && echo "::notice::v${SURUM} zaten yayımlanmış; yeni Release açılmadı."
+          exit 0
+      - uses: actions/download-artifact@v4
+        if: steps.var.outputs.var == 'hayir'
+        with:
+          name: kurulum-paketi
+          path: indirilen
+      - name: Yeniden adlandır, özeti yeniden hesapla ve doğrula
+        if: steps.var.outputs.var == 'hayir'
+        run: |
+          set -euo pipefail
+          EXE=$(find indirilen -name 'KimlikMerkezi-*-kurulum.exe' | head -1)
+          ESKI_OZET=$(find indirilen -name SHA256SUMS | head -1)
+          test -f "$EXE" && test -f "$ESKI_OZET"
+          mkdir -p yayin
+          AD="KimlikMerkezi-Kurulum-v${SURUM}.exe"
+          cp "$EXE" "yayin/$AD"
+          # derleme sırasında hesaplanan hash ile indirilen dosya aynı mı
+          BEKLENEN=$(awk '{print $1}' "$ESKI_OZET" | head -1)
+          (cd yayin && sha256sum "$AD" > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          YENI=$(awk '{print $1}' yayin/SHA256SUMS.txt)
+          [ "$BEKLENEN" = "$YENI" ] || { echo "::error::Hash derleme sırasındakiyle uyuşmuyor ($BEKLENEN != $YENI)"; exit 1; }
+          (cd yayin && sha256sum -c SHA256SUMS.txt)
+      - name: Release notu
+        if: steps.var.outputs.var == 'hayir'
+        run: |
+          test -f windows/paket/surum-notu.md
+          sed "s/{SURUM}/${SURUM}/g" windows/paket/surum-notu.md > not.md
+          test "$(wc -l < not.md)" -le 12
+          cat not.md
+      - name: Release oluştur
+        if: steps.var.outputs.var == 'hayir'
+        run: |
+          ON=""
+          [ "$ONSURUM" = "true" ] && ON="--prerelease"
+          gh release create "v${SURUM}" --target "${{ github.sha }}" --title "Kimlik Merkezi ${SURUM}" --notes-file not.md $ON \
+            "yayin/KimlikMerkezi-Kurulum-v${SURUM}.exe" "yayin/SHA256SUMS.txt"
+          gh release view "v${SURUM}" --json tagName,isPrerelease,assets --jq '{tagName,isPrerelease,dosyalar:[.assets[].name]}'
