@@ -1,6 +1,6 @@
 # INTERFACES — Sözleşmeler (sahibi: müdür)
 
-Sürüm: 1.1 (v0.1.0 kapsamı). Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
+Sürüm: 1.3. Değişiklik yalnızca müdür tarafından, sürüm numarası artırılarak yapılır. Karar B sonrası eklenecekler en altta "Bekleyenler"de.
 
 ## 1. Genel kurallar
 - Dil: Python 3.12+ (Python sürümü Karar B sonrası sabitlenir). Paketler: `core` → `kimlikcore`, `server` → `kimlikserver`, `importers` → `kimlikimport`. Her klasörün altında `src/<paket>/` ve `tests/` bulunur.
@@ -27,6 +27,7 @@ Sabit kimlik metni (kod içinde `Category` sabiti):
 | `eposta` | Gmail | **evet** |
 | `mesaj` | Instagram/Facebook/Reddit özel mesajları | **evet** |
 | `konum` | GPS koordinatları, konum geçmişi | **evet** |
+| `sohbet` | Yapay zekâ sohbet geçmişi (ChatGPT, Claude, DeepSeek, Gemini) | **evet** |
 
 Kurallar: her olay tam bir kategoriyle etiketlenir. GPS içeren alan ayrılıp `konum` kategorili ayrı bir olay olarak yazılır (ana olay GPS'siz kalır). Hassas kategoriler izin ekranında ayrı onay ister, toplu açmaya dahil değildir.
 
@@ -148,3 +149,6 @@ Bölge → kategori eşlemesi (varsayılan, ayarlanabilir):
 Hassas bölgeler (`kalp`, `karin`, `ayak`) varsayılan **kilitli**: yalnız kullanıcı Windows uygulamasında ayrı onayla açarsa (`ac_hassas`) sayılar görünür; içerik hiçbir koşulda görünmez. Tombstone'lu (gizli) kayıtlar sayılmaz. Veri yoksa bölge "Henüz veri yok" der.
 Çoklu kişi: her kişi ayrı veri klasörüdür (ayrı `Hub`). Windows kabuğunda "Kişiler" listesi veri klasörlerini tutar; seçilen kişi haritayı belirler. Anahtar/izin/erişim bu klasöre bağlı kalır.
 Performans: 1 milyon olayda `harita` < 3 sn; ağır sayımlar SQL ile (Python'da döngü yok), isteğe bağlı önbellek tablosu çekirdekte değil `kimlikserver` içinde.
+
+## 13. Ek 1.3
+- Yeni kategori `sohbet` (hassas: ayrı onay, toplu açmaya dahil değil). `kimlikcore.Category`, `permissions` CHECK kısıtı ve MCP kategori listesi bunu tanır (göçle). Persona Haritası'nda `sohbet` bölgesi: ağız bölgesine bağlı değil; ayrı "Zihin" (baş) alt grubu olarak, hassas kilitli.
