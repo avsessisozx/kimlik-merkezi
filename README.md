@@ -5,7 +5,7 @@ tek bir yerde toplayan, aramanıza ve zaman çizelgesinde görmenize izin veren,
 uygulamalarına **yalnızca sizin seçtiğiniz kategorilerden ve salt okunur** erişim veren açık kaynaklı bir
 Windows uygulaması.
 
-> **Durum: v0.1 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
+> **Durum: v0.1.1 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
 > "Kısıtlar"). Önemli verilerinizin tek kopyasıyla denemeyin; kaynak dosyalarınıza zaten dokunulmaz,
 > ama yine de yedeğiniz olsun.
 
@@ -87,7 +87,7 @@ Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md).
 
 1. GitHub'daki "Releases" bölümünden `KimlikMerkezi-Kurulum-v….exe` ve `SHA256SUMS.txt` dosyalarını indirin.
 2. Bütünlüğü doğrulayın (PowerShell). Çıkan değer `SHA256SUMS.txt` içindeki satırla aynı olmalıdır:
-   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.0.exe -Algorithm SHA256`
+   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.1.exe -Algorithm SHA256`
 3. Çalıştırın. Paket **imzasız** olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı
    gösterebilir; yalnızca özeti doğruladıysanız "Ek bilgi > Yine de çalıştır" deyin.
 4. Yayınlarda ayrıca yazılım malzeme listesi (SBOM, CycloneDX JSON) bulunur; hangi bileşenlerin ve
@@ -107,7 +107,7 @@ doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmış
 
 ## Kısıtlar (dürüst durum)
 
-- **v0.1 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
+- **v0.1.1 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
 - **İçe aktarıcılar gerçek veriyle doğrulanmadı.** Her biri, resmî/yaygın biçime göre hazırlanmış sahte
   ama gerçeğe yakın dosyalarla test edildi; gerçek dışa aktarmalarla doğrulama beklemede. Hangi kaynağın
   hangi varsayımlarla yazıldığı: [importers/DOGRULAMA-DURUMU.md](importers/DOGRULAMA-DURUMU.md).
