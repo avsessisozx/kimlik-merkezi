@@ -13,6 +13,7 @@ from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, c
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
 from kimlikserver.access import KeyManager
+from kimlikserver.oneri import OneriYonetici
 from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 
 from . import claude_ayar, gunluk, harita_kopru
@@ -84,6 +85,7 @@ class Uygulama:
         self.hub = Hub.open(self.veri, write=True)   # tek yazan süreç: hub.lock alınır
         self.persona = Persona(self.hub)
         self.anahtarlar = KeyManager(self.hub)
+        self.oneriler = OneriYonetici(self.hub, self.veri, persona=self.persona)
         self.is_: IceAktarmaIsi | None = None
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
@@ -246,7 +248,7 @@ class Uygulama:
     # ------------------------------------------------------------------ persona
     def persona_liste(self) -> dict:
         facts = self.persona.list_facts(include_inactive=True)
-        return {"bilgiler": [_fact(f) for f in facts],
+        return {"bilgiler": [_fact(f) for f in facts], "oneri_sayisi": len(self.oneriler.kuyruk_listele("bekliyor")),
                 "kategoriler": [{"kimlik": k, "ad": CATEGORY_TITLES[k]} for k in FACT_CATEGORIES],
                 "kaynaklar": [{"id": s.source_id, "ad": f"{s.kind} ({s.imported_at[:10]})"}
                               for s in self.hub.sources(include_removed=False)]}
@@ -275,6 +277,52 @@ class Uygulama:
             {"id": c.contradiction_id, "kategori": c.category, "anahtar": c.fact_key, "acilis": c.opened,
              "eski": _fact(c.old_fact), "yeni": _fact(c.new_fact)}
             for c in self.persona.list_contradictions()]}
+
+    # ------------------------------------------------------------------ persona önerileri (yapay zekâ önerir, kullanıcı onaylar)
+    def _oneri(self, o) -> dict[str, Any]:
+        adlar = {a[0]: a[1] for a in self.anahtarlar.list_keys()}
+        return {"id": o.oneri_id, "ts": o.ts, "uygulama": adlar.get(o.app_id, "bilinmeyen uygulama"), "ifade": o.statement,
+                "kategori": o.category, "kategori_ad": CATEGORY_TITLES.get(o.category, o.category), "anahtar": o.fact_key,
+                "guven": round(o.guven, 3), "kanit_sayisi": len(o.kanit_event_ids), "durum": o.durum}
+
+    def oneri_listele(self, durum: str | None = "bekliyor") -> dict:
+        liste = [self._oneri(o) for o in self.oneriler.kuyruk_listele(durum or None)]
+        return {"oneriler": liste, "sayi": len(liste)}
+
+    def oneri_kanit(self, oneri_id: str) -> dict:
+        """Önerinin dayandığı kayıtlar (kullanıcı kendi verisini kendi uygulamasında görür; yalnız tıklayınca yüklenir)."""
+        o = next((x for x in self.oneriler.kuyruk_listele(None) if x.oneri_id == oneri_id), None)
+        if o is None:
+            raise IslemHatasi("Öneri bulunamadı.", "yok")
+        out = []
+        for eid in o.kanit_event_ids:
+            try:
+                e = self.hub.get_event(eid)
+            except NotFoundError:
+                out.append({"id": eid, "yok": True})
+                continue
+            out.append({"id": e.event_id, "yok": False, "zaman": e.ts, "tur": e.kind, "kategori": e.category,
+                        "hassas": e.category in Category.SENSITIVE, "gizli": bool(e.hidden), "metin": "" if e.hidden else e.text[:600]})
+        return {"kanit": out}
+
+    def oneri_onayla(self, oneri_id: str) -> dict:
+        return {"fact_id": self.oneriler.onayla(oneri_id)}
+
+    def oneri_duzelt(self, oneri_id: str, ifade: str) -> dict:
+        if not (ifade or "").strip():
+            raise IslemHatasi("Düzeltilmiş ifade boş olamaz.")
+        return {"fact_id": self.oneriler.duzelt(oneri_id, ifade)}
+
+    def oneri_reddet(self, oneri_id: str) -> dict:
+        self.oneriler.reddet(oneri_id)
+        return {"ok": True}
+
+    def oneri_hic_dogru_degil(self, oneri_id: str) -> dict:
+        self.oneriler.hic_dogru_degil(oneri_id)
+        return {"ok": True}
+
+    def oneri_toplu_reddet(self, idler: list[str] | None = None) -> dict:
+        return {"reddedilen": self.oneriler.toplu_reddet(idler)}
 
     def celiski_coz(self, secilen_id: str) -> dict:
         return {"kapanan": self.persona.resolve_contradiction(secilen_id)}

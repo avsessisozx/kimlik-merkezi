@@ -42,24 +42,24 @@ function grafikKur(g,r,tikla,baz){
   const sec=g.secili,top=g.degerler.flat?g.degerler.flat().reduce((a,b)=>a+b,0):0;
   const o=temel(r);
   const dim=(Array.isArray(g.boyut)?g.boyut[0]:g.boyut);
-  const soluklastir=(i,adlar)=>sec==null||adlar[i]==sec;
+  const soluklastir=(i,adlar)=>sec==null||adlar[i]==sec||((dim==='gun'||dim==='saat')&&+sec===i);
   if(g.tur==='zaman'){
     const x=g.etiketler.map(ayEtiket);
     const seri=[{name:'Seçili',type:'line',data:g.degerler,smooth:.35,showSymbol:false,symbolSize:7,lineStyle:{width:2.6,color:r.v,shadowBlur:12,shadowColor:hexA(r.v,.6)},
       itemStyle:{color:r.v},areaStyle:{color:gradyan(r.v,'66','03')},emphasis:{focus:'series'},
-      markLine:sec?{symbol:'none',silent:true,lineStyle:{color:r.amber,type:'dashed'},label:{formatter:degerMetin('ay',sec),color:r.amber},data:[{xAxis:g.etiketler.indexOf(sec)}]}:undefined}];
+      markLine:sec?{symbol:'none',silent:true,lineStyle:{color:r.v2,type:'dashed'},label:{formatter:degerMetin('ay',sec),color:r.v2},data:[{xAxis:g.etiketler.indexOf(sec)}]}:undefined}];
     if(baz){const d=new Map(baz.etiketler.map((e,i)=>[e,baz.degerler[i]]));
-      seri.unshift({name:'Tüm kayıtlar',type:'line',data:g.etiketler.map(e=>d.get(e)||0),smooth:.35,showSymbol:false,lineStyle:{width:1.5,type:'dashed',color:r.soluk},areaStyle:{color:hexA(r.soluk,.07)},z:1});}
-    Object.assign(o,{grid:{left:44,right:16,top:baz?34:16,bottom:62},
+      seri.unshift({name:'Tüm kayıtlar (sağ eksen)',type:'line',yAxisIndex:1,data:g.etiketler.map(e=>d.get(e)||0),smooth:.35,showSymbol:false,lineStyle:{width:1.5,type:'dashed',color:r.soluk},areaStyle:{color:hexA(r.soluk,.07)},z:1});}
+    Object.assign(o,{grid:{left:44,right:baz?44:16,top:baz?34:16,bottom:62},
       legend:baz?{top:0,right:8,textStyle:{color:r.soluk},icon:'roundRect',itemWidth:14,itemHeight:4,inactiveColor:r.cizgi}:undefined,
       tooltip:{...o.tooltip,trigger:'axis',axisPointer:{type:'line',lineStyle:{color:r.v}},formatter:p=>`<b>${degerMetin('ay',g.etiketler[p[0].dataIndex])}</b><br>`+p.map(q=>`${q.marker} ${q.seriesName}: <b>${SAYI(q.value)}</b>`).join('<br>')},
       xAxis:{type:'category',data:x,boundaryGap:false,axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},axisLabel:{color:r.soluk,interval:Math.max(0,Math.ceil(x.length/9)-1)}},
-      yAxis:{type:'value',splitNumber:3,axisLabel:{color:r.soluk,formatter:v=>SAYI(v)},splitLine:{lineStyle:{color:hexA(r.cizgi,.5),type:'dashed'}}},
+      yAxis:baz?[{type:'value',splitNumber:3,axisLabel:{color:r.v,formatter:v=>SAYI(v)},splitLine:{lineStyle:{color:hexA(r.cizgi,.5),type:'dashed'}}},{type:'value',splitNumber:3,axisLabel:{color:r.soluk,formatter:v=>SAYI(v)},splitLine:{show:false}}]:{type:'value',splitNumber:3,axisLabel:{color:r.soluk,formatter:v=>SAYI(v)},splitLine:{lineStyle:{color:hexA(r.cizgi,.5),type:'dashed'}}},
       dataZoom:[{type:'inside',zoomOnMouseWheel:true,moveOnMouseMove:false,moveOnMouseWheel:false},
         {type:'slider',height:16,bottom:8,borderColor:'transparent',backgroundColor:hexA(r.cizgi,.25),fillerColor:hexA(r.v,.22),handleSize:'110%',
          handleStyle:{color:r.v,borderColor:r.v},moveHandleStyle:{color:r.v},dataBackground:{lineStyle:{color:r.soluk,opacity:.3},areaStyle:{color:r.soluk,opacity:.08}},selectedDataBackground:{lineStyle:{color:r.v},areaStyle:{color:r.v,opacity:.2}},textStyle:{color:r.soluk}}],
       toolbox:{right:6,top:baz?30:-2,itemSize:13,iconStyle:{borderColor:r.soluk},emphasis:{iconStyle:{borderColor:r.v}},feature:{brush:{type:['lineX','clear'],title:{lineX:'Aralık seç (sürükle)',clear:'Seçimi temizle'}}}},
-      brush:{xAxisIndex:0,brushType:'lineX',brushMode:'single',transformable:true,brushStyle:{color:hexA(r.amber,.16),borderColor:r.amber,borderWidth:1}},
+      brush:{xAxisIndex:0,brushType:'lineX',brushMode:'single',transformable:true,brushStyle:{color:hexA(r.v2,.2),borderColor:r.v2,borderWidth:1}},
       series:seri});
     return {o,init(c){c.dispatchAction({type:'takeGlobalCursor',key:'brush',brushOption:{brushType:'lineX',brushMode:'single'}});
       c.on('click',p=>{if(p.componentType==='series'&&tikla.deger)tikla.deger('ay',g.etiketler[p.dataIndex]);});
@@ -93,7 +93,7 @@ function grafikKur(g,r,tikla,baz){
   }
   if(g.tur==='saat'){
     const mx=Math.max(1,...g.degerler);
-    const veri=g.degerler.map((v,i)=>({value:v,itemStyle:{opacity:sec==null||+sec===i?1:.3,color:v===mx?r.amber:r.v}}));
+    const veri=g.degerler.map((v,i)=>({value:v,itemStyle:{opacity:sec==null||+sec===i?1:.3,color:v===mx?r.v2:r.v}}));
     Object.assign(o,{polar:{radius:['16%','90%'],center:['50%','52%']},
       tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${String(p.dataIndex).padStart(2,'0')}:00 – ${String(p.dataIndex).padStart(2,'0')}:59</b><br>${SAYI(p.value)} kayıt${yuzde(p.value,top)}`},
       angleAxis:{type:'category',data:g.etiketler,startAngle:90,clockwise:true,axisLabel:{color:r.soluk,interval:2,fontSize:10},axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},splitLine:{show:true,lineStyle:{color:hexA(r.cizgi,.4)}}},
@@ -109,7 +109,7 @@ function grafikKur(g,r,tikla,baz){
       tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${GUN[p.value[1]]||''} ${String(p.value[0]).padStart(2,'0')}:00</b><br>${SAYI(p.value[2])} kayıt`},
       xAxis:{type:'category',data:[...Array(24).keys()].map(h=>String(h).padStart(2,'0')),splitArea:{show:false},axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk,interval:2,fontSize:10}},
       yAxis:{type:'category',data:GUNK.slice(0,m.length),inverse:true,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk}},
-      visualMap:{min:0,max:mx,calculable:false,orient:'horizontal',left:'center',bottom:2,itemWidth:10,itemHeight:140,text:['çok','az'],textStyle:{color:r.soluk,fontSize:10},inRange:{color:[hexA(r.v,.06),hexA(r.v,.35),r.v,r.amber]}},
+      visualMap:{min:0,max:mx,calculable:false,orient:'horizontal',left:'center',bottom:2,itemWidth:10,itemHeight:140,text:['çok','az'],textStyle:{color:r.soluk,fontSize:10},inRange:{color:[hexA(r.v,.06),hexA(r.v,.38),r.v,r.yazi]}},
       series:[{type:'heatmap',data:veri.map(d=>({value:d,itemStyle:(sg===d[1]&&ss===d[0])||(sg===d[1]&&ss==null)||(sg==null&&ss===d[0])?{borderColor:r.yazi,borderWidth:2}:undefined})),
         itemStyle:{borderRadius:3,borderColor:r.panel,borderWidth:1.5},emphasis:{itemStyle:{borderColor:r.yazi,borderWidth:2,shadowBlur:10,shadowColor:r.v}}}]});
     return {o,init(c){c.on('click',p=>{if(tikla.coklu)tikla.coklu({gun:p.value[1],saat:p.value[0]});});}};
@@ -117,9 +117,9 @@ function grafikKur(g,r,tikla,baz){
   if(g.tur==='agac'){
     const veri=g.etiketler.map((e,i)=>({name:e,value:g.degerler[i],itemStyle:{color:hexA(r.palet[i%4===0?0:i%4],.75),borderColor:r.panel,opacity:soluklastir(i,g.etiketler)?1:.3}}));
     Object.assign(o,{tooltip:{...o.tooltip,formatter:p=>`<b>${p.name}</b><br>${SAYI(p.value)} arama`},
-      series:[{type:'treemap',data:veri,roam:false,nodeClick:false,breadcrumb:{show:false},width:'100%',height:'100%',squareRatio:1.2,
+      series:[{type:'treemap',data:veri,roam:false,nodeClick:false,breadcrumb:{show:false},left:0,right:0,top:0,bottom:0,squareRatio:1.2,
         label:{show:true,formatter:'{b}',color:r.yazi,fontSize:12,fontWeight:600,overflow:'truncate',position:'insideTopLeft',padding:[5,7]},
-        itemStyle:{borderWidth:2,gapWidth:2,borderRadius:6},emphasis:{itemStyle:{shadowBlur:14,shadowColor:r.v}}}]});
+        levels:[{itemStyle:{borderColor:'transparent',borderWidth:0,gapWidth:3}}],itemStyle:{borderWidth:0,gapWidth:3,borderRadius:7},emphasis:{itemStyle:{shadowBlur:14,shadowColor:r.v}}}]});
     return {o,init(c){c.on('click',p=>{if(tikla.deger&&dim)tikla.deger(dim,p.name);});}};
   }
   return null;
@@ -370,20 +370,20 @@ async function karsilastirmaCiz(p){const kk=HS.karsilastir,A=HS.veri;
       xAxis:{type:'category',data:x,boundaryGap:false,axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},axisLabel:{color:r.soluk,interval:Math.max(0,Math.ceil(n/9)-1),formatter:v=>idx?v:ayEtiket(v)}},
       yAxis:{type:'value',splitNumber:3,axisLabel:{color:r.soluk,formatter:SAYI},splitLine:{lineStyle:{color:hexA(r.cizgi,.5),type:'dashed'}}},
       series:[{name:etA,type:'line',data:al(za),smooth:.35,showSymbol:false,connectNulls:true,lineStyle:{width:2.6,color:r.v,shadowBlur:10,shadowColor:hexA(r.v,.5)},itemStyle:{color:r.v},areaStyle:{color:gradyan(r.v,'55','03')}},
-              {name:etB,type:'line',data:al(zb),smooth:.35,showSymbol:false,connectNulls:true,lineStyle:{width:2.6,color:r.amber,shadowBlur:10,shadowColor:hexA(r.amber,.5)},itemStyle:{color:r.amber},areaStyle:{color:gradyan(r.amber,'44','02')}}]});
+              {name:etB,type:'line',data:al(zb),smooth:.35,showSymbol:false,connectNulls:true,lineStyle:{width:2.6,color:r.palet[2],shadowBlur:10,shadowColor:hexA(r.palet[2],.5)},itemStyle:{color:r.palet[2]},areaStyle:{color:gradyan(r.palet[2],'44','02')}}]});
     isler.push(()=>canliKur(kap,{o}));}
   const sa=gz(A,'saat'),sb=gz(B,'saat');
   if(sa&&sb){const kap=kart('Günün saatleri: A ve B');const o=temel(r);Object.assign(o,{grid:{left:40,right:10,top:34,bottom:24},legend:{top:0,right:8,textStyle:{color:r.soluk},icon:'roundRect',itemWidth:14,itemHeight:4,inactiveColor:r.cizgi},
       tooltip:{...o.tooltip,trigger:'axis'},xAxis:{type:'category',data:sa.etiketler,axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},axisLabel:{color:r.soluk,interval:2}},
       yAxis:{type:'value',splitNumber:3,axisLabel:{color:r.soluk,formatter:SAYI},splitLine:{lineStyle:{color:hexA(r.cizgi,.5),type:'dashed'}}},
-      series:[{name:etA,type:'bar',data:sa.degerler,itemStyle:{color:r.v,borderRadius:[4,4,0,0]}},{name:etB,type:'bar',data:sb.degerler,itemStyle:{color:r.amber,borderRadius:[4,4,0,0]}}]});isler.push(()=>canliKur(kap,{o}));}
+      series:[{name:etA,type:'bar',data:sa.degerler,itemStyle:{color:r.v,borderRadius:[4,4,0,0]}},{name:etB,type:'bar',data:sb.degerler,itemStyle:{color:r.palet[2],borderRadius:[4,4,0,0]}}]});isler.push(()=>canliKur(kap,{o}));}
   const ga=(A.gruplar||[])[0],gb=(B.gruplar||[]).find(g=>ga&&g.id===ga.id);
   if(ga&&gb){const kap=kart('En çok '+ga.ad.toLowerCase()+': A ve B');const adlar=[...new Set([...ga.ogeler.slice(0,8).map(o=>o.ad),...gb.ogeler.slice(0,8).map(o=>o.ad)])].slice(0,10);
     const al=(g)=>adlar.map(a=>(g.ogeler.find(o=>o.ad===a)||{sayi:0}).sayi);
     const o=temel(r);Object.assign(o,{grid:{left:118,right:46,top:34,bottom:6},legend:{top:0,right:8,textStyle:{color:r.soluk},icon:'roundRect',itemWidth:14,itemHeight:4,inactiveColor:r.cizgi},tooltip:{...o.tooltip,trigger:'axis',axisPointer:{type:'shadow'}},
       xAxis:{type:'value',show:false},yAxis:{type:'category',data:adlar,inverse:true,axisTick:{show:false},axisLine:{lineStyle:{color:r.cizgi}},axisLabel:{color:r.yazi,width:108,overflow:'truncate'}},
       series:[{name:etA,type:'bar',data:al(ga),barWidth:9,itemStyle:{color:r.v,borderRadius:[0,5,5,0]},label:{show:true,position:'right',color:r.soluk,formatter:q=>SAYI(q.value),fontSize:10}},
-              {name:etB,type:'bar',data:al(gb),barWidth:9,itemStyle:{color:r.amber,borderRadius:[0,5,5,0]},label:{show:true,position:'right',color:r.soluk,formatter:q=>SAYI(q.value),fontSize:10}}]});isler.push(()=>canliKur(kap,{o}));}
+              {name:etB,type:'bar',data:al(gb),barWidth:9,itemStyle:{color:r.palet[2],borderRadius:[0,5,5,0]},label:{show:true,position:'right',color:r.soluk,formatter:q=>SAYI(q.value),fontSize:10}}]});isler.push(()=>canliKur(kap,{o}));}
   requestAnimationFrame(()=>isler.forEach(f=>f()));}
 
 window.HARITA={ekran,durum:HS,temizle,yenidenBoyut,figurYenile};

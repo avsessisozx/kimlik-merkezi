@@ -22,7 +22,7 @@ from .cekirdek import IslemHatasi, Uygulama
 UYGULAMA_API = frozenset({
     "durum", "ara", "zaman", "kayit_gizle", "kaynaklar", "kaynak_kaldir", "kaynak_sil", "turler",
     "ice_aktar_baslat", "ice_aktar_durum", "persona_liste", "persona_ekle", "persona_guncelle",
-    "persona_sil", "persona_sure_kontrol", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
+    "persona_sil", "persona_sure_kontrol", "oneri_listele", "oneri_kanit", "oneri_onayla", "oneri_duzelt", "oneri_reddet", "oneri_hic_dogru_degil", "oneri_toplu_reddet", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "izin_toplu", "erisim_kaydi",
     "baglanti_bilgisi", "claude_ekle", "harita", "harita_bolge", "harita_hassas", "harita_kayitlar", "harita_ayrinti",
 })

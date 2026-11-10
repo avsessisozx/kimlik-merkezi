@@ -212,12 +212,46 @@ SF.zaman=async a=>{
   a.append(h('h2',{},'Zaman çizelgesi'),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç ',b,' Bitiş ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
   yukle(true).catch(hataGoster);};
 // ------------------------------------------------------------------ persona
+let PERSONA_SEKME='bilgiler';
+const ONERI_KOMUT=`Sohbet geçmişimi tara ve persona önerileri yaz. Önce \`kategorileri_listele\` ile neye iznin olduğuna bak, sonra \`ornekle\` ve \`ara\` ile sohbet kayıtlarından örnekler al. Benim hakkımda kalıcı, tekrar eden bilgileri (nerede yaşadığım, işim, cihazlarım, projelerim, tercihlerim) bul ve her biri için \`persona_oner\` ile öneri yaz; her öneride dayandığın kayıtların \`id\` değerlerini \`kanit\` olarak ver. Tahmin yürütme, emin olmadığını yazma. Yazdıklarını onaylamadan persona değişmeyeceğini unutma; daha önce reddettiğim öneriler kuyruğa girmez.`;
+function oneriYardim(){return h('details',{class:'kart hud yardim'},h('summary',{},'Öneriler nasıl üretilir?'),
+  h('p',{},'Claude gibi bir yapay zekâ, izin verdiğiniz kayıtlara bakıp sizin hakkınızda kalıcı bilgiler ',h('b',{},'önerir'),'. Öneri yalnızca bu kuyruğa düşer; ',h('b',{},'siz onaylamadan persona değişmez'),'. Önerinin dayandığı kayıtları açıp kendiniz kontrol edebilirsiniz.'),
+  h('ol',{},h('li',{},'Erişim ekranında Claude\'un anahtarına, örneğin ',h('b',{},'sohbet'),' kategorisi için (hassas: ayrı onay) okuma izni verin.'),h('li',{},'Claude\'a aşağıdaki komutu yazın.'),h('li',{},'Öneriler burada belirir; Onayla, Düzelt, Reddet ya da "Hiç doğru değil" deyin.')),
+  h('div',{class:'komut'},ONERI_KOMUT),h('div',{class:'satir'},h('button',{class:'i',onclick:()=>kopyala(ONERI_KOMUT)},'Komutu kopyala')),
+  h('p',{class:'soluk'},'Sınır: yapay zekânın öneriyi doğru çıkaracağı garanti edilmez; onay ekranı bu yüzden vardır. Bu akış gerçek Claude ile bu uygulamada denenmedi.'));}
+async function oneriPaneli(kok){
+  const r=await api('oneri_listele');kok.textContent='';
+  kok.append(oneriYardim());
+  if(!r.oneriler.length){kok.append(h('div',{class:'kart hud bos-kutu'},h('h3',{},'Bekleyen öneri yok'),h('p',{},'Claude öneri yazdığında burada görünür.')));return;}
+  const yenile=async(mesaj)=>{if(mesaj)bildir(mesaj);git('persona');};
+  kok.append(h('div',{class:'oneri-ust'},h('span',{class:'soluk'},`${r.sayi} öneri onayınızı bekliyor`),
+    h('button',{class:'t',onclick:async()=>{if(!confirm(`${r.sayi} öneri toplu reddedilsin mi? (Bastırma yapmaz; benzerleri tekrar önerilebilir.)`))return;
+      const x=await api('oneri_toplu_reddet',{}).catch(hataGoster);if(x)yenile(`${x.reddedilen} öneri reddedildi.`);}},'Hepsini reddet')));
+  r.oneriler.forEach((o,i)=>{
+    const kanit=h('div',{class:'kanit'});const duzen=h('div',{class:'satir',style:'display:none'});
+    const girdi=h('input',{type:'text',value:o.ifade});duzen.append(girdi,h('button',{class:'d',onclick:async()=>{const x=await api('oneri_duzelt',{oneri_id:o.id,ifade:girdi.value}).catch(hataGoster);if(x)yenile('Düzeltilmiş hâliyle persona\'ya eklendi.');}},'Kaydet'),h('button',{class:'i',onclick:()=>{duzen.style.display='none';}},'Vazgeç'));
+    const pct=Math.round(o.guven*100);
+    kok.append(h('div',{class:'kart hud oneri giris',style:`--i:${i}`},
+      h('div',{class:'oneri-ifade'},o.ifade),
+      h('div',{class:'oneri-meta'},h('span',{class:'rozet'},o.kategori_ad),h('span',{class:'guven',title:'Yapay zekânın kendi bildirdiği güven'},h('span',{class:'soluk'},'güven '),h('b',{},'%'+pct),h('i',{style:`--g:${pct}%`})),
+        h('button',{class:'baglanti',onclick:async e=>{if(kanit.dataset.acik){kanit.textContent='';delete kanit.dataset.acik;return;}kanit.dataset.acik='1';kanit.textContent='Yükleniyor…';
+          const k=await api('oneri_kanit',{oneri_id:o.id}).catch(x=>{hataGoster(x);return null;});kanit.textContent='';if(!k)return;
+          k.kanit.forEach(x=>kanit.append(x.yok?h('div',{class:'kanit-satir soluk'},'Kayıt artık yok.'):h('div',{class:'kanit-satir'},h('div',{class:'soluk'},new Date(x.zaman).toLocaleString('tr-TR',{timeZone:'UTC'})+' · ',h('span',{class:'rozet'+(x.hassas?' h':'')},x.kategori),' ',x.tur),h('div',{class:'m'},x.gizli?'(gizlenmiş kayıt)':(x.metin||'(metin yok)')))));}},`${o.kanit_sayisi} kanıt kaydı ▾`),
+        h('span',{class:'soluk'},`${o.uygulama} · ${new Date(o.ts).toLocaleDateString('tr-TR')}`)),
+      kanit,duzen,
+      h('div',{class:'oneri-eylem'},h('button',{class:'d',onclick:async()=>{const x=await api('oneri_onayla',{oneri_id:o.id}).catch(hataGoster);if(x)yenile('Persona\'ya eklendi.');}},'Onayla'),
+        h('button',{class:'i',onclick:()=>{duzen.style.display='flex';girdi.focus();}},'Düzelt'),
+        h('button',{class:'i',onclick:async()=>{const x=await api('oneri_reddet',{oneri_id:o.id}).catch(hataGoster);if(x)yenile('Reddedildi.');}},'Reddet'),
+        h('button',{class:'t',title:'Reddeder ve aynı ifadenin bir daha önerilmesini engeller',onclick:async()=>{if(!confirm('Bu ve aynı ifadeli öneriler bir daha kuyruğa girmesin mi?'))return;const x=await api('oneri_hic_dogru_degil',{oneri_id:o.id}).catch(hataGoster);if(x)yenile('Reddedildi; benzer öneriler engellendi.');}},'Hiç doğru değil'))));});
+}
 SF.persona=async a=>{
   const [p,c]=await Promise.all([api('persona_liste'),api('celiskiler')]);
+  const sek=h('div',{class:'sekmeler',role:'tablist'},[['bilgiler','Bilgiler'],['oneriler',`Öneriler (${p.oneri_sayisi})`]].map(([id,ad])=>h('button',{role:'tab','aria-selected':PERSONA_SEKME===id,class:'sek'+(PERSONA_SEKME===id?' secili':'')+(id==='oneriler'&&p.oneri_sayisi?' dikkat':''),onclick:()=>{PERSONA_SEKME=id;git('persona');}},ad)));
+  if(PERSONA_SEKME==='oneriler'){const kok=h('div',{class:'oneri-kok'});a.append(h('h2',{},'Persona'),sek,kok);await oneriPaneli(kok);return;}
   const metin=h('input',{type:'text',placeholder:'Örn. Windows 11 bilgisayarım var'});
   const kat=h('select',{},p.kategoriler.map(k=>h('option',{value:k.kimlik},k.ad)));
   const kay=h('select',{},h('option',{value:''},'Kendi beyanım'),p.kaynaklar.map(s=>h('option',{value:s.id},'Belgeden: '+s.ad)));
-  a.append(h('h2',{},'Persona'),
+  a.append(h('h2',{},'Persona'),sek,
     h('div',{class:'kart'},h('h3',{},'Bilgi ekle'),h('div',{class:'satir'},metin),
       h('div',{class:'satir'},kat,kay,h('button',{class:'d',onclick:async()=>{await api('persona_ekle',{metin:metin.value,kategori:kat.value,kaynak_id:kay.value||null}).catch(hataGoster);git('persona');}},'Ekle')),
       h('div',{class:'soluk'},'"Belgeden" seçerseniz bilgi o kaynağa bağlanır ve kimlik kartında kaynak adıyla görünür.')));
