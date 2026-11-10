@@ -44,5 +44,22 @@ python -m pytest eval/tanir -q            # düzenek testleri
 3. Puanlayın: `python eval/tanir/tanir.py puanla A=cikti/tanir/cevaplar/A.json B=...B.json C=...C.json --rapor SONUC-ham.md --json puan.json`.
 4. `manuel` etiketli cevapları elle gözden geçirin; tohumu (`--tohum`) değiştirerek başka bir sahte örneklem deneyin. Anlamlı sonuç için çok sayıda tohum/çoklu çalıştırma gerekir.
 
+### C koşulunu çalıştırma
+Cevaplayıcı ajanın kendi MCP istemcisi yoksa (yalnız kabuğu varsa) ona şu iki dosyayı ek olarak verin:
+`eval/tanir/mcp_cagri.py` (yardımcı) ve `eval/tanir/paket_c_talimat_eki.md` (talimat eki; `TALIMAT.md`'ye ekleyin).
+Paket: `cikti/tanir/paket/C/` (`TALIMAT.md`, `sorular.json`, `mcp.json`) + `mcp_cagri.py` aynı klasöre kopyalanır.
+```
+python mcp_cagri.py --yapilandirma mcp.json kategorileri_listele
+python mcp_cagri.py --yapilandirma mcp.json ara --arg sorgu=v60 --arg limit=5
+```
+Yardımcı gerçek MCP stdio protokolüyle sunucuyu başlatır, yalnız altı izinli aracı çağırır (`persona_oner` ve bilinmeyenler
+Türkçe hatayla reddedilir), `mcp.json` ortam değerlerini (anahtar) çıktıdan siler, kendisi ağa bağlanmaz. Kapalı kategoriler
+sunucuda hâlâ reddedilir (testli: `tests/test_mcp_cagri.py`).
+**Dürüst sınır:** `mcp.json` sunucunun başlatılabilmesi için anahtarı düz metin taşır ve cevaplayıcının Bash'i kısıtlanamıyorsa
+o dosyayı, veri klasörünü ve SQLite'ı doğrudan açabilir, sunucuyu kendisi başlatabilir. Yardımcı bir **erişim kısıtı değildir**;
+izolasyon talimata (`paket_c_talimat_eki.md`) ve cevaplayıcının uymasına dayanır. Bash'i kısıtlayabilen bir ortam
+(yalnız bu komuta izin veren allowlist, veri klasörü cevaplayıcıya bağlanmamış kapsayıcı) bunu gerçek izolasyona çevirir; ihlal
+şüphesinde cevap günlüğünü (kullanılan komutlar) inceleyin.
+
 ## Dosyalar
-`gercekler.py` gerçekler+sorular+kabul ölçütleri · `uret.py` sahte dışa aktarma üreticisi · `tanir.py` komut satırı (kur, doğrula, erişim, puanla, referans) · `puanla.py` otomatik puanlama · `erisim_sorgulari.py` betikli sorgular · `tests/` düzenek testleri.
+`gercekler.py` gerçekler+sorular+kabul ölçütleri · `uret.py` sahte dışa aktarma üreticisi · `tanir.py` komut satırı (kur, doğrula, erişim, puanla, referans) · `puanla.py` otomatik puanlama · `erisim_sorgulari.py` betikli sorgular · `mcp_cagri.py` C koşulu tek-araç yardımcısı · `paket_c_talimat_eki.md` C talimat eki · `tests/` düzenek testleri.
