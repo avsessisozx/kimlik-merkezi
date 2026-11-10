@@ -54,6 +54,10 @@ jobs:
           echo "KIMLIK_TARAYICI_ZORUNLU=1" >> "$GITHUB_ENV"
       - name: windows (arayüzden bağımsız mantık + gerçek tarayıcı) testleri
         if: hashFiles('windows/pyproject.toml') != ''
-        run: python -m pytest windows
+        run: python -m pytest windows -rs
+      - name: Tarayıcı testi atlanmadı mı (yalnız 3.13; atlanırsa ZORUNLU=1 ile kırmızı)
+        if: matrix.python == '3.13'
+        shell: bash
+        run: python -m pytest windows/tests/test_tarayici.py -rs -v 2>&1 | tee "$RUNNER_TEMP/tarayici.log"; ! grep -q SKIPPED "$RUNNER_TEMP/tarayici.log"
       - name: entegrasyon testleri
         run: python -m pytest entegrasyon -m "not buyuk"
