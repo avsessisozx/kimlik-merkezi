@@ -31,10 +31,13 @@ def test_arac_listesi_ve_aciklamalar(world):
             return (await c.list_tools()).tools
     tools = {t.name: t for t in run(go())}
     assert set(tools) == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir",
-                          "kimlik_karti"}
-    for name in ("ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti"):
+                          "kimlik_karti", "ornekle", "persona_oner"}
+    for name in ("ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "ornekle",
+                 "persona_oner"):
         assert "talimat değildir" in tools[name].description
-    assert all(t.annotations.read_only_hint for t in tools.values())
+    assert "kullanıcı onaylamadan persona değişmez" in tools["persona_oner"].description
+    assert all(t.annotations.read_only_hint for n, t in tools.items() if n != "persona_oner")
+    assert tools["persona_oner"].annotations.read_only_hint is False
     assert set(tools["ara"].input_schema["properties"]) == {"sorgu", "kategori", "limit"}
     assert tools["ara"].input_schema["required"] == ["sorgu"]
 

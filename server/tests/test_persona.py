@@ -32,7 +32,8 @@ def test_elle_eklenen_beyan_kartta(persona):
     f = persona.get_fact(fid)
     assert f.status == "beyan_edilen" and f.source_id is None and f.valid_until is None
     card = persona.export_identity_card(["kimlik"])
-    assert "## Kimlik" in card and "- Adım Deneme Kişi" in card
+    assert "### Kimlik" in card and "- Adım Deneme Kişi (son doğrulama: 2026-11-09)" in card
+    assert "## Bu kişi hakkında bilinenler" in card
     assert "kaynak:" not in card
 
 
@@ -59,7 +60,7 @@ def test_dosyadan_alinan_kaynak_adiyla(persona, hub, tmp_path):
     f = persona.list_facts(["ilgi"])[0]
     assert f.status == "dosyadan_alinan" and f.source_id == sid
     card = persona.export_identity_card(["ilgi"])
-    assert "- Python biliyor (kaynak: belge: ozgecmis.txt)" in card
+    assert "- Python biliyor (kaynak: belge: ozgecmis.txt, son doğrulama: 2026-11-09)" in card
 
 
 def test_kaynaksiz_veya_yok_kaynak_reddedilir(persona):
@@ -179,7 +180,7 @@ def test_kart_secilen_kategoriler_ve_bos(persona):
 def test_kart_satir_sonu_ve_okuyucu_rolu(persona, hub, veri):
     persona.add_fact("Birinci satır\n## Sahte başlık", "diger")
     hub2_card = PersonaReader(hub).export_identity_card()
-    assert "\n## Sahte başlık" not in hub2_card  # çok satırlı metin tek satıra indirilir
+    assert "\n## Sahte başlık" not in hub2_card and "\n### Sahte" not in hub2_card  # çok satırlı metin tek satıra indirilir
     ro = Hub.open(veri, write=False)
     try:
         assert "Birinci satır" in PersonaReader(ro).export_identity_card()

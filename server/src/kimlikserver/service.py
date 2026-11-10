@@ -26,7 +26,8 @@ from kimlikcore import (
 
 from ._db import Clock, utc_now
 from .access import AccessLog, AccessLogError, Authorizer, categories_label
-from .persona import FACT_CATEGORIES, PersonaReader
+from .oneri import (MAX_ONERI_CAGRI, OneriKuyrugu, OneriYazilamadi, dogrula_onerme)
+from .persona import CATEGORY_TITLES, FACT_CATEGORIES, PersonaReader, son_dogrulama
 
 log = logging.getLogger("kimlikserver")  # kayıt içeriği asla günlüğe yazılmaz
 
@@ -68,6 +69,8 @@ class _Result:
     data: dict[str, Any]
     count: int
     category: str | None
+    # Erişim kaydı yazıldıktan SONRA çalışır (kayıtsız yazma olmasın); sonucu `data`yı değiştirir.
+    commit: Callable[[], dict[str, Any]] | None = None
 
 
 class QueryService:
@@ -91,6 +94,7 @@ class QueryService:
                 auth = Authorizer(hub, clock=self._clock)
                 ident = auth.authenticate(self._key)
                 app_id = ident.app_id
+                auth.ident = ident
                 res = fn(hub, auth, auth.allowed_categories(app_id))
                 cat_label = res.category
             finally:
@@ -119,6 +123,14 @@ class QueryService:
             log.error("%s: erişim kaydı yazılamadı; sorgu reddedildi", tool)
             raise ServiceError("reddedildi: erişim kaydı yazılamadığı için sorgu "
                                "yanıtlanmadı.") from None
+        if res.commit is not None:
+            try:
+                return res.commit()
+            except OneriYazilamadi:
+                log.error("%s: öneri kuyruğu yazılamadı", tool)
+                self._log_best_effort(app_id, tool, res.category, 0, "hata")
+                raise ServiceError("reddedildi: öneri kuyruğu yazılamadı; hiçbir şey eklenmedi.") \
+                    from None
         return res.data
 
     def _log_best_effort(self, app_id: str, tool: str, category: str | None, count: int,
@@ -192,9 +204,11 @@ class QueryService:
                 raise ServiceError("Bilinmeyen persona kategorisi.")
             pr = PersonaReader(hub, clock=self._clock)
             facts = pr.list_facts([kategori] if kategori else None)
-            recs = [{"etiket": "veri", "kategori": f.category, "durum": f.status,
+            recs = [{"etiket": "veri", "kategori": f.category,
+                     "kategori_basligi": CATEGORY_TITLES[f.category], "durum": f.status,
                      "kaynak": pr.source_label(f.source_id) if f.status == "dosyadan_alinan"
-                     else None, "veri": f.statement} for f in facts]
+                     else None, "son_dogrulama": son_dogrulama(f), "veri": f.statement}
+                    for f in facts]
             return _Result({"veri_uyarisi": VERI_UYARISI, "kayitlar": recs}, len(recs),
                            Category.PERSONA)
         return self._run("persona_getir", Category.PERSONA, fn)
@@ -210,3 +224,60 @@ class QueryService:
             return _Result({"etiket": "veri", "veri_uyarisi": VERI_UYARISI, "veri": md}, n,
                            Category.PERSONA)
         return self._run("kimlik_karti", Category.PERSONA, fn)
+
+    def ornekle(self, kategori: str, n: int | None = None, sorgu: str | None = None
+                ) -> dict[str, Any]:
+        """İzinli bir kategoriden örnek kayıtlar (persona çıkarımı için tarama). `sorgu` verilirse
+        eşleşenlerden, verilmezse rastgele örneklenir (zamana göre sıralı döner)."""
+        def fn(hub, auth, allowed):
+            if kategori is None:
+                raise ServiceError("kategori gerekli.")
+            cats = self._categories(allowed, kategori)
+            lim = _limit(n, 20)
+            if sorgu:
+                evs = hub.search(sorgu, categories=cats, limit=lim)
+            else:
+                ids = [r[0] for r in hub.query(
+                    "SELECT event_id FROM events WHERE hidden = 0 AND category = ? "
+                    "ORDER BY random() LIMIT ?", (cats[0], lim))]
+                evs = sorted((hub.get_event(i) for i in ids), key=lambda e: e.ts)
+            recs = self._records(evs, allowed)
+            return _Result({"veri_uyarisi": VERI_UYARISI, "kayitlar": recs}, len(recs),
+                           categories_label(cats))
+        return self._run("ornekle", kategori, fn)
+
+    def persona_oner(self, onermeler: list[dict[str, Any]]) -> dict[str, Any]:
+        """Persona önerilerini YALNIZ öneri kuyruğuna (oneri.db) ekler; `facts` değişmez.
+        Her önerinin kanıt olay kimlikleri geçerli olmalı ve kategorileri için okuma izni olmalı."""
+        def fn(hub, auth, allowed):
+            if not isinstance(onermeler, list) or not onermeler:
+                raise ServiceError("'onermeler' en az bir öneri içeren liste olmalı.")
+            if len(onermeler) > MAX_ONERI_CAGRI:
+                raise ServiceError(f"Bir çağrıda en çok {MAX_ONERI_CAGRI} öneri gönderilebilir.")
+            norm = [dogrula_onerme(o) for o in onermeler]
+            ids = sorted({k for o in norm for k in o["kanit"]})
+            bulunan: dict[str, str] = {}
+            for i in range(0, len(ids), 200):
+                parca = ids[i:i + 200]
+                for eid, cat in hub.query(
+                        "SELECT event_id, category FROM events WHERE hidden = 0 AND event_id IN "
+                        f"({','.join('?' * len(parca))})", parca):
+                    bulunan[eid] = cat
+            # Yok, gizli ve izinsiz kategori aynı iletiyle reddedilir (varlık sızmasın).
+            if any(k not in bulunan or bulunan[k] not in allowed for k in ids):
+                raise PermissionDenied("Kanıt olay kimliği geçersiz ya da kategorisi için "
+                                       "okuma izni yok; hiçbir öneri eklenmedi.")
+            kuyruk = OneriKuyrugu(self.root, clock=self._clock)
+            durum, _ = kuyruk.on_kontrol(norm)
+            planli = sum(1 for d in durum if d is None)
+            app_id = auth.ident.app_id
+            etiket = categories_label({bulunan[k] for k in ids})
+
+            def commit():
+                sonuc = kuyruk.ekle(app_id, norm)
+                return {"bilgi": "Öneriler kuyruğa eklendi; kullanıcı onaylamadan persona "
+                                 "değişmez.",
+                        "eklenen": sum(1 for r in sonuc if r["sonuc"] == "eklendi"),
+                        "sonuclar": [{"sira": i, **r} for i, r in enumerate(sonuc)]}
+            return _Result({}, planli, etiket, commit)
+        return self._run("persona_oner", None, fn)

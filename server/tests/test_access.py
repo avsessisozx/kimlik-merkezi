@@ -241,3 +241,56 @@ def test_authorizer_dogrudan(world):
         assert a.authenticate(world["a_key"]).app_id == world["a_id"]
         with pytest.raises(PermissionDenied):
             a.authenticate(world["a_key"] + "x")
+
+
+# ---------------------------------------------------------------- sohbet: hassas kategori
+def test_sohbet_hassas_ayri_onay_ister(world):
+    from kimlikcore import Category
+    assert "sohbet" in Category.SENSITIVE and "sohbet" in Category.ALL
+
+    def f(hub):
+        km = KeyManager(hub)
+        with pytest.raises(SensitiveConfirmationRequired):
+            km.grant(world["b_id"], "sohbet")
+        with pytest.raises(sqlite3.IntegrityError):  # çekirdek CHECK kısıtı
+            with hub.transaction() as c:
+                c.execute("INSERT INTO permissions(app_id, category, granted_at, "
+                          "confirmed_sensitive) VALUES (?, 'sohbet', 'x', 0)", (world["b_id"],))
+        done = km.grant_all_non_sensitive(world["b_id"])  # toplu açma sohbeti içermez
+        assert "sohbet" not in done
+    mutate(world, f)
+    s = svc(world, world["b_key"])
+    assert "sohbet" not in [k["kategori"] for k in s.kategorileri_listele()["kategoriler"]]
+    with pytest.raises(ServiceError) as e:
+        s.ara("kahve", "sohbet")
+    assert str(e.value).startswith("reddedildi")
+    with pytest.raises(ServiceError):
+        s.ornekle("sohbet")
+    mutate(world, lambda hub: KeyManager(hub).grant(world["b_id"], "sohbet",
+                                                    confirmed_sensitive=True))
+    assert "sohbet" in [k["kategori"] for k in s.kategorileri_listele()["kategoriler"]]
+
+
+def test_sohbet_kaydi_izne_baglidir_ve_kanit_olur(world):
+    def f(hub):
+        sid = hub.add_source("sohbet", "1", None)
+        hub.add_events(sid, [ev("kahve konusan sohbet mesaji", "sohbet", kind="sohbet.mesaj",
+                                payload={"platform": "claude", "rol": "kullanici"})])
+    mutate(world, f)
+    s = svc(world)
+    with pytest.raises(ServiceError):
+        s.ara("sohbet", "sohbet")
+    assert "sohbet mesaji" not in json.dumps(s.ara("kahve"), ensure_ascii=False)  # kategorisiz sızmaz
+    sid_ = eid_sohbet(world)
+    with pytest.raises(ServiceError):  # kanıt olarak da kullanılamaz
+        s.persona_oner([{"ifade": "Kahve konuşur", "kategori": "ilgi", "kanit": [sid_], "guven": 0.5}])
+    mutate(world, lambda hub: KeyManager(hub).grant(world["a_id"], "sohbet",
+                                                    confirmed_sensitive=True))
+    assert s.ara("sohbet", "sohbet")["kayitlar"][0]["kategori"] == "sohbet"
+    assert s.persona_oner([{"ifade": "Kahve konuşur", "kategori": "ilgi", "kanit": [sid_],
+                            "guven": 0.5}])["eklenen"] == 1
+
+
+def eid_sohbet(world):
+    with Hub.open(world["root"], write=False) as h:
+        return h.query_one("SELECT event_id FROM events WHERE category = 'sohbet'")[0]
