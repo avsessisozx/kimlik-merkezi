@@ -77,11 +77,27 @@ $kabuk = (Get-Process -Id $PID).Path
 Write-Host "ağ izleyici kabuğu: $kabuk"
 $agIzleyici = Start-Process $kabuk -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$k\ag_izle.ps1", '-Cikti', $agCikti, '-DurdurDosyasi', $agDurdur, '-Hazir', $agHazir) -PassThru -WindowStyle Hidden -RedirectStandardOutput $agOut -RedirectStandardError $agErr
 function AgGunlugu() {
-  foreach ($f in @($agOut, $agErr)) { if (Test-Path $f) { Write-Host "--- $(Split-Path $f -Leaf)"; Get-Content $f -Raw | Write-Host } }
+  foreach ($f in @($agOut, $agErr)) { if (Test-Path $f) { Write-Host "--- $(Split-Path $f -Leaf)"; $m = Get-Content -LiteralPath $f -Raw -ErrorAction SilentlyContinue; if ($m) { Write-Host $m } } }
+}
+# Dosyayı DOLU görene kadar okur (izleyici dosyayı oluşturmuş ama içeriği henüz yazmamış olabilir; Get-Content
+# bu durumda $null döner). Zaman aşımında dosyanın durumunu söyleyen net bir hata verir.
+function OkuDolu([string]$Yol, [string]$Ad, [int]$ZamanAsimiMs = 15000) {
+  $bitis = (Get-Date).AddMilliseconds($ZamanAsimiMs)
+  do {
+    $ham = $null
+    if (Test-Path -LiteralPath $Yol) {
+      try { $ham = Get-Content -LiteralPath $Yol -Raw -ErrorAction Stop } catch { $ham = $null }   # yazan tarafla yarış: sonra yeniden dene
+    }
+    if (($null -ne $ham) -and ($ham.Trim().Length -gt 0)) { return $ham.Trim() }
+    Start-Sleep -Milliseconds 100
+  } while ((Get-Date) -lt $bitis)
+  $durum = if (Test-Path -LiteralPath $Yol) { "dosya var ama $([int](Get-Item -LiteralPath $Yol).Length) bayt (boş)" } else { 'dosya yok' }
+  throw "BAŞARISIZ: $Ad $($ZamanAsimiMs / 1000) sn içinde dolu okunamadı ($Yol): $durum"
 }
 for ($i = 0; $i -lt 100 -and -not (Test-Path $agHazir) -and -not $agIzleyici.HasExited; $i++) { Start-Sleep -Milliseconds 200 }
 if (-not (Test-Path $agHazir)) { AgGunlugu; throw "BAŞARISIZ: ağ izleyici başlamadı (çıkış kodu: $($agIzleyici.ExitCode)); örnek alınamadı" }
-Write-Host ("[tamam] ağ izleyici başladı: " + (Get-Content $agHazir -Raw).Trim())
+$agHazirMetin = OkuDolu $agHazir 'ağ izleyici hazır işareti'
+Write-Host ("[tamam] ağ izleyici başladı: " + $agHazirMetin)
 python kurulu_dene.py $hedef $calisma $fixture $Surum
 $deneKod = $LASTEXITCODE
 Start-Sleep -Milliseconds 600
@@ -90,7 +106,9 @@ if (-not $agIzleyici.WaitForExit(30000)) { Write-Host '::warning::ağ izleyici 3
 AgGunlugu
 if ($deneKod) { throw 'kurulu_dene' }
 if (-not (Test-Path $agCikti)) { throw 'BAŞARISIZ: ağ izleyici sonuç dosyası yazmadı (izleyici çökmüş olabilir; yukarıdaki çıktılara bakın)' }
-$ag = Get-Content $agCikti -Raw | ConvertFrom-Json
+$agMetin = OkuDolu $agCikti 'ağ izleyici sonuç dosyası'
+$ag = $agMetin | ConvertFrom-Json
+if ($null -eq $ag) { throw "BAŞARISIZ: ağ izleyici sonucu çözümlenemedi: $agMetin" }
 Write-Host "ağ izleme sonucu:"
 Write-Host ($ag | ConvertTo-Json -Depth 4)
 Write-Host ("ağ izleme: {0} yoklama ({1} tanesinde uygulama süreci vardı), {2} süreç görüldü, {3} yerel bağlantı, {4} yoklama hatası, {5} ihlal" -f $ag.yoklama_sayisi, $ag.surecli_yoklama_sayisi, $ag.izlenen_surec_sayisi, $ag.yerel_baglanti_sayisi, $ag.yoklama_hatasi, @($ag.ihlaller).Count)

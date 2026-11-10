@@ -3,6 +3,7 @@
 # SINIRLAR (docs/AG-GARANTISI.md): yoklama (ornekleme) yapar; yoklama araligindan kisa omurlu baglanti kacabilir.
 # UDP ve DNS sorgulari surecle eslenemez. Tek basina "hic baglanmadi" kaniti degildir.
 # Her durumda (hata dahil) -Cikti dosyasina JSON yazar. -Hazir dosyasi ilk yoklamadan hemen once yazilir.
+# Her iki dosya ATOMIK yazilir (once gecici dosya, sonra yeniden adlandirma): okuyan taraf yari/bos dosya gormez.
 param(
   [Parameter(Mandatory = $true)][string]$Cikti,
   [Parameter(Mandatory = $true)][string]$DurdurDosyasi,
@@ -20,6 +21,12 @@ $surecli = 0
 $hatalar = 0
 $sonHata = ''
 $kritik = ''
+
+function AtomikYaz([string]$Yol, [string]$Metin) {
+  $gecici = $Yol + '.tmp'
+  $Metin | Out-File -LiteralPath $gecici -Encoding ascii
+  Move-Item -LiteralPath $gecici -Destination $Yol -Force
+}
 
 function Torunlar($kokler) {
   $hepsi = @{}
@@ -39,7 +46,7 @@ function Torunlar($kokler) {
 }
 
 try {
-  'basladi ' + (Get-Date).ToString('o') + ' pid=' + $PID + ' surum=' + $PSVersionTable.PSVersion | Out-File $Hazir -Encoding ascii
+  AtomikYaz $Hazir ('basladi ' + (Get-Date).ToString('o') + ' pid=' + $PID + ' surum=' + $PSVersionTable.PSVersion)
   while (-not (Test-Path $DurdurDosyasi)) {
     try {
       $kok = @(Get-Process -Name $SurecAdlari -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
@@ -74,4 +81,4 @@ $sonuc = [ordered]@{
   yerel_baglanti_sayisi = $yerelGorulen.Count
   ihlaller = @($ihlaller)
 }
-$sonuc | ConvertTo-Json -Depth 4 | Out-File $Cikti -Encoding ascii
+AtomikYaz $Cikti ($sonuc | ConvertTo-Json -Depth 4)
