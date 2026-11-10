@@ -63,7 +63,7 @@ def test_buyuk_dosya_bellek_sismeden_alinir(tmp_path, child_env):
     real = src.stat().st_size
     print(f"\nüretildi: {n} satır, {real / 1024**3:.2f} GB, {time.time() - t0:.0f} sn")
     r = subprocess.run([sys.executable, "-c", INGEST, str(tmp_path / "hub"), str(src)], env=child_env,
-                       capture_output=True, text=True, timeout=7200)
+                       capture_output=True, encoding="utf-8", timeout=7200)
     assert r.returncode == 0, r.stderr[-2000:]
     out = json.loads(r.stdout.strip().splitlines()[-1])
     print("SONUC", out)

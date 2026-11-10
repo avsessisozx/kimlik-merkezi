@@ -233,7 +233,19 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _utf8_streams() -> None:
+    """Borulanmış/yönlendirilmiş çıktı yerel kodlamaya (Windows'ta cp1252) bağlı kalmasın.
+    Etkileşimli konsola dokunulmaz."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if not stream.isatty():
+                stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_streams()
     args = build_parser().parse_args(argv)
     if args.veri is None:
         args.veri = default_root()

@@ -55,7 +55,7 @@ def test_wal_mode_ro_ikinci_surec_yazani_bozmaz(root, child_env):
                                      category="notlar", text="sentetik tohum")])
         assert hub._conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         p = subprocess.Popen([sys.executable, "-c", READER, str(root), "4"], env=child_env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
         written = 1
         slowest = 0.0
         t_end = time.time() + 4.5
@@ -104,7 +104,7 @@ def test_ikinci_yazan_surec_kilitli_hatasi_alir(root, child_env):
             Hub.open(root, write=True)  # aynı süreçte de
         # CLI anlaşılır hata ve çıkış kodu 3 verir
         c = subprocess.run([sys.executable, "-m", "kimlikcore", "--veri", str(root), "baslat"],
-                           env=child_env, capture_output=True, text=True)
+                           env=child_env, capture_output=True, encoding="utf-8")
         assert c.returncode == 3 and "başka bir süreç" in c.stderr
     with Hub.open(root, write=True):  # kapanınca kilit serbest
         pass
@@ -115,7 +115,7 @@ def test_bayat_kilit_devralinir(root, child_env):
     code = ("from kimlikcore import Hub; import sys, time\n"
             "Hub.open(sys.argv[1], write=True); print('hazir', flush=True); time.sleep(60)\n")
     p = subprocess.Popen([sys.executable, "-c", code, str(root)], env=child_env,
-                         stdout=subprocess.PIPE, text=True)
+                         stdout=subprocess.PIPE, encoding="utf-8")
     assert p.stdout.readline().strip() == "hazir"
     with pytest.raises(HubLockedError):
         Hub.open(root, write=True)  # sahibi canlı
@@ -166,7 +166,7 @@ for i in range(300):
 print("tamam")
 """
     procs = [subprocess.Popen([sys.executable, "-c", code, str(root), f"app{i}"], env=child_env,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for i in range(4)]
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8") for i in range(4)]
     for p in procs:
         out, err = p.communicate(timeout=60)
         assert p.returncode == 0 and out.strip() == "tamam", err

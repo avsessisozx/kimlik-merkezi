@@ -11,7 +11,7 @@ import pytest
 def cli(child_env, root):
     def run(*args, ok=True, veri=None, **kw):
         r = subprocess.run([sys.executable, "-m", "kimlikcore", "--veri", str(veri or root), *map(str, args)],
-                           env=child_env, capture_output=True, text=True, **kw)
+                           env=child_env, capture_output=True, encoding="utf-8", **kw)
         if ok:
             assert r.returncode == 0, r.stderr
         return r

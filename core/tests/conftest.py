@@ -35,5 +35,5 @@ def run_child(code: str, env, *args, timeout=120):
 
     return subprocess.run(
         [sys.executable, "-c", code, *map(str, args)],
-        env=env, capture_output=True, text=True, timeout=timeout,
+        env=env, capture_output=True, encoding="utf-8", timeout=timeout,
     )
