@@ -1,0 +1,47 @@
+name: ci
+
+# Hızlı birim testleri: her push ve PR'da, yalnızca ubuntu (Windows testleri tam.yml'de).
+# Büyük (`buyuk`) testler burada ÇALIŞMAZ.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            core/pyproject.toml
+            server/pyproject.toml
+            importers/pyproject.toml
+      - name: Kurulum (core, server, varsa importers)
+        run: |
+          pkgs="-e core -e server"
+          if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          python -m pip install $pkgs pytest
+      - name: core testleri
+        run: python -m pytest core -m "not buyuk"
+      - name: server testleri
+        run: python -m pytest server
+      - name: importers testleri
+        if: hashFiles('importers/pyproject.toml') != ''
+        run: python -m pytest importers -m "not buyuk"
+      - name: entegrasyon testleri
+        run: python -m pytest entegrasyon -m "not buyuk"
