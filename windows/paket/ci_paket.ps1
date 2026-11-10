@@ -66,23 +66,42 @@ Remove-Item $calisma -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $calisma | Out-Null
 $fixture = (Resolve-Path "$k\..\..\importers\fixtures\takeout_tr").Path
 # Ağ izleme: uygulama + MCP süreçleri yalnız 127.0.0.1 ile konuşuyor mu (docs/AG-GARANTISI.md; örnekleme, sınırları orada)
+# İzleyici PowerShell 7 (pwsh, bu betiği çalıştıran kabuk) ile ayrı süreçte başlar; çıktısı dosyaya yazılır.
 $agCikti = Join-Path $calisma 'ag_sonuc.json'
 $agDurdur = Join-Path $calisma 'ag_durdur'
-$agIzleyici = Start-Process powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$k\ag_izle.ps1", '-Cikti', $agCikti, '-DurdurDosyasi', $agDurdur) -PassThru -WindowStyle Hidden
+$agHazir = Join-Path $calisma 'ag_hazir.txt'
+$agOut = Join-Path $calisma 'ag_izle.out.txt'
+$agErr = Join-Path $calisma 'ag_izle.err.txt'
+Remove-Item $agCikti, $agDurdur, $agHazir, $agOut, $agErr -Force -ErrorAction SilentlyContinue
+$kabuk = (Get-Process -Id $PID).Path
+Write-Host "ağ izleyici kabuğu: $kabuk"
+$agIzleyici = Start-Process $kabuk -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$k\ag_izle.ps1", '-Cikti', $agCikti, '-DurdurDosyasi', $agDurdur, '-Hazir', $agHazir) -PassThru -WindowStyle Hidden -RedirectStandardOutput $agOut -RedirectStandardError $agErr
+function AgGunlugu() {
+  foreach ($f in @($agOut, $agErr)) { if (Test-Path $f) { Write-Host "--- $(Split-Path $f -Leaf)"; Get-Content $f -Raw | Write-Host } }
+}
+for ($i = 0; $i -lt 100 -and -not (Test-Path $agHazir) -and -not $agIzleyici.HasExited; $i++) { Start-Sleep -Milliseconds 200 }
+if (-not (Test-Path $agHazir)) { AgGunlugu; throw "BAŞARISIZ: ağ izleyici başlamadı (çıkış kodu: $($agIzleyici.ExitCode)); örnek alınamadı" }
+Write-Host ("[tamam] ağ izleyici başladı: " + (Get-Content $agHazir -Raw).Trim())
 python kurulu_dene.py $hedef $calisma $fixture $Surum
 $deneKod = $LASTEXITCODE
 Start-Sleep -Milliseconds 600
 New-Item -ItemType File $agDurdur -Force | Out-Null
-[void]$agIzleyici.WaitForExit(30000)
+if (-not $agIzleyici.WaitForExit(30000)) { Write-Host '::warning::ağ izleyici 30 sn içinde kapanmadı, zorla durduruluyor'; Stop-Process -Id $agIzleyici.Id -Force -ErrorAction SilentlyContinue }
+AgGunlugu
 if ($deneKod) { throw 'kurulu_dene' }
-Dene 'ağ izleyici sonuç yazdı' { Test-Path $agCikti }
+if (-not (Test-Path $agCikti)) { throw 'BAŞARISIZ: ağ izleyici sonuç dosyası yazmadı (izleyici çökmüş olabilir; yukarıdaki çıktılara bakın)' }
 $ag = Get-Content $agCikti -Raw | ConvertFrom-Json
-Write-Host ("ağ izleme: {0} yoklama, {1} süreç görüldü, {2} yerel bağlantı, {3} ihlal" -f $ag.yoklama_sayisi, $ag.izlenen_surec_sayisi, $ag.yerel_baglanti_sayisi, @($ag.ihlaller).Count)
+Write-Host "ağ izleme sonucu:"
+Write-Host ($ag | ConvertTo-Json -Depth 4)
+Write-Host ("ağ izleme: {0} yoklama ({1} tanesinde uygulama süreci vardı), {2} süreç görüldü, {3} yerel bağlantı, {4} yoklama hatası, {5} ihlal" -f $ag.yoklama_sayisi, $ag.surecli_yoklama_sayisi, $ag.izlenen_surec_sayisi, $ag.yerel_baglanti_sayisi, $ag.yoklama_hatasi, @($ag.ihlaller).Count)
 $ozet['ag_yoklama'] = $ag.yoklama_sayisi
+$ozet['ag_surecli_yoklama'] = $ag.surecli_yoklama_sayisi
 $ozet['ag_izlenen_surec'] = $ag.izlenen_surec_sayisi
 $ozet['ag_yerel_baglanti'] = $ag.yerel_baglanti_sayisi
 $ozet['ag_ihlal'] = @($ag.ihlaller).Count
-Dene 'ağ izleyici gerçekten çalıştı (yoklama yapıldı, uygulama süreci görüldü)' { ($ag.yoklama_sayisi -gt 5) -and ($ag.izlenen_surec_sayisi -gt 0) }
+Dene 'ağ izleyici kritik hata vermedi' { -not $ag.kritik_hata }
+Dene 'örnek alınabildi (yoklama yapıldı ve uygulama süreci görüldü; aksi halde kanıt yok sayılır)' { ($ag.yoklama_sayisi -gt 5) -and ($ag.surecli_yoklama_sayisi -gt 0) -and ($ag.izlenen_surec_sayisi -gt 0) }
+if ($ag.yoklama_hatasi -gt 0) { Write-Host "::warning::izleyici $($ag.yoklama_hatasi) yoklamada hata aldı, son hata: $($ag.son_hata)" }
 if ($ag.yerel_baglanti_sayisi -eq 0) { Write-Host '::warning::İzleyici hiç yerel (127.0.0.1) bağlantı yakalamadı; örnekleme kısa ömürlü bağlantıları kaçırmış olabilir (bilgi, hata değil).' }
 if (@($ag.ihlaller).Count -gt 0) { $ag.ihlaller | ForEach-Object { Write-Host "::error::$_" } }
 Dene 'uygulama ve MCP yalnız 127.0.0.1 ile bağlandı (dış bağlantı görülmedi)' { @($ag.ihlaller).Count -eq 0 }

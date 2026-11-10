@@ -326,7 +326,7 @@ def test_paket_ci_ag_izleme_adimi_bagli():
     ps = (KOK / "windows/paket/ci_paket.ps1").read_text(encoding="utf-8")
     izle = (KOK / "windows/paket/ag_izle.ps1").read_text(encoding="utf-8")
     assert "ag_izle.ps1" in ps and "kurulu_dene.py" in ps
-    assert "Get-NetTCPConnection" in izle and "127.0.0.1" in izle
+    assert "Get-NetTCPConnection" in izle and "127.0.0.1" in izle and izle.isascii()
     yml = (KOK / ".github/workflows/paket.yml").read_text(encoding="utf-8")
     assert "ci_paket.ps1" in yml and "ag_sonuc.json" in yml
     yaml = pytest.importorskip("yaml")
