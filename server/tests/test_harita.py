@@ -6,10 +6,11 @@ import time
 from pathlib import Path
 
 import pytest
-from kimlikcore import EventIn, Hub, NotFoundError
+from kimlikcore import EventIn, FormatError, Hub, NotFoundError
 from kimlikimport.run import run as ice_al
 
-from kimlikserver.harita import HASSAS_BOLGELER, VARSAYILAN_BOLGELER, bolge, harita
+from kimlikserver.harita import (HASSAS_BOLGELER, VARSAYILAN_BOLGELER, ayrinti, bolge, harita,
+                                 karsilastir, kayitlar)
 from kimlikserver.persona import Persona
 
 FIX = Path(__file__).resolve().parents[2] / "importers" / "fixtures"
@@ -92,7 +93,8 @@ def test_importer_fixture_sayilari(fixture_hub):
     assert {e["ad"] for e in b["en_cok"]} >= {"Kanal A", "Kanal B"}
     assert any("gerçek zaman yok" in n for n in b["notlar"])
     s = bolge(fixture_hub, "agiz")
-    assert {"ad": "ornek", "sayi": 3, "grup": "subreddit"} in s["en_cok"]
+    assert {"ad": "ornek", "sayi": 3, "grup": "subreddit",
+            "anahtar": {"alan": "subreddit", "deger": "ornek"}} in s["en_cok"]
     t = bolge(fixture_hub, "bas")
     assert {e["ad"] for e in t["en_cok"] if e["grup"] == "site"} == {"example.test"}
     assert {e["ad"] for e in t["en_cok"] if e["grup"] == "arama terimi"} == \
@@ -133,7 +135,8 @@ def test_her_bolgenin_ciktisi(hub):
     assert any("bu alan yok" in n for n in kulak["notlar"]) and graf(kulak, "Aylık")
     assert graf(kulak, "sanat") is None and kulak["en_cok"] == []
     agiz = bolge(hub, "agiz")
-    assert agiz["en_cok"] == [{"ad": "ornek", "sayi": 2, "grup": "subreddit"}]  # abone sayılmaz
+    assert agiz["en_cok"] == [{"ad": "ornek", "sayi": 2, "grup": "subreddit",
+                               "anahtar": {"alan": "subreddit", "deger": "ornek"}}]  # abone sayılmaz
     assert graf(agiz, "Aylık")["degerler"] == [2]  # dosya tarihli abone grafikte yok
     assert any("gerçek zaman yok" in n for n in agiz["notlar"])
     el = bolge(hub, "el")
@@ -141,7 +144,8 @@ def test_her_bolgenin_ciktisi(hub):
     assert dict(zip(pasta["etiketler"], pasta["degerler"])) == {"notlar": 1, "dosyalar": 1}
     assert any("bu alan yok" in n for n in el["notlar"])
     ic = bolge(hub, "ic")
-    assert ic["en_cok"][0] == {"ad": "Maps", "sayi": 2, "grup": "uygulama"}
+    assert ic["en_cok"][0] == {"ad": "Maps", "sayi": 2, "grup": "uygulama",
+                               "anahtar": {"alan": "uygulama", "deger": "Maps"}}
     assert any("süresi: bu alan yok" in n for n in ic["notlar"])
 
 
@@ -278,18 +282,33 @@ def test_200bin_olayda_sure(tmp_path):
                 yield EventIn(ts=ts, kind=kind, category=cat, payload=pay, text=f"kayit {i}",
                               event_key=f"b{i}")
         h.add_events(sid, gen())
+        ac = {"kalp", "ayak", "zihin"}
         t0 = time.perf_counter()
-        hh = harita(h, ac_hassas={"kalp", "ayak"})
+        hh = harita(h, ac_hassas=ac)
         t_harita = time.perf_counter() - t0
         sure = {}
+
+        def olc(ad, fn):
+            t = time.perf_counter()
+            r = fn()
+            sure[ad] = time.perf_counter() - t
+            return r
         for bid in ("bas", "goz", "agiz", "ic", "kalp", "ayak"):
-            t0 = time.perf_counter()
-            bolge(h, bid, ac_hassas={"kalp", "ayak"})
-            sure[bid] = time.perf_counter() - t0
-    print(f"\nHARITA 200k olay: harita={t_harita:.3f}s bolge={ {k: round(v, 3) for k, v in sure.items()} }")
+            olc(bid, lambda bid=bid: bolge(h, bid, ac_hassas=ac))
+        olc("filtre:site", lambda: bolge(h, "bas", filtre={"site": "site7.example", "ay": ["2024-03", "2024-04"]}))
+        olc("filtre:saat", lambda: bolge(h, "goz", filtre={"saat": 5}, utc_kaydirma=3))
+        sayfa = olc("kayitlar", lambda: kayitlar(h, "bas", limit=50, offset=20_000))
+        olc("kayitlar:filtre", lambda: kayitlar(h, "goz", filtre={"kanal": "Kanal 7"}, limit=50))
+        olc("kayitlar:hassas", lambda: kayitlar(h, "ayak", ac_hassas=ac, limit=50))
+        olc("ayrinti", lambda: ayrinti(h, sayfa["kayitlar"][0]["event_id"]))
+        olc("karsilastir", lambda: karsilastir(h, "bas", ("2023-01-01T00:00:00Z", "2023-12-31T23:59:59Z"),
+                                               ("2024-01-01T00:00:00Z", "2024-12-31T23:59:59Z")))
+        olc("karsilastir:goz", lambda: karsilastir(h, "goz", ("2023-01-01T00:00:00Z", "2023-12-31T23:59:59Z"),
+                                                   ("2025-01-01T00:00:00Z", "2025-12-31T23:59:59Z")))
+    print(f"\nHARITA 200k olay: harita={t_harita:.3f}s {({k: round(v, 3) for k, v in sure.items()})}")
     assert hh["profil"]["olay"] == 200_000  # kalp ve ayak açık, eposta üretilmedi
-    assert t_harita < 3.0
-    assert max(sure.values()) < 3.0
+    assert t_harita < 1.5
+    assert max(sure.values()) < 1.5, sure
 
 
 # ---------------------------------------------------------------- sohbet (Zihin) ve yeni içe aktarıcılar
@@ -360,3 +379,206 @@ def test_el_github_ve_dosya_turleri(hub):
     assert dict(zip(boy["etiketler"], boy["degerler"]))[".pdf"] == 3.0
     assert any("Notlar: bu alan yok" in n for n in el["notlar"])
     assert not any("Depo" in n and "bu alan yok" in n for n in el["notlar"])
+
+
+# ---------------------------------------------------------------- drill-down: filtre, kayıtlar, ayrıntı, karşılaştırma
+def etiketli(b, parca):
+    return graf(b, parca)
+
+
+def test_filtre_elle_sayilmis(hub):
+    elle_veri(hub)
+    # bas: t1 01-05 08:00 siteler/a, t2 01-06 09:00 siteler/b, t3 02-06 23:30 baska, t4 02-07 10:00 arama,
+    #      t5 02-08 10:00 arama (UTC)
+    def sayi(b, baslik):
+        g = graf(b, baslik)
+        return dict(zip(g["etiketler"], g["degerler"])) if g else {}
+    b = bolge(hub, "bas", filtre={"site": "siteler.example"})
+    assert b["toplam"] == 2 and b["filtre"] == {"site": "siteler.example"}
+    assert sayi(b, "Aylık") == {"2026-01": 2}
+    assert sayi(b, "siteler") == {"siteler.example": 2} and sayi(b, "aranan") == {}
+    assert {k: v for k, v in sayi(b, "saat").items() if v} == {"08": 1, "09": 1}
+    b = bolge(hub, "bas", filtre={"ay": "2026-02"})
+    assert b["toplam"] == 3 and sayi(b, "siteler") == {"baska.example:8080": 1}
+    assert sayi(b, "aranan") == {"kahve makinesi": 2}
+    assert bolge(hub, "bas", filtre={"saat": 10})["toplam"] == 2          # UTC 10:00
+    b3 = bolge(hub, "bas", filtre={"saat": 13}, utc_kaydirma=3)           # +3: 10:00 -> 13:00
+    assert b3["toplam"] == 2
+    assert bolge(hub, "bas", filtre={"saat": 2}, utc_kaydirma=3)["toplam"] == 1  # 23:30 -> 02:30
+    assert bolge(hub, "bas", filtre={"ay": ["2026-01", "2026-02"]})["toplam"] == 5
+    assert bolge(hub, "bas", filtre={"terim": "KAHVE Makinesi"})["toplam"] == 2  # küçük harfe çevrilir
+    assert bolge(hub, "bas", filtre={"gun": "Cum"})["toplam"] == 1        # 2026-02-06 Cuma
+    assert bolge(hub, "bas", filtre={"gun": 5})["toplam"] == 1            # 5 = Cmt (07 Şubat)
+    # çoklu alan VE; boş sonuç
+    assert bolge(hub, "bas", filtre={"site": "siteler.example", "ay": "2026-01"})["toplam"] == 2
+    bos = bolge(hub, "bas", filtre={"site": "siteler.example", "ay": "2026-02"})
+    assert bos["toplam"] == 0 and bos["grafikler"] == [] and bos["notlar"] == ["Filtreye uyan kayıt yok."]
+    # video: kanal filtresi
+    g = bolge(hub, "goz", filtre={"kanal": "Kanal X"})
+    assert g["toplam"] == 2 and sayi(g, "Aylık") == {"2026-03": 2}
+    # tür/kategori filtresi
+    assert bolge(hub, "bas", filtre={"tur": "google.arama"})["toplam"] == 2
+    assert bolge(hub, "el", filtre={"kategori": "notlar"})["toplam"] == 1
+
+
+def test_filtre_gecersiz_alan_ve_deger(hub):
+    elle_veri(hub)
+    for f in ({"kanal": "x"}, {"saat": 24}, {"saat": "ab"}, {"ay": "2026-13"}, {"ay": "26-01"},
+              {"gun": "Xyz"}, {"gun": 7}, {"site": ""}, {"site": []}, {"nokta": 1}):
+        with pytest.raises(FormatError):
+            bolge(hub, "bas", filtre=f)
+    with pytest.raises(FormatError):
+        kayitlar(hub, "bas", filtre={"kanal": "x"})
+    with pytest.raises(FormatError):  # hassas bölgede içerik alanıyla filtre yok
+        bolge(hub, "kalp", ac_hassas={"kalp"}, filtre={"site": "x"})
+
+
+def test_anahtar_gidis_donus(fixture_hub):
+    """Her grafik noktasının ve en_cok satırının `anahtar`ı filtre olarak geri gönderilince
+    süzülen toplam o noktanın sayısına eşit olmalı (cubuk/pasta/zaman/saat/hafta)."""
+    _ice_al(fixture_hub, "spotify_standart", "github", "chat_chatgpt", "chat_claude")
+    kontrol = 0
+    ac = {"zihin"}
+    for bid in ("bas", "goz", "kulak", "agiz", "el", "zihin"):
+        b = bolge(fixture_hub, bid, ac_hassas=ac)
+        assert b["grafikler"], bid
+        for g in b["grafikler"]:
+            assert len(g["anahtarlar"]) == len(g["etiketler"]) == len(g["degerler"])
+            if any(x in g["baslik"] for x in ("dakika", "boyut", "Sayılar")):
+                continue
+            for a, n in zip(g["anahtarlar"], g["degerler"]):
+                if a is None or n == 0:
+                    continue
+                f = bolge(fixture_hub, bid, ac_hassas=ac, filtre={a["alan"]: a["deger"]})
+                assert f["toplam"] == n, (bid, g["baslik"], a, n, f["toplam"])
+                kontrol += 1
+        for e in b["en_cok"]:
+            f = bolge(fixture_hub, bid, ac_hassas=ac, filtre={e["anahtar"]["alan"]: e["anahtar"]["deger"]})
+            assert f["toplam"] == e["sayi"], (bid, e)
+            kontrol += 1
+    assert kontrol > 60
+    b = bolge(fixture_hub, "bas")
+    aylik = graf(b, "Aylık")
+    assert aylik["anahtarlar"][0] == {"alan": "ay", "deger": aylik["etiketler"][0]}
+    assert graf(b, "saat")["anahtarlar"][8] == {"alan": "saat", "deger": 8}
+    assert graf(b, "Haftanın")["anahtarlar"][0] == {"alan": "gun", "deger": "Pzt"}
+
+
+def test_kayitlar_sayfalama(hub):
+    elle_veri(hub)
+    k = kayitlar(hub, "bas", limit=2)
+    assert k["toplam"] == 5 and len(k["kayitlar"]) == 2 and k["limit"] == 2 and k["offset"] == 0
+    tum = []
+    for off in (0, 2, 4):
+        tum += kayitlar(hub, "bas", limit=2, offset=off)["kayitlar"]
+    assert len(tum) == 5 and len({x["event_id"] for x in tum}) == 5
+    assert [x["ts"] for x in tum] == sorted((x["ts"] for x in tum), reverse=True)  # yeniden eskiye
+    assert tum[0]["ts"] == "2026-02-08T10:00:00Z" and tum[0]["kind"] == "google.arama"
+    assert tum[0]["kaynak_adi"] == "elle" and tum[0]["ozet"] and tum[0]["baslik"]
+    assert kayitlar(hub, "bas", limit=2, offset=5)["kayitlar"] == []
+    assert kayitlar(hub, "bas", limit=0)["limit"] == 1 and kayitlar(hub, "bas", limit=10**6)["limit"] == 200
+    assert kayitlar(hub, "bas", offset=-3)["offset"] == 0
+    f = kayitlar(hub, "bas", filtre={"ay": "2026-01"}, limit=10)
+    assert f["toplam"] == 2 and {x["ts"][:7] for x in f["kayitlar"]} == {"2026-01"}
+    r = kayitlar(hub, "bas", aralik=("2026-02-07T00:00:00Z", None))
+    assert r["toplam"] == 2
+    with pytest.raises(NotFoundError):
+        kayitlar(hub, "yok")
+
+
+def test_kayitlar_ve_ayrinti_kaynak_adi(fixture_hub):
+    k = kayitlar(fixture_hub, "goz", limit=3)
+    assert all(x["kaynak_adi"].startswith("google_takeout") for x in k["kayitlar"])
+    d = ayrinti(fixture_hub, k["kayitlar"][0]["event_id"])
+    assert d["kaynak"]["tur"] == "google_takeout" and len(d["kaynak"]["dosya_sha256"]) == 64
+    assert d["kaynak"]["dosyalar"] and d["kaynak"]["dosyalar"][0]["sha256"]
+    assert d["kaynak"]["ad"].startswith("google_takeout: ")
+    assert d["bolge"] == "goz" and d["alanlar"] and d["metin"] and d["kilitli"] is False
+
+
+def test_ayrinti_icerik_ve_tekrar(hub):
+    sid = elle_veri(hub)
+    hub.add_events(sid, [E("chrome.ziyaret", "tarama", "2026-03-01T10:00:00Z", "konumlu sayfa",
+                           {"baslik": "x", "lat": 41.5, "url": "https://a.example"}, "g1")])
+    k = {x["kind"] + x["ts"]: x for x in kayitlar(hub, "bas", limit=50)["kayitlar"]}
+    d = ayrinti(hub, k["google.arama2026-02-08T10:00:00Z"]["event_id"])
+    assert d["tekrar"] == {"ilk": "2026-02-07T10:00:00Z", "son": "2026-02-08T10:00:00Z", "sayi": 2}
+    assert d["ts"] == "2026-02-08T10:00:00Z" and d["kaynak"]["tur"] == "elle"
+    g = ayrinti(hub, k["chrome.ziyaret2026-03-01T10:00:00Z"]["event_id"])
+    assert g["alanlar"]["lat"] == "[konum alanı gizlendi]" and g["alanlar"]["baslik"] == "x"
+    with pytest.raises(NotFoundError):
+        ayrinti(hub, "yok")
+
+
+def test_hassas_kayitlar_ve_ayrinti_icerik_yok(hub):
+    elle_veri(hub)
+    # kilitli
+    for bid in ("kalp", "karin", "ayak", "zihin"):
+        assert kayitlar(hub, bid) == {"id": bid, "kilitli": True, "toplam": None, "kayitlar": []}
+    ids = {r[0]: r[1] for r in hub.query("SELECT event_id, category FROM events")}
+    for eid, cat in ids.items():
+        if cat in ("mesaj", "eposta", "konum", "medya_meta"):
+            assert ayrinti(hub, eid) == {"event_id": eid, "kilitli": True}
+    # açık: içerik asla
+    ac = {"kalp", "karin", "ayak"}
+    parcalar = []
+    for bid, n in (("kalp", 2), ("karin", 1), ("ayak", 3)):
+        k = kayitlar(hub, bid, ac_hassas=ac)
+        assert k["toplam"] == n and len(k["kayitlar"]) == n
+        for x in k["kayitlar"]:
+            assert x["baslik"] is None and x["ozet"] is None and x["kaynak_adi"] == "elle"
+            assert set(x) == {"event_id", "ts", "kind", "kategori", "baslik", "ozet", "kaynak_adi"}
+            d = ayrinti(hub, x["event_id"], ac_hassas=ac)
+            assert d["alanlar"] is None and d["metin"] is None and d["tekrar"] is None
+            parcalar += [json.dumps(x, ensure_ascii=False), json.dumps(d, ensure_ascii=False)]
+    tum = "\n".join(parcalar)
+    for yasak in (SIR_METIN, SIR_URL, "Gizli Mahalle", "Baska Gizli", "41.01", "28.98", "41.5",
+                  "gizli.example", "FOTO-GIZLI-METIN"):
+        assert yasak not in tum, yasak
+    # yalnız kategori adıyla açılan bölge de aynı
+    assert kayitlar(hub, "ayak", ac_hassas={"konum"})["toplam"] == 3
+
+
+def test_tombstone_drilldown(hub):
+    sid = elle_veri(hub)
+    onceki = kayitlar(hub, "bas", limit=50)
+    gizle = onceki["kayitlar"][0]["event_id"]
+    hub.hide_event(gizle, "test")
+    sonra = kayitlar(hub, "bas", limit=50)
+    assert sonra["toplam"] == onceki["toplam"] - 1
+    assert gizle not in {x["event_id"] for x in sonra["kayitlar"]}
+    assert bolge(hub, "bas")["toplam"] == onceki["toplam"] - 1
+    assert bolge(hub, "bas", filtre={"ay": "2026-02"})["toplam"] == 2
+    with pytest.raises(NotFoundError):
+        ayrinti(hub, gizle)
+    hub.remove_source(sid, "yanlış")
+    assert kayitlar(hub, "bas")["toplam"] == 0 and bolge(hub, "bas", filtre={"ay": "2026-01"})["toplam"] == 0
+    k = karsilastir(hub, "bas", ("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z"),
+                    ("2026-02-01T00:00:00Z", "2026-02-28T23:59:59Z"))
+    assert k["a"]["toplam"] == 0 and k["b"]["toplam"] == 0 and k["fark"]["yuzde"] is None
+
+
+def test_karsilastir(hub):
+    elle_veri(hub)
+    ocak = ("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z")
+    subat = ("2026-02-01T00:00:00Z", "2026-02-28T23:59:59Z")
+    k = karsilastir(hub, "bas", ocak, subat)
+    assert k["kilitli"] is False and k["a"]["toplam"] == 2 and k["b"]["toplam"] == 3
+    assert k["fark"] == {"toplam": 1, "yuzde": 50.0}
+    assert k["a"]["aralik"] == list(ocak)
+    d = {(e["grup"], e["ad"]): e for e in k["en_cok_degisim"]}
+    assert d[("site", "siteler.example")]["a"] == 2 and d[("site", "siteler.example")]["b"] == 0
+    assert d[("site", "siteler.example")]["fark"] == -2
+    assert d[("arama terimi", "kahve makinesi")]["b"] == 2
+    assert [e["fark"] for e in k["en_cok_degisim"]] == sorted((e["fark"] for e in k["en_cok_degisim"]),
+                                                              key=abs, reverse=True)
+    # filtreyle birlikte
+    kf = karsilastir(hub, "bas", ocak, subat, filtre={"saat": 9})
+    assert kf["a"]["toplam"] == 1 and kf["b"]["toplam"] == 0
+    # kilitli hassas bölge
+    assert karsilastir(hub, "kalp", ocak, subat) == {"id": "kalp", "ad": "Kalp: kişisel (hassas)",
+                                                     "kilitli": True, "notlar": ["Kilitli"]}
+    ac = karsilastir(hub, "kalp", ("2026-07-01T00:00:00Z", "2026-07-31T23:59:59Z"),
+                     ("2026-08-01T00:00:00Z", "2026-08-31T23:59:59Z"), ac_hassas={"kalp"})
+    assert ac["a"]["toplam"] == 0 and ac["b"]["toplam"] == 2 and ac["fark"]["yuzde"] is None
+    assert SIR_METIN not in json.dumps(ac, ensure_ascii=False)
