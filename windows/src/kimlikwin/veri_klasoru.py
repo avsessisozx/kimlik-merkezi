@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from kimlikcore import Hub
+from kimlikcore.sifreleme import varsayilan_acik_mi
 
 DB_AD = "kimlik.db"
 
@@ -90,9 +91,11 @@ def olustur(yol: str | Path) -> dict:
     if not d.ok:
         raise ValueError(d.mesaj)
     p = Path(str(yol).strip().strip('"'))
-    with Hub.open(p, write=True) as hub:
+    # Yeni klasör varsayılan ŞİFRELİ (anahtar Windows hesabına bağlı); sağlayıcı yoksa şifresiz.
+    with Hub.open(p, write=True, sifreli=True if d.durum != "mevcut" and varsayilan_acik_mi() else None) as hub:
         surum = hub.schema_version
-    return {"yol": str(p), "sema": surum, "mevcut_idi": d.durum == "mevcut",
+        sifreli = hub.sifreli
+    return {"yol": str(p), "sema": surum, "mevcut_idi": d.durum == "mevcut", "sifreli": sifreli,
             "dosyalar": sorted(x.name for x in p.iterdir())}
 
 

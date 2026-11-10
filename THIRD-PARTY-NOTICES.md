@@ -17,6 +17,7 @@ sürümleri ve lisansları gösterir ve bu tablodan üstündür. Üst veride lis
 |---|---|---|
 | Apache ECharts 6.1.0 | Grafikler (yerelde paketli, CDN yok) | Apache-2.0 (`windows/src/kimlikwin/statik/ECHARTS-LICENSE.txt`, `ECHARTS-NOTICE.txt`) |
 | mcp (Python SDK) 2.3.0 | MCP sunucusu | MIT |
+| cryptography (≥42) | Veri şifreleme (AES-256-GCM); tekerlek OpenSSL (Apache-2.0) içerir | Apache-2.0 OR BSD-3-Clause |
 | ijson | Akışlı JSON ayrıştırma | BSD-3-Clause AND ISC |
 | pypdf | PDF metni | BSD-3-Clause |
 | python-docx | DOCX metni | MIT |

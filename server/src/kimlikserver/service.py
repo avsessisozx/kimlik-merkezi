@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from kimlikcore import (
+    AnahtarGerekli,
+    SifrelemeHatasi,
     Category,
     Event,
     FormatError,
@@ -106,6 +108,15 @@ class QueryService:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")
             raise ServiceError("Veritabanı sürümü uyumsuz. Önce Kimlik Merkezi uygulamasını "
                                "bir kez açın.") from None
+        except AnahtarGerekli:
+            self._log_best_effort(app_id, tool, cat_label, 0, "hata")
+            raise ServiceError("Veri şifreli ve anahtar açılamadı. Parola koruması varsa MCP "
+                               "sürecine KIMLIK_PAROLA ortam değişkenini verin; Windows hesabı "
+                               "farklıysa Kimlik Merkezi'nde kurtarma ifadesiyle yeniden bağlayın."
+                               ) from None
+        except SifrelemeHatasi:
+            self._log_best_effort(app_id, tool, cat_label, 0, "hata")
+            raise ServiceError("Şifreli veri okunamadı (dosya bozuk olabilir).") from None
         except HubNotFoundError:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")
             raise ServiceError("Veri klasöründe veritabanı yok. Önce Kimlik Merkezi uygulamasını "

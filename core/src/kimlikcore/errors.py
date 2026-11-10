@@ -40,3 +40,27 @@ class HubNotEmptyError(KimlikError):
 
 class NotFoundError(KimlikError, LookupError):
     """İstenen kaynak/olay yok."""
+
+
+class SifrelemeHatasi(KimlikError):
+    """Şifreleme katmanı hataları için taban sınıf."""
+
+
+class AnahtarGerekli(SifrelemeHatasi):
+    """Veri şifreli ama anahtar açılamadı (Windows hesabı farklı, parola gerekli ya da yanlış)."""
+
+
+class YanlisParola(AnahtarGerekli):
+    """Parola ya da kurtarma ifadesi yanlış."""
+
+
+class KuralHatasi(SifrelemeHatasi, ValueError):
+    """Parola ya da kurtarma ifadesi kurallara uymuyor / iki giriş eşleşmiyor."""
+
+
+class SaglayiciYok(SifrelemeHatasi):
+    """Bu sistemde anahtar koruma sağlayıcısı (Windows DPAPI) yok."""
+
+
+class SifreliDosyaBozuk(SifrelemeHatasi):
+    """Şifreli dosya doğrulanamadı (bozulma, kırpılma ya da yanlış anahtar)."""

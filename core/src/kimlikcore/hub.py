@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable
 from contextlib import contextmanager
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import schema as _schema
+from . import sifreleme as _sif
 from .erisim import init_erisim_db
 from .errors import (
     FormatError,
@@ -121,20 +123,43 @@ class Hub:
 
     schema_version: int
 
-    def __init__(self, root: Path, conn: sqlite3.Connection, write: bool, lock: HubLock | None):
+    def __init__(self, root: Path, conn: sqlite3.Connection, write: bool, lock: HubLock | None,
+                 dek: bytes | None = None):
         self.root = root
         self._conn = conn
         self._write = write
         self._lock = lock
+        # Şifreli veri klasörü: veritabanı bellekte çalışır, diske şifreli kapsayıcı olarak yazılır
+        # (docs/SIFRELEME.md). `_dek` yoksa klasör şifresizdir.
+        self._dek = dek
+        self._yazilan_degisim = conn.total_changes
+        self._son_yazim = time.monotonic()
+        self._ertele = False
         self._mutex = threading.RLock()
         self._closed = False
         self.schema_version = _schema.current_version(conn)
 
     # ------------------------------------------------------------------ açma/kapama
     @classmethod
-    def open(cls, root: Path | str, *, write: bool) -> "Hub":
+    def open(cls, root: Path | str, *, write: bool, parola: str | None = None,
+             saglayici: "_sif.AnahtarSaglayici | None" = None,
+             sifreli: bool | None = None) -> "Hub":
+        """Veri klasörünü açar.
+
+        Şifreli klasör (kimlik.db şifreli kapsayıcı) otomatik algılanır; anahtar sırayla OS
+        sağlayıcısından (Windows DPAPI), `parola` argümanından ya da KIMLIK_PAROLA ortam
+        değişkeninden alınır; alınamazsa `AnahtarGerekli`. `sifreli=True` yalnız YENİ (kimlik.db
+        olmayan) klasörde anlamlıdır: şifreli oluşturur; mevcut şifresiz klasör `donusum.sifrele`
+        ile dönüştürülür, burada otomatik dönüştürülmez.
+        """
         root = Path(root)
         db = root / DB_NAME
+        durum = _sif.db_durumu(db)
+        if sifreli and durum == "duz":
+            raise FormatError("Bu klasör şifresiz; 'kimlikmerkezi sifrele' ile dönüştürün.")
+        dek: bytes | None = None
+        if durum == "sifreli":
+            dek = _sif.anahtari_coz(root, parola=parola, saglayici=saglayici)
         if write:
             root.mkdir(parents=True, exist_ok=True)
             lock = HubLock(root / "hub.lock")
@@ -142,26 +167,40 @@ class Hub:
             try:
                 (root / "arsiv").mkdir(exist_ok=True)
                 (root / "cikti").mkdir(exist_ok=True)
-                conn = sqlite3.connect(db, timeout=5, isolation_level=None, check_same_thread=False)
+                if durum == "yok" and sifreli:
+                    dek = _sif.anahtar_kur(root, saglayici)
+                if dek is not None:
+                    conn = cls._bellek_baglanti(db, dek, durum == "sifreli")
+                else:
+                    conn = sqlite3.connect(db, timeout=5, isolation_level=None, check_same_thread=False)
                 try:
                     conn.execute("PRAGMA busy_timeout = 5000")
-                    conn.execute("PRAGMA journal_mode = WAL")
-                    conn.execute("PRAGMA synchronous = NORMAL")
+                    if dek is None:
+                        conn.execute("PRAGMA journal_mode = WAL")
+                        conn.execute("PRAGMA synchronous = NORMAL")
+                    else:
+                        conn.execute("PRAGMA temp_store = MEMORY")
                     conn.execute("PRAGMA foreign_keys = ON")
                     conn.execute("PRAGMA cache_size = -65536")
                     _schema.migrate(conn)
                     init_erisim_db(root)
+                    if dek is not None and (durum != "sifreli" or conn.total_changes > 0):
+                        _sif.bayt_sifrele_yaz(dek, conn.serialize(), db)   # yeni klasör ya da göç yapıldı
                 except BaseException:
                     conn.close()
                     raise
             except BaseException:
                 lock.release()
                 raise
-            return cls(root, conn, True, lock)
-        if not db.is_file():
+            return cls(root, conn, True, lock, dek)
+        if durum == "yok":
             raise HubNotFoundError(f"Veri klasöründe {DB_NAME} yok: {root}")
-        uri = db.resolve().as_uri() + "?mode=ro"
-        conn = sqlite3.connect(uri, uri=True, timeout=5, isolation_level=None, check_same_thread=False)
+        if dek is not None:
+            conn = cls._bellek_baglanti(db, dek, True)
+            conn.execute("PRAGMA query_only = ON")
+        else:
+            uri = db.resolve().as_uri() + "?mode=ro"
+            conn = sqlite3.connect(uri, uri=True, timeout=5, isolation_level=None, check_same_thread=False)
         try:
             conn.execute("PRAGMA busy_timeout = 5000")
             conn.execute("PRAGMA query_only = ON")
@@ -179,7 +218,49 @@ class Hub:
         except BaseException:
             conn.close()
             raise
-        return cls(root, conn, False, None)
+        return cls(root, conn, False, None, dek)
+
+    @staticmethod
+    def _bellek_baglanti(db: Path, dek: bytes, mevcut: bool) -> sqlite3.Connection:
+        """Şifreli kapsayıcıyı çözüp bellek içi SQLite bağlantısı kurar (düz metin diske yazılmaz)."""
+        conn = sqlite3.connect(":memory:", isolation_level=None, check_same_thread=False)
+        if mevcut:
+            try:
+                veri = _sif.bayt_coz_oku(dek, db)
+                conn.deserialize(veri)
+            except BaseException:
+                conn.close()
+                raise
+        return conn
+
+    @property
+    def sifreli(self) -> bool:
+        return self._dek is not None
+
+    def _kalici_yaz(self, *, zamanli: bool = False) -> None:
+        """Şifreli klasörde değişiklik varsa veritabanını şifreli kapsayıcıya atomik yazar.
+        `zamanli`: toplu içe almada en çok ~20 sn'de bir yazar (her grupta tüm dosyayı yazmamak için)."""
+        if self._dek is None or not self._write:
+            return
+        if self._conn.total_changes == self._yazilan_degisim:
+            return
+        if zamanli and time.monotonic() - self._son_yazim < 20:
+            return
+        _sif.bayt_sifrele_yaz(self._dek, self._conn.serialize(), self.root / DB_NAME)
+        self._yazilan_degisim = self._conn.total_changes
+        self._son_yazim = time.monotonic()
+
+    def raw_parcalari(self, yol: str):
+        """Arşivdeki ham dosyanın DÜZ içeriğini parça parça üretir (şifreliyse çözerek)."""
+        p = self.root / yol
+        if _sif.sifreli_mi(p):
+            dek = self._dek or _sif.anahtari_coz(self.root)
+            with open(p, "rb") as f:
+                yield from _sif.SifreOkuyucu(f, dek).parcalar()
+        else:
+            with open(p, "rb") as f:
+                while chunk := f.read(CHUNK):
+                    yield chunk
 
     def close(self) -> None:
         with self._mutex:
@@ -187,10 +268,13 @@ class Hub:
                 return
             self._closed = True
             try:
-                self._conn.close()
+                self._kalici_yaz()
             finally:
-                if self._lock:
-                    self._lock.release()
+                try:
+                    self._conn.close()
+                finally:
+                    if self._lock:
+                        self._lock.release()
 
     def __enter__(self) -> "Hub":
         return self
@@ -213,6 +297,7 @@ class Hub:
             raise
         else:
             c.execute("COMMIT")
+            self._kalici_yaz(zamanli=self._ertele)
 
     # ------------------------------------------------------------------ genel SQL erişimi
     @contextmanager
@@ -302,10 +387,16 @@ class Hub:
         size = 0
         try:
             with open(src, "rb") as fi, open(tmp, "wb") as fo:
+                yazici = _sif.SifreYazici(fo, self._dek) if self._dek else None
                 while chunk := fi.read(CHUNK):
                     h.update(chunk)
-                    fo.write(chunk)
+                    if yazici:
+                        yazici.yaz(chunk)
+                    else:
+                        fo.write(chunk)
                     size += len(chunk)
+                if yazici:
+                    yazici.bitir()
                 fo.flush()
                 os.fsync(fo.fileno())
             sha = h.hexdigest()
@@ -314,7 +405,8 @@ class Hub:
             d.mkdir(exist_ok=True)
             dest = d / name
             if dest.exists():
-                if dest.stat().st_size != size:
+                mevcut = _sif.acik_boyut(dest) if _sif.sifreli_mi(dest) else dest.stat().st_size
+                if mevcut != size:
                     raise FormatError("Arşivdeki aynı adlı dosyanın boyutu uyuşmuyor (bozulma?).")
                 tmp.unlink()
             else:
@@ -367,9 +459,12 @@ class Hub:
                 problems.append(f"eksik: {path}")
                 continue
             h = hashlib.sha256()
-            with open(p, "rb") as f:
-                while chunk := f.read(CHUNK):
+            try:
+                for chunk in self.raw_parcalari(path):
                     h.update(chunk)
+            except _sif.SifrelemeHatasi:
+                problems.append(f"şifre çözülemedi/bozuk: {path}")
+                continue
             if h.hexdigest() != sha:
                 problems.append(f"hash uyuşmuyor: {path}")
         return problems
@@ -433,17 +528,22 @@ class Hub:
         kind = src[1]
         added = dup = 0
         batch: list[tuple] = []
-        for ev in events:
-            batch.append(self._prepare(ev, kind))
-            if len(batch) >= batch_size:
+        self._ertele = True   # şifreli klasörde her grupta tüm dosyayı yeniden yazma (zamanlı yaz)
+        try:
+            for ev in events:
+                batch.append(self._prepare(ev, kind))
+                if len(batch) >= batch_size:
+                    a, d = self._flush(source_id, batch)
+                    added += a
+                    dup += d
+                    batch.clear()
+            if batch:
                 a, d = self._flush(source_id, batch)
                 added += a
                 dup += d
-                batch.clear()
-        if batch:
-            a, d = self._flush(source_id, batch)
-            added += a
-            dup += d
+        finally:
+            self._ertele = False
+            self._kalici_yaz()
         return AddResult(added=added, duplicate=dup)
 
     def _flush(self, source_id: str, batch: list[tuple]) -> tuple[int, int]:
@@ -661,6 +761,7 @@ class Hub:
                 pass
         finally:
             c.execute("PRAGMA secure_delete = OFF")
+        self._kalici_yaz()
         return PurgeResult(source_id, src[1], n, deleted_files, tuple(hashes), demoted)
 
     @_locked
@@ -682,6 +783,7 @@ class Hub:
             self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         except sqlite3.OperationalError:
             pass
+        self._kalici_yaz()
 
     # ------------------------------------------------------------------ dışa/içe aktarım
     @_locked
