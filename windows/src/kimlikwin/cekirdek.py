@@ -85,6 +85,7 @@ class Uygulama:
         self.persona = Persona(self.hub)
         self.anahtarlar = KeyManager(self.hub)
         self.is_: IceAktarmaIsi | None = None
+        self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Lock()
         self.eskiyen = self.persona.check_expiry()   # açılışta süre kontrolü
@@ -111,7 +112,8 @@ class Uygulama:
     # ------------------------------------------------------------------ persona haritası (§12)
     def _kopru(self, fn, *a, **kw):
         try:
-            return fn(self.hub, *a, **kw)
+            with self._harita_kilit:
+                return fn(self.hub, *a, **kw)
         except harita_kopru.HaritaYok as e:
             raise IslemHatasi(str(e), "harita_yok") from None
         except harita_kopru.OzellikYok as e:

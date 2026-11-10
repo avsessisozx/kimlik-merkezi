@@ -58,6 +58,7 @@ function grafikKur(g,r,tikla,baz){
       dataZoom:[{type:'inside',zoomOnMouseWheel:true,moveOnMouseMove:false,moveOnMouseWheel:false},
         {type:'slider',height:16,bottom:8,borderColor:'transparent',backgroundColor:hexA(r.cizgi,.25),fillerColor:hexA(r.v,.22),handleSize:'110%',
          handleStyle:{color:r.v,borderColor:r.v},moveHandleStyle:{color:r.v},dataBackground:{lineStyle:{color:r.soluk,opacity:.3},areaStyle:{color:r.soluk,opacity:.08}},selectedDataBackground:{lineStyle:{color:r.v},areaStyle:{color:r.v,opacity:.2}},textStyle:{color:r.soluk}}],
+      toolbox:{right:6,top:baz?30:-2,itemSize:13,iconStyle:{borderColor:r.soluk},emphasis:{iconStyle:{borderColor:r.v}},feature:{brush:{type:['lineX','clear'],title:{lineX:'Aralık seç (sürükle)',clear:'Seçimi temizle'}}}},
       brush:{xAxisIndex:0,brushType:'lineX',brushMode:'single',transformable:true,brushStyle:{color:hexA(r.amber,.16),borderColor:r.amber,borderWidth:1}},
       series:seri});
     return {o,init(c){c.dispatchAction({type:'takeGlobalCursor',key:'brush',brushOption:{brushType:'lineX',brushMode:'single'}});
@@ -104,11 +105,11 @@ function grafikKur(g,r,tikla,baz){
     let m=g.degerler;if(!Array.isArray(m[0]))m=[m];
     const veri=[];m.forEach((satir,gi)=>satir.forEach((v,hi)=>veri.push([hi,gi,v])));
     const mx=Math.max(1,...m.flat());const sg=g.secili&&g.secili.gun!=null?+g.secili.gun:null,ss=g.secili&&g.secili.saat!=null?+g.secili.saat:null;
-    Object.assign(o,{grid:{left:36,right:8,top:6,bottom:40},
+    Object.assign(o,{grid:{left:36,right:8,top:6,bottom:58},
       tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${GUN[p.value[1]]||''} ${String(p.value[0]).padStart(2,'0')}:00</b><br>${SAYI(p.value[2])} kayıt`},
       xAxis:{type:'category',data:[...Array(24).keys()].map(h=>String(h).padStart(2,'0')),splitArea:{show:false},axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk,interval:2,fontSize:10}},
       yAxis:{type:'category',data:GUNK.slice(0,m.length),inverse:true,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk}},
-      visualMap:{min:0,max:mx,calculable:false,orient:'horizontal',left:'center',bottom:0,itemWidth:10,itemHeight:140,text:['çok','az'],textStyle:{color:r.soluk,fontSize:10},inRange:{color:[hexA(r.v,.06),hexA(r.v,.35),r.v,r.amber]}},
+      visualMap:{min:0,max:mx,calculable:false,orient:'horizontal',left:'center',bottom:2,itemWidth:10,itemHeight:140,text:['çok','az'],textStyle:{color:r.soluk,fontSize:10},inRange:{color:[hexA(r.v,.06),hexA(r.v,.35),r.v,r.amber]}},
       series:[{type:'heatmap',data:veri.map(d=>({value:d,itemStyle:(sg===d[1]&&ss===d[0])||(sg===d[1]&&ss==null)||(sg==null&&ss===d[0])?{borderColor:r.yazi,borderWidth:2}:undefined})),
         itemStyle:{borderRadius:3,borderColor:r.panel,borderWidth:1.5},emphasis:{itemStyle:{borderColor:r.yazi,borderWidth:2,shadowBlur:10,shadowColor:r.v}}}]});
     return {o,init(c){c.on('click',p=>{if(tikla.coklu)tikla.coklu({gun:p.value[1],saat:p.value[0]});});}};
@@ -249,9 +250,9 @@ function panelCiz(b){const d=HS.dom,p=d.panel,v=HS.veri;temizle();p.textContent=
   const kilitSutun=HASSAS.includes(HS.bolge);
   p.append(h('div',{class:'panel-baslik'},h('h2',{},(v.ad||b.ad||HAP_AD[HS.bolge]).replace(/^([^:]+):/,'$1 ·')),h('span',{class:'etiket-veri'},'veriden sayım'),
     h('span',{class:'bosluk'}),
-    !v.kilitli?h('button',{class:'i',onclick:karsilastirmaSec},HS.karsilastir?'Karşılaştırmayı değiştir':'Karşılaştır'):null,
+    h('div',{class:'bgrup'},!v.kilitli?h('button',{class:'i',onclick:karsilastirmaSec},HS.karsilastir?'Karşılaştırmayı değiştir':'Karşılaştır'):null,
     HS.karsilastir?h('button',{class:'i',onclick:()=>{HS.karsilastir=null;bolgeYukle();}},'Karşılaştırmayı kapat'):null,
-    kilitSutun&&!v.kilitli?h('button',{class:'i',onclick:async()=>{await api('harita_hassas',{bolge_id:HS.bolge,ac:false}).catch(hataGoster);git('harita');}},'Tekrar kilitle'):null));
+    kilitSutun&&!v.kilitli?h('button',{class:'i',onclick:async()=>{await api('harita_hassas',{bolge_id:HS.bolge,ac:false}).catch(hataGoster);git('harita');}},'Tekrar kilitle'):null)));
   if(v.kilitli){p.append(kilitKutusu(b));return;}
   if(!v.toplam&&!(v.grafikler||[]).length&&!Object.keys(HS.filtre).length){p.append(h('div',{class:'kart bos-kutu hud'},h('h3',{},'Henüz veri yok'),h('p',{},'Bu bölge için içe aktarılmış kayıt bulunmuyor.'),h('button',{class:'d',onclick:()=>git('ice')},'İçe aktar\'a git')));return;}
   if(v.filtre_destegi===false)p.append(h('div',{class:'uyari'},'Bu sürümün veri katmanı filtreleme/aralık desteği sunmuyor; grafikler tüm veriyi gösterir.'));

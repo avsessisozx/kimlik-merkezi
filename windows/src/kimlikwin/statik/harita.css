@@ -160,3 +160,5 @@ dl.ayr{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;margin:14px 0}d
 header .kisi select{border-radius:8px}
 @media(max-width:700px){header{flex-wrap:wrap;gap:8px;padding:8px 12px}header h1{flex:1 1 100%}header .kisi{flex:1}header select{max-width:140px}.profil-ust .ad{font-size:24px}.sayi-b{font-size:30px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.bgrup{display:flex;gap:8px;flex-wrap:wrap}

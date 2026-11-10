@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -60,6 +61,7 @@ class Yonetici:
         self.son_dogrulama: str | None = None
         self.baslangic_hatasi: str | None = None
         self.cikis_istegi = False
+        self._api_kilit = threading.RLock()   # kişi değişimi ve sorgular aynı SQLite bağlantısında çakışmasın
 
     # ------------------------------------------------------------------ yaşam döngüsü
     def baslat(self) -> None:
@@ -148,6 +150,12 @@ class Yonetici:
 
     # ------------------------------------------------------------------ API
     def api(self, ad: str, girdi: dict[str, Any]) -> Any:
+        if ad == "sec":                       # dosya penceresi dakikalarca açık kalabilir; kilit tutma
+            return self.api_sec(**girdi)
+        with self._api_kilit:
+            return self._api(ad, girdi)
+
+    def _api(self, ad: str, girdi: dict[str, Any]) -> Any:
         yerel = getattr(self, "api_" + ad, None)
         if yerel is not None:
             return yerel(**girdi)

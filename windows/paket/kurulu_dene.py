@@ -112,6 +112,17 @@ try:
     n = api("durum")["ozet"]["counts"]["event"]
     kontrol(n > 0, f"{n} olay veritabanında")
 
+    # yerel grafik kütüphanesi pakete girdi mi (CDN yok, internetsiz çalışır)
+    for ad, asgari in (("echarts.min.js", 500_000), ("harita.js", 5_000), ("figur.js", 3_000), ("harita.css", 3_000), ("ECHARTS-LICENSE.txt", 5_000)):
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/statik/{ad}", timeout=20) as x:
+            boy = len(x.read())
+        kontrol(boy >= asgari, f"pakette statik/{ad} var ({boy} bayt)")
+    # persona haritası (gerçek kimlikserver.harita) paketlenmiş uygulamada çalışıyor
+    hv = api("harita")
+    kontrol(len(hv["bolgeler"]) >= 9 and hv["profil"]["olay"] > 0, f"harita: {len(hv['bolgeler'])} bölge, {hv['profil']['olay']} olay")
+    hb = api("harita_bolge", {"bolge_id": "goz", "filtre": {}})
+    kontrol(not hb["kilitli"] and "grafikler" in hb, "harita bölgesi (gözler) okunuyor")
+
     # Claude'a ekle (sahte ayar dosyası, APPDATA yönlendirildi)
     c = api("claude_ekle")
     kontrol(c["durum"] == "eklendi" and c["yedek"], "Claude'a ekle: eklendi + yedek alındı")
