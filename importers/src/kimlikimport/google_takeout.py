@@ -15,7 +15,7 @@ import io
 import re
 from collections import Counter
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -28,7 +28,6 @@ from .base import (
     Entry,
     FormatReport,
     Origin,
-    csv_header,
     csv_rows,
     has_coordinates,
     iso_utc,
@@ -315,7 +314,7 @@ class GoogleTakeout:
                 self._skipped["chrome: time_usec/url yok"] += 1
                 continue
             try:
-                ts = datetime.fromtimestamp(usec / 1_000_000, tz=timezone.utc).strftime(
+                ts = datetime.fromtimestamp(usec / 1_000_000, tz=UTC).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
                 )
             except (OverflowError, OSError, ValueError):
@@ -449,4 +448,4 @@ def factory() -> GoogleTakeout:
     return GoogleTakeout()
 
 
-__all__ = ["GoogleTakeout", "factory", "NAME", "VERSION"]
+__all__ = ["NAME", "VERSION", "GoogleTakeout", "factory"]

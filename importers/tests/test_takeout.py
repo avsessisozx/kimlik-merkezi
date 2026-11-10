@@ -8,8 +8,8 @@ from collections import Counter
 import pytest
 from conftest import FIX, count_events, make_zip
 from kimlikcore import FormatError
-from kimlikimport.google_takeout import GoogleTakeout
 from kimlikimport.base import ImportFormatError
+from kimlikimport.google_takeout import GoogleTakeout
 from kimlikimport.run import run
 
 # Fixture içeriği: izleme 4 + arama 2 + abonelik 3 + MyActivity/YouTube 2 (1'i tekrar)

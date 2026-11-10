@@ -14,7 +14,7 @@ import unicodedata
 import zipfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Protocol
 
@@ -82,7 +82,7 @@ class Importer(Protocol):
     def parse(self, path: Path) -> Iterator[EventIn]: ...
 
     # Çalıştırıcının kullandığı isteğe bağlı ek yöntemler (bkz. run.py):
-    def input_files(self, path: Path) -> list["Origin"]: ...
+    def input_files(self, path: Path) -> list[Origin]: ...
     def skipped_counts(self) -> dict[str, int]: ...
 
 
@@ -152,7 +152,7 @@ def _nfc(s: str) -> str:
 
 
 def _utc_from_ts(ts: float) -> datetime:
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)
 
 
 class Archive:
@@ -183,7 +183,7 @@ class Archive:
                         continue
                     name = _nfc(prefix + zi.filename)
                     try:
-                        mt = datetime(*zi.date_time, tzinfo=timezone.utc)
+                        mt = datetime(*zi.date_time, tzinfo=UTC)
                         if mt.year < 1990:
                             raise ValueError
                     except ValueError:
@@ -261,8 +261,8 @@ def iso_utc(value) -> str | None:
         else:
             dt = datetime.fromisoformat(str(value).strip().replace(" UTC", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     except (ValueError, OverflowError, TypeError):
         return None
 
