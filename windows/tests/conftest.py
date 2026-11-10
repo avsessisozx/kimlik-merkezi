@@ -47,3 +47,11 @@ def yonetici(tmp_path, arka_uc):
 def kurulu(yonetici, veri):
     yonetici.api("sihirbaz_tamamla", {"yol": str(veri), "otomatik_baslat": True})
     return yonetici
+
+
+# Ağ koruması (kök ag_koruma.py): paket klasöründen tek başına koşulsa da devrede olsun.
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
+from ag_koruma import ag_korumasi, pytest_configure, pytest_unconfigure  # noqa: E402,F401
