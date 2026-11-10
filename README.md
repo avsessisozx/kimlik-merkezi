@@ -111,8 +111,11 @@ doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmış
 - **İçe aktarıcılar gerçek veriyle doğrulanmadı.** Her biri, resmî/yaygın biçime göre hazırlanmış sahte
   ama gerçeğe yakın dosyalarla test edildi; gerçek dışa aktarmalarla doğrulama beklemede. Hangi kaynağın
   hangi varsayımlarla yazıldığı: [importers/DOGRULAMA-DURUMU.md](importers/DOGRULAMA-DURUMU.md).
-  Kendi dışa aktarmanızla `kimlikmerkezi tanila <yol>` çalıştırırsanız içeriksiz bir yapı raporu çıkar;
-  uyumsuzluk bildirimi için bunu kullanın (önce okuyup içinde kişisel şey kalmadığından emin olun).
+  Dosyanız tanınmazsa kendi dışa aktarmanızın içeriksiz bir yapı raporunu çıkarabilirsiniz: kurulu uygulamada
+  **İçe aktar > "Dosyayı denetle (içerik göstermez)"** (rapor ekranda, "Kopyala" düğmesiyle), konsolda
+  `kimlikmerkezi-mcp.exe tanila <yol>` (kaynak kodda `kimlikmerkezi tanila <yol>`). Rapor yalnız alan adları, türler
+  ve sayılar içerir; hiçbir şey kaydedilmez. Uyumsuzluk bildirimi için bunu kullanın (önce okuyup içinde kişisel
+  şey kalmadığından emin olun).
 - **Kod imzası yok.** Araştırma ve plan: [docs/IMZA.md](docs/IMZA.md).
 - **Şifreleme kısmi ve Windows'ta gerçek DPAPI ile denenmedi** (yukarıdaki "Şifreleme" bölümü), yalnızca Windows, yalnızca Türkçe arayüz. Android uygulaması yok.
 - **Test kapsamı:** otomatik testler Linux'ta ve Windows paket CI'sında çalışır; gerçek bir Windows

@@ -1,7 +1,7 @@
 """Kurulu uygulamayı gerçek süreçlerle dener (CI, Windows). Kullanım:
   python kurulu_dene.py <kurulum_dizini> <calisma_dizini> <takeout_klasoru>
-Uygulamayı arka planda başlatır, yerel web API'siyle sihirbazı tamamlar, içe aktarır, "Claude'a ekle"yi
-SAHTE ayar dosyasıyla dener, MCP exe'sini gerçek stdio ile sorgular, uygulamayı kapatır.
+Konsol exe'sinin `tanila` komutunu sentinel'li sahte örnekle dener (sızıntı yok, çıkış 0). Uygulamayı arka planda başlatır, yerel web API'siyle sihirbazı tamamlar, içe aktarır, "Claude'a ekle"yi
+SAHTE ayar dosyasıyla dener, arayüzün dosya denetimi ucunu bir kez çağırır, MCP exe'sini gerçek stdio ile sorgular, uygulamayı kapatır.
 Başarısızlıkta sıfır olmayan kodla çıkar; her adım yazdırılır."""
 from __future__ import annotations
 
@@ -53,6 +53,23 @@ adim(r.stdout.strip())
 if BEKLENEN_SURUM:
     kontrol(f"Kimlik Merkezi {BEKLENEN_SURUM}\n" in r.stdout.replace("\r\n", "\n"), f"exe sürümü {BEKLENEN_SURUM} (Release sürümüyle eşleşiyor)")
 kontrol(r.returncode == 0 and "ijson arka ucu: yajl2_c" in r.stdout, "pakette ijson C uzantısı (yajl2_c) var")
+kontrol("pypdf: var" in r.stdout and "docx: var" in r.stdout, "pakette pypdf ve python-docx (belge okuyucular) var")
+
+# ---- konsol exe: `tanila <yol>` (dosya denetimi). Sahte örnekte özel işaretli dizgiler (sentinel) rapora SIZMAMALI.
+import tanila_dene as TD
+os.makedirs(calisma, exist_ok=True)
+sahte = TD.sahte_zip(calisma / "sentinel-ornek.zip")
+tenv = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", KIMLIK_AYAR_DIZINI=str(ayar))
+tenv.pop("KIMLIK_VERI", None)
+for ek, acik in (([], False), (["--ayrinti"], False), (["--adlari-goster"], True)):
+    t = subprocess.run([str(MCP), "tanila", str(sahte), *ek], capture_output=True, text=True, encoding="utf-8",
+                       timeout=300, env=tenv, cwd=str(calisma))
+    kontrol(t.returncode == 0, f"kimlikmerkezi-mcp.exe tanila {' '.join(ek)} çıkış kodu 0 (stderr: {t.stderr.strip()[:200]})")
+    sorun = TD.sizinti_var_mi(t.stdout, adlar_acik=acik)
+    kontrol(sorun is None, f"tanila raporunda sentinel sızıntısı yok ({'adlar açık' if acik else 'varsayılan'}; {len(t.stdout)} karakter)"
+            + (f" — {sorun}" if sorun else ""))
+t = subprocess.run([str(MCP), "tanila", str(calisma / "yok-boyle-dosya")], capture_output=True, text=True, encoding="utf-8", timeout=60, env=tenv)
+kontrol(t.returncode == 1, "olmayan yolda tanila çıkış kodu 1 (çökmedi)")
 
 # ---- lisans dosyaları ve pystray (LGPL) değiştirilebilirliği: kurulu pakette ayrı dosyalar olarak durmalı
 lis = [p for p in kurulum.rglob("*") if p.is_file() and "lisanslar" in p.parts]
@@ -111,6 +128,20 @@ try:
             "veritabanı ve klasörler oluştu: " + ", ".join(t["dosyalar"]))
     s = api("saglik")
     kontrol(s["ok"], "sağlık denetimi geçti\n" + s["metin"])
+
+    # dosya denetimi (arayüz ucu): sentinel rapora sızmamalı, veritabanına hiçbir şey eklenmemeli
+    once = api("durum")["ozet"]["counts"]["event"]
+    api("tanila_baslat", {"yol": str(sahte)})
+    for _ in range(240):
+        td = api("tanila_durum")
+        if td["durum"] != "calisiyor":
+            break
+        time.sleep(0.5)
+    kontrol(td["durum"] == "bitti" and td["hata"] is None, f"arayüz ucu tanila_baslat: denetim bitti ({td['durum']})")
+    sorun = TD.sizinti_var_mi(td["rapor"])
+    kontrol(sorun is None, "arayüz ucu raporunda sentinel sızıntısı yok" + (f" — {sorun}" if sorun else ""))
+    kontrol(api("durum")["ozet"]["counts"]["event"] == once and api("kaynaklar")["kaynaklar"] == [], "dosya denetimi veritabanına kayıt/kaynak eklemedi")
+    api("tanila_temizle")
 
     # içe aktar (zip)
     zp = calisma / "takeout.zip"

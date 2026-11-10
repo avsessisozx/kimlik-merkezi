@@ -147,9 +147,9 @@ function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
   kap.sec=()=>kutular.filter(c=>c.checked).map(c=>c.value);return kap;}
 
 const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['guvenlik','Güvenlik'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
-let sayfa='harita',AYAR_TEMA='sistem',yoklama=null;
+let sayfa='harita',AYAR_TEMA='sistem',yoklama=null,yoklamaT=null;
 function menu(){const n=$('#nav');n.textContent='';SAYFALAR.forEach(([id,ad])=>n.append(h('button',{class:id===sayfa?'secili':'',onclick:()=>git(id)},ad)));}
-function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}
+function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}if(yoklamaT){clearInterval(yoklamaT);yoklamaT=null;}
   const a=$('#ana');a.textContent='';SF[id](a).catch(hataGoster);}
 function temaUygula(t){document.documentElement.dataset.tema=t;AYAR_TEMA=t;}
 
@@ -227,11 +227,36 @@ SF.ice=async a=>{
       if(s.hata_kodu==='daha_once_silinmis')alan.append(h('div',{class:'satir'},h('span',{},'Daha önce kalıcı sildiğiniz bir girdi. Yine de alınsın mı?'),
         h('button',{class:'d',onclick:()=>baslat(true).catch(hataGoster)},'Evet, yine de al')));
       SON_HATA={adim:'içe aktar',mesaj:s.hata,ek:s.bicim_raporu||''};}}
+  // ---- dosya denetimi (tanila): içerik göstermez, veritabanına yazmaz
+  const tAlan=h('div',{id:'tanila-alan'});
+  const tAdlar=h('input',{type:'checkbox',id:'tanila-adlar'}),tAyrinti=h('input',{type:'checkbox',id:'tanila-ayrinti'});
+  function tCiz(s){tAlan.textContent='';
+    if(s.durum==='calisiyor')tAlan.append(h('div',{class:'kart'},h('div',{},'Dosya denetleniyor… ',SAYI(Math.floor(s.gecen_sn)),' sn (büyük dosya birkaç dakika sürebilir; ekranı kullanmaya devam edebilirsiniz).'),h('progress',{})));
+    else if(s.durum==='bitti'){
+      tAlan.append(h('div',{class:'kart'},h('h3',{class:'tamam'},'Denetim raporu'),
+        h('p',{class:'soluk'},'Bu rapor dosya içeriğini içermez, yalnız alan adları, türler ve sayılar.'),
+        s.kisaltildi?h('p',{class:'soluk'},'Rapor çok uzundu; başı gösteriliyor.'):null,
+        h('textarea',{id:'tanila-rapor',readonly:'',rows:'14',onclick:e=>e.target.select()},s.rapor),
+        h('div',{class:'satir'},h('button',{class:'d',id:'tanila-kopyala',onclick:()=>kopyala(s.rapor)},'Kopyala'),
+          h('button',{class:'i',id:'tanila-temizle',onclick:async()=>{await api('tanila_temizle').catch(()=>{});tAlan.textContent='';}},'Raporu temizle'))));}
+    else if(s.durum==='hata'||s.durum==='zaman_asimi')tAlan.append(h('div',{class:'hata'},s.hata||'Denetlenemedi.'));}
+  function tYokla(){if(yoklamaT)clearInterval(yoklamaT);
+    yoklamaT=setInterval(async()=>{const s=await api('tanila_durum').catch(()=>null);if(!s)return;tCiz(s);
+      if(s.durum!=='calisiyor'){clearInterval(yoklamaT);yoklamaT=null;}},700);}
+  async function denetle(){tAlan.textContent='';
+    const s=await api('tanila_baslat',{yol:yol.value,adlari_goster:tAdlar.checked,ayrinti:tAyrinti.checked});tCiz(s);tYokla();}
   a.append(h('h2',{},'İçe aktar'),serit,h('div',{class:'kart'},
     h('p',{},'Google Takeout zip dosyası, Reddit veri dışa aktarımı ya da açılmış bir klasör seçin.'),
     h('div',{class:'satir'},yol),
     h('div',{class:'satir'},h('button',{class:'i',onclick:()=>sec('dosya').catch(hataGoster)},'Dosya seç…'),h('button',{class:'i',onclick:()=>sec('klasor').catch(hataGoster)},'Klasör seç…'),tur,
-      h('button',{class:'d',onclick:()=>baslat(false).catch(hataGoster)},'İçe aktarmayı başlat'))),alan);
+      h('button',{class:'d',onclick:()=>baslat(false).catch(hataGoster)},'İçe aktarmayı başlat'))),alan,
+    h('div',{class:'kart'},h('h3',{},'Dosya tanınmadı mı?'),
+      h('p',{class:'soluk'},'Yukarıda seçtiğiniz dosyayı denetleyin: dosyanın yapısını (alan adları, türler, sayılar) gösteren bir rapor çıkar. Hiçbir şey içe aktarılmaz ya da kaydedilmez; rapor dosya içeriğini içermez. Tanınmayan bir dosya için raporu kopyalayıp gönderebilirsiniz.'),
+      h('div',{class:'satir'},h('button',{class:'i',id:'tanila-dugme',onclick:()=>denetle().catch(hataGoster)},'Dosyayı denetle (içerik göstermez)')),
+      h('details',{class:'ayrinti-kutu'},h('summary',{},'Gelişmiş'),
+        h('label',{class:'satir'},tAdlar,' Dosya ve klasör adlarını gerçek haliyle yaz (kişi adı içerebilir; göndermeden önce raporu okuyun)'),
+        h('label',{class:'satir'},tAyrinti,' Daha ayrıntılı (uzun) rapor'))),tAlan);
+  const ts=await api('tanila_durum').catch(()=>({durum:'yok'}));if(ts.durum!=='yok'){tCiz(ts);if(ts.durum==='calisiyor')tYokla();}
   const s=await api('ice_aktar_durum');if(s.durum!=='yok'){ciz(s);if(s.durum==='calisiyor')yokla();}
 };
 // ------------------------------------------------------------------ kayıt listesi
