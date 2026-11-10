@@ -20,7 +20,8 @@ def olay_ekle(y):
     from kimlikcore import EventIn
     h = y.uygulama.hub
     sid = h.add_source("test", "1", None)
-    h.add_events(sid, [EventIn(ts="2026-01-01T10:00:00Z", kind="x", category="video", text="a", event_key="k1")])
+    h.add_events(sid, [EventIn(ts=f"2026-01-0{i + 1}T10:00:00Z", kind="x", category=c, text="a", event_key=f"k{i}")
+                       for i, c in enumerate(["video", "mesaj", "eposta", "konum", "sohbet"])])
 
 
 def test_uretimde_sahteye_dusme_yok(kurulu, monkeypatch):
@@ -43,12 +44,12 @@ def test_harita_bicimi_ve_bos_veri(kurulu):
 def test_hassas_bolge_kilitli_sayi_ve_icerik_sizmaz(kurulu):
     olay_ekle(kurulu)
     cagrilar = []
-    gercek_h, gercek_b = harita_kopru.saglayici
+    s0 = harita_kopru.saglayici
 
     def bolge_izle(hub, bid, **kw):
         cagrilar.append(bid)
-        return gercek_b(hub, bid, **kw)
-    harita_kopru.saglayici = (gercek_h, bolge_izle)
+        return s0.bolge(hub, bid, **kw)
+    harita_kopru.saglayici = s0._replace(bolge=bolge_izle)
     v = kurulu.api("harita", {})
     for b in v["bolgeler"]:
         if b["id"] in ("kalp", "karin", "ayak", "zihin"):
@@ -69,8 +70,8 @@ def test_hassas_bolge_kilitli_sayi_ve_icerik_sizmaz(kurulu):
 
 
 def test_sagayici_hassas_icin_en_cok_dondururse_atilir(kurulu):
-    harita_kopru.saglayici = (harita_kopru.saglayici[0],
-                              lambda hub, bid, **kw: {"id": bid, "grafikler": [{"tur": "cubuk", "baslik": "x", "etiketler": ["a"], "degerler": [1], "ornek": "gizli metin"}],
+    harita_kopru.saglayici = harita_kopru.saglayici._replace(
+        bolge=lambda hub, bid, **kw: {"id": bid, "grafikler": [{"tur": "cubuk", "baslik": "x", "etiketler": ["a"], "degerler": [1], "ornek": "gizli metin"}],
                                                       "en_cok": [{"ad": "gizli", "sayi": 1, "ornek": "gizli"}], "notlar": []})
     kurulu.api("harita_hassas", {"bolge_id": "ayak", "ac": True, "onay": True})
     d = kurulu.api("harita_bolge", {"bolge_id": "ayak"})
@@ -100,7 +101,7 @@ def test_kisi_ekle_sec_kalici_ve_ayri_veri(kurulu, tmp_path, veri):
     # geri dön
     ben = next(x for x in kurulu.api("kisiler", {})["kisiler"] if x["ad"] == "Ben")
     kurulu.api("kisi_sec", {"kisi_id": ben["id"]})
-    assert kurulu.api("durum", {})["ozet"]["counts"]["event"] == 1
+    assert kurulu.api("durum", {})["ozet"]["counts"]["event"] == 5
     assert [f["metin"] for f in kurulu.api("persona_liste", {})["bilgiler"]] == ["Ben kahve severim"]
     # seçili olmayan kişinin klasörü kilitli değil (yalnız seçili kişi yazılır)
     with Hub.open(ikinci, write=True):

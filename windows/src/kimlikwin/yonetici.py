@@ -12,7 +12,7 @@ from typing import Any
 
 from kimlikcore import KimlikError
 
-from . import APP_AD, __version__, claude_ayar, gunluk, hata_raporu, saglik, veri_klasoru
+from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_raporu, saglik, veri_klasoru
 from .ayarlar import Ayarlar
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
@@ -23,7 +23,7 @@ UYGULAMA_API = frozenset({
     "ice_aktar_baslat", "ice_aktar_durum", "persona_liste", "persona_ekle", "persona_guncelle",
     "persona_sil", "persona_sure_kontrol", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "izin_toplu", "erisim_kaydi",
-    "baglanti_bilgisi", "claude_ekle", "harita", "harita_bolge", "harita_hassas",
+    "baglanti_bilgisi", "claude_ekle", "harita", "harita_bolge", "harita_hassas", "harita_kayitlar", "harita_ayrinti",
 })
 
 
@@ -164,6 +164,26 @@ class Yonetici:
                 "yarim_is": self.uygulama.yarim_kalan_is() if self.uygulama else None,
                 "eskiyen": self.uygulama.eskiyen if self.uygulama else 0,
                 "baslangic_hatasi": self.baslangic_hatasi}
+
+    def api_harita_karsilastir(self, kisi_id: str, bolge_id: str, filtre: dict | None = None,
+                               aralik: dict | None = None) -> dict:
+        """Başka bir kişinin (ya da aynı kişinin) bölge verisi, karşılaştırma için. Diğer kişinin klasörü
+        SALT OKUNUR açılır; hassas bölge yalnız bu oturumda zaten açıksa gelir."""
+        if self.uygulama is None:
+            raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
+        if kisi_id == self.ayarlar["secili_kisi"]:
+            return self.uygulama.harita_bolge(bolge_id, filtre, aralik)
+        kisi = next((k for k in self.ayarlar["kisiler"] if k["id"] == kisi_id), None)
+        if kisi is None:
+            raise IslemHatasi("Böyle bir kişi yok.")
+        from kimlikcore import Hub
+        try:
+            with Hub.open(kisi["klasor"], write=False) as hub:
+                return {**harita_kopru.bolge(hub, bolge_id, self.uygulama.hassas_acik, filtre, aralik), "kisi": kisi["ad"]}
+        except harita_kopru.HaritaYok as e:
+            raise IslemHatasi(str(e), "harita_yok") from None
+        except KimlikError as e:
+            raise IslemHatasi(f"{kisi['ad']} okunamadı: {e}", "kisi_acilamadi") from None
 
     def api_sec(self, tur: str) -> dict:
         if tur not in ("dosya", "klasor"):

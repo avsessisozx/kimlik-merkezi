@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from kimlikcore import Category, FormatError, Hub, KimlikError, connect_erisim, fold
+from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, connect_erisim, fold
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
 from kimlikserver.access import KeyManager
@@ -109,17 +109,28 @@ class Uygulama:
                 for k in sorted(Category.ALL, key=lambda x: (x in Category.SENSITIVE, x))]
 
     # ------------------------------------------------------------------ persona haritası (§12)
-    def harita(self) -> dict[str, Any]:
+    def _kopru(self, fn, *a, **kw):
         try:
-            return harita_kopru.harita(self.hub, self.hassas_acik)
+            return fn(self.hub, *a, **kw)
         except harita_kopru.HaritaYok as e:
             raise IslemHatasi(str(e), "harita_yok") from None
+        except harita_kopru.OzellikYok as e:
+            raise IslemHatasi(str(e), "ozellik_yok") from None
+        except NotFoundError as e:
+            raise IslemHatasi(str(e), "yok") from None
 
-    def harita_bolge(self, bolge_id: str) -> dict[str, Any]:
-        try:
-            return harita_kopru.bolge(self.hub, bolge_id, self.hassas_acik)
-        except harita_kopru.HaritaYok as e:
-            raise IslemHatasi(str(e), "harita_yok") from None
+    def harita(self, aralik: dict | None = None) -> dict[str, Any]:
+        return self._kopru(harita_kopru.harita, self.hassas_acik, aralik)
+
+    def harita_bolge(self, bolge_id: str, filtre: dict | None = None, aralik: dict | None = None) -> dict[str, Any]:
+        return self._kopru(harita_kopru.bolge, bolge_id, self.hassas_acik, filtre, aralik)
+
+    def harita_kayitlar(self, bolge_id: str, filtre: dict | None = None, aralik: dict | None = None,
+                        limit: int = 20, offset: int = 0) -> dict[str, Any]:
+        return self._kopru(harita_kopru.kayitlar, bolge_id, self.hassas_acik, filtre, aralik, limit, offset)
+
+    def harita_ayrinti(self, olay_id: str) -> dict[str, Any]:
+        return self._kopru(harita_kopru.ayrinti, olay_id, self.hassas_acik)
 
     def harita_hassas(self, bolge_id: str, ac: bool, onay: bool = False) -> dict[str, Any]:
         """Hassas bölgenin SAYILARINI açar/kapatır; açmak için ayrı onay şart, içerik hiçbir zaman gösterilmez."""

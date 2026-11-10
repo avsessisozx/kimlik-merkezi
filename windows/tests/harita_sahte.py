@@ -1,142 +1,286 @@
-"""§12 JSON biçimine uyan SAHTE sağlayıcı: yalnız testlerde ve ekran görüntüsü demosunda kullanılır.
-Üretim kodu bunu içe aktarmaz; gerçek işlevler `kimlikserver.harita` içindedir.
+"""§12 + genişletilmiş (filtre / aralık / kayıtlar / ayrıntı) SAHTE sağlayıcı.
 
-Veri yoksa (hub'da olay yok) bütün bölgeler boş döner. Aksi hâlde klasör adından türetilen tohumla
-kişiye özgü, tekrarlanabilir sayılar üretilir (başka kişi = başka persona)."""
+Yalnız testlerde ve ekran görüntüsü demosunda kullanılır; üretim kodu bunu içe aktarmaz. Gerçek işlevler
+`kimlikserver.harita` içindedir. Bu modül hub'daki GERÇEK olaylardan (demo_veri.py ile üretilmiş ya da
+içe aktarılmış) SQL ile sayım yapar; sözleşme İ2'ye böyle gösterilir:
+
+    bolge(hub, bolge_id, *, ac_hassas, aralik=None, filtre=None) -> dict
+    kayitlar(hub, bolge_id, *, ac_hassas, filtre=None, aralik=None, limit=20, offset=0) -> dict
+    ayrinti(hub, event_id) -> dict
+    harita(hub, *, ac_hassas, now=None, aralik=None) -> dict
+
+`aralik = {"baslangic": ts|None, "bitis": ts|None}`; `filtre = {boyut: deger}` (VE ile birleşir).
+Boyutlar: ay (YYYY-MM), gun (0=Pzt..6=Paz), saat (0-23) + bölgeye özgü (kanal, terim, site, sanatci, ...).
+Çapraz filtreleme: bir grafik kendi boyutunun filtresini UYGULAMAZ (bağlam kalsın), `secili` ile vurgulanır.
+"""
 from __future__ import annotations
 
-import random
-from datetime import date
+import json
 
 from kimlikserver.persona import PersonaReader
 
-BOLGELER = [
-    ("bas", "Baş: ilgi ve merak", ["tarama"], False),
-    ("zihin", "Zihin: yapay zekâ sohbetleri (hassas)", ["sohbet"], True),
-    ("goz", "Gözler: izledikleri", ["video"], False),
-    ("kulak", "Kulaklar: dinledikleri", ["muzik"], False),
-    ("agiz", "Ağız: yazdıkları/söyledikleri", ["sosyal"], False),
-    ("el", "Eller: üretim ve iş", ["kod", "dosyalar", "notlar"], False),
-    ("kalp", "Kalp: kişisel (hassas)", ["mesaj"], True),
-    ("karin", "Karın: e-posta (hassas)", ["eposta"], True),
-    ("ayak", "Ayaklar: konum (hassas)", ["konum", "medya_meta"], True),
-    ("ic", "Merkez: uygulama kullanımı", ["uygulama"], False),
-]
-AYLAR = [f"{y}-{m:02d}" for y in (2025, 2026) for m in range(1, 13)][:23]
 GUNLER = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
-KANALLAR = ["Kod Mutfağı", "Gezgin Mehmet", "Bilim Atölyesi", "Pratik Yemek", "Tarih Sohbetleri", "Mini Belgesel",
-            "Gece Müziği", "Oyun Günlüğü"]
-TERIMLER = ["hava durumu", "python sqlite", "tatil otelleri", "kahve makinesi", "uçak bileti", "film önerileri",
-            "ev kirası", "mac sonucu"]
-SITELER = ["wikipedia.org", "github.com", "stackoverflow.com", "ekşisözlük", "haber siteleri", "youtube.com"]
-SANATCI = ["Sezen Aksu", "Daft Punk", "Tarkan", "Mor ve Ötesi", "Radiohead", "Duman", "Norah Jones"]
-SUBREDDIT = ["r/Turkey", "r/python", "r/AskReddit", "r/istanbul", "r/selfhosted", "r/Sqlite"]
-UYGULAMALAR = ["Tarayıcı", "Kod düzenleyici", "Mesajlaşma", "Müzik", "Harita", "Fotoğraflar", "Notlar"]
-DOSYA_TURLERI = ["pdf", "jpg", "docx", "py", "xlsx", "zip"]
+AY_AD = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+PAYLOAD = lambda a: f"json_extract(payload, '$.{a}')"  # noqa: E731
+
+# bolge_id -> (ad, kategoriler, hassas, boyutlar{ad: (etiket, ifade, kind_kosulu|None)}, birincil)
+BOLGELER = {
+    "bas": ("Baş: ilgi ve merak", ["tarama"], False,
+            {"terim": ("Arama terimleri", PAYLOAD("terim"), "chrome.arama"),
+             "site": ("Siteler", PAYLOAD("site"), "chrome.ziyaret")}, "terim"),
+    "zihin": ("Zihin: yapay zekâ sohbetleri (hassas)", ["sohbet"], True,
+              {"platform": ("Platformlar", PAYLOAD("platform"), None)}, "platform"),
+    "goz": ("Gözler: izledikleri", ["video"], False,
+            {"kanal": ("Kanallar", PAYLOAD("kanal"), None), "video": ("Videolar", PAYLOAD("video"), None),
+             "tur": ("Türler", PAYLOAD("tur"), None)}, "kanal"),
+    "kulak": ("Kulaklar: dinledikleri", ["muzik"], False,
+              {"sanatci": ("Sanatçılar", PAYLOAD("sanatci"), None), "parca": ("Parçalar", PAYLOAD("parca"), None),
+               "tur": ("Türler", PAYLOAD("tur"), None)}, "sanatci"),
+    "agiz": ("Ağız: yazdıkları/söyledikleri", ["sosyal"], False,
+             {"subreddit": ("Subreddit'ler", PAYLOAD("subreddit"), None), "tur": ("Gönderi türü", PAYLOAD("tur"), None)}, "subreddit"),
+    "el": ("Eller: üretim ve iş", ["kod", "dosyalar", "notlar"], False,
+           {"depo": ("Depolar", PAYLOAD("depo"), "github.commit"), "dosya_turu": ("Dosya türleri", PAYLOAD("dosya_turu"), None),
+            "kategori": ("Kategori", "category", None)}, "depo"),
+    "kalp": ("Kalp: kişisel (hassas)", ["mesaj"], True, {}, None),
+    "karin": ("Karın: e-posta (hassas)", ["eposta"], True, {}, None),
+    "ayak": ("Ayaklar: konum (hassas)", ["konum", "medya_meta"], True,
+             {"yer": ("Yerler", PAYLOAD("yer"), None)}, "yer"),
+    "ic": ("Merkez: uygulama kullanımı", ["uygulama"], False,
+           {"uygulama": ("Uygulamalar", PAYLOAD("uygulama"), None)}, "uygulama"),
+}
+ZAMAN_IFADE = {"ay": "substr(ts, 1, 7)", "gun": "((CAST(strftime('%w', ts) AS INTEGER) + 6) % 7)",
+               "saat": "CAST(substr(ts, 12, 2) AS INTEGER)"}
 
 
-def _olay_sayisi(hub) -> int:
-    return int(hub.summary()["counts"]["event"])
+def _tum_ifadeler(bolge_id):
+    d = dict(ZAMAN_IFADE)
+    for k, (_, ifade, _kind) in BOLGELER[bolge_id][3].items():
+        d[k] = ifade
+    return d
 
 
-def _rng(hub, anahtar: str) -> random.Random:
-    return random.Random(f"{hub.root.parent.name}/{hub.root.name}/{anahtar}")
+def _kosul(bolge_id, aralik, filtre, haric=()):
+    kats = BOLGELER[bolge_id][1]
+    w = [f"hidden = 0 AND category IN ({','.join('?' * len(kats))})"]
+    a = list(kats)
+    aralik = aralik or {}
+    if aralik.get("baslangic"):
+        w.append("ts >= ?")
+        a.append(aralik["baslangic"])
+    if aralik.get("bitis"):
+        w.append("ts <= ?")
+        a.append(aralik["bitis"])
+    ifadeler = _tum_ifadeler(bolge_id)
+    for k, v in (filtre or {}).items():
+        if k in haric or k not in ifadeler:
+            continue
+        w.append(f"{ifadeler[k]} = ?")
+        a.append(v)
+    for k, (_, _ifade, kind) in BOLGELER[bolge_id][3].items():   # boyut yalnız belli türde geçerliyse
+        if kind and k in (filtre or {}) and k not in haric:
+            w.append("kind = ?")
+            a.append(kind)
+    return " AND ".join(w), a
 
 
-def _sayilar(rng: random.Random, n: int, buyuk: int) -> list[int]:
-    return sorted((rng.randint(buyuk // 8, buyuk) for _ in range(n)), reverse=True)
+def _say(hub, bolge_id, aralik, filtre, ifade, haric=(), limit=None, kind=None, sirala="cnt DESC"):
+    w, a = _kosul(bolge_id, aralik, filtre, haric)
+    if kind:
+        w += " AND kind = ?"
+        a.append(kind)
+    sql = f"SELECT {ifade} AS k, count(*) AS cnt FROM events WHERE {w} AND {ifade} IS NOT NULL GROUP BY k ORDER BY {sirala}"
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+    return hub.query(sql, a)
 
 
-def _zaman(rng, baslik="Aylık etkinlik", taban=200):
-    return {"tur": "zaman", "baslik": baslik, "etiketler": AYLAR,
-            "degerler": [int(taban * (0.4 + rng.random() * 1.2) * (1 + i / 30)) for i in range(len(AYLAR))]}
+def _toplam(hub, bolge_id, aralik, filtre):
+    w, a = _kosul(bolge_id, aralik, filtre)
+    r = hub.query_one(f"SELECT count(*), min(ts), max(ts) FROM events WHERE {w}", a)
+    return r[0], r[1], r[2]
 
 
-def _saat(rng, baslik="Günün saatleri"):
-    egri = [int(40 + 120 * max(0.0, 1 - abs(h - rng.choice([14, 21])) / 7) + rng.randint(0, 25)) for h in range(24)]
-    return {"tur": "saat", "baslik": baslik, "etiketler": [f"{h:02d}" for h in range(24)], "degerler": egri}
+def _ay_listesi(ilk, son):
+    if not ilk:
+        return []
+    y, m = int(ilk[:4]), int(ilk[5:7])
+    ys, ms = int(son[:4]), int(son[5:7])
+    out = []
+    while (y, m) <= (ys, ms):
+        out.append(f"{y}-{m:02d}")
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
+    return out
 
 
-def _hafta(rng, baslik="Hafta ısı haritası"):
-    return {"tur": "hafta", "baslik": baslik, "etiketler": GUNLER,
-            "degerler": [[max(0, int(rng.gauss(30, 18) * (1.6 if g >= 5 else 1) * (0.2 if h < 7 else 1)))
-                          for h in range(24)] for g in range(7)]}
+def _grafik(tur, baslik, etiketler, degerler, boyut=None, secili=None, **ek):
+    g = {"tur": tur, "baslik": baslik, "etiketler": etiketler, "degerler": degerler}
+    if boyut:
+        g["boyut"] = boyut
+    if secili is not None:
+        g["secili"] = secili
+    g.update(ek)
+    return g
 
 
-def _cubuk(rng, baslik, adlar, buyuk=900):
-    return {"tur": "cubuk", "baslik": baslik, "etiketler": adlar, "degerler": _sayilar(rng, len(adlar), buyuk)}
+def _zaman(hub, bid, aralik, filtre):
+    gl = _say(hub, bid, aralik, filtre, ZAMAN_IFADE["ay"], haric=("ay",), sirala="k ASC")
+    if not gl:
+        return None
+    ilk, son = gl[0][0], gl[-1][0]
+    d = {k: c for k, c in gl}
+    aylar = _ay_listesi(ilk, son)
+    return _grafik("zaman", "Aylık etkinlik", aylar, [d.get(a, 0) for a in aylar], "ay", (filtre or {}).get("ay"))
 
 
-def _pasta(rng, baslik, adlar):
-    return {"tur": "pasta", "baslik": baslik, "etiketler": adlar, "degerler": [rng.randint(5, 90) for _ in adlar]}
+def _saat(hub, bid, aralik, filtre):
+    d = dict(_say(hub, bid, aralik, filtre, ZAMAN_IFADE["saat"], haric=("saat", "gun")))
+    return _grafik("saat", "Günün saatleri", [f"{h:02d}" for h in range(24)], [d.get(h, 0) for h in range(24)], "saat",
+                   (filtre or {}).get("saat"))
 
 
-def _en_cok(rng, adlar, buyuk=900, ornek=None):
-    return [{"ad": a, "sayi": s, **({"ornek": ornek} if ornek else {})} for a, s in zip(adlar, _sayilar(rng, len(adlar), buyuk))]
+def _hafta(hub, bid, aralik, filtre):
+    w, a = _kosul(bid, aralik, filtre, haric=("gun", "saat"))
+    rows = hub.query(f"SELECT {ZAMAN_IFADE['gun']} g, {ZAMAN_IFADE['saat']} h, count(*) FROM events WHERE {w} GROUP BY g, h", a)
+    m = [[0] * 24 for _ in range(7)]
+    for g, h, c in rows:
+        m[g][h] = c
+    f = filtre or {}
+    return _grafik("hafta", "Hafta × saat yoğunluğu", GUNLER, m, ["gun", "saat"],
+                   {"gun": f.get("gun"), "saat": f.get("saat")} if ("gun" in f or "saat" in f) else None)
 
 
-def harita(hub, *, ac_hassas=frozenset(), now=None) -> dict:
-    n = _olay_sayisi(hub)
+def _gunluk_dagilim(hub, bid, aralik, filtre):
+    d = dict(_say(hub, bid, aralik, filtre, ZAMAN_IFADE["gun"], haric=("gun", "saat")))
+    return _grafik("cubuk", "Haftanın günleri", GUNLER, [d.get(i, 0) for i in range(7)], "gun", (filtre or {}).get("gun"), sirali=True)
+
+
+def _dim_say(hub, bid, aralik, filtre, dim, limit):
+    _, ifade, kind = BOLGELER[bid][3][dim]
+    return _say(hub, bid, aralik, filtre, ifade, haric=(dim,), limit=limit, kind=kind)
+
+
+def harita(hub, *, ac_hassas=frozenset(), now=None, aralik=None) -> dict:
     pr = PersonaReader(hub)
     beyan = [{"kategori": f.category, "durum": f.status, "kaynak": None, "veri": f.statement} for f in pr.list_facts()]
-    bolgeler = []
-    for i, (bid, ad, kat, hassas) in enumerate(BOLGELER):
+    bolgeler, toplam, ilk, son = [], 0, None, None
+    for bid, (ad, kat, hassas, _dims, _p) in BOLGELER.items():
+        n, i, s = _toplam(hub, bid, aralik, None)
         kilitli = hassas and bid not in ac_hassas
-        rng = _rng(hub, bid)
-        sayi = 0 if n == 0 else rng.randint(40, 6000) // (3 if hassas else 1)
-        b = {"id": bid, "ad": ad, "kategoriler": kat, "olay_sayisi": sayi, "kilitli": kilitli,
-             "ilk": "2019-03-14T08:00:00Z" if sayi else None, "son": "2026-11-09T21:40:00Z" if sayi else None,
-             "ozet": (f"{sayi} kayıt, en çok {kat[0]} kategorisinde." if sayi else "")}
-        bolgeler.append(b)
-    toplam = sum(b["olay_sayisi"] for b in bolgeler)
-    return {"profil": {"ad": hub.root.parent.name, "olay": toplam if n else 0,
-                       "ilk": "2019-03-14T08:00:00Z" if n else None, "son": "2026-11-09T21:40:00Z" if n else None},
-            "bolgeler": bolgeler, "beyan": beyan}
+        bolgeler.append({"id": bid, "ad": ad, "kategoriler": kat, "olay_sayisi": n, "kilitli": kilitli, "ilk": i, "son": s,
+                         "ozet": f"{n} kayıt." if n else ""})
+        if not hassas:
+            toplam += n
+            ilk = min([x for x in (ilk, i) if x], default=None)
+            son = max([x for x in (son, s) if x], default=None)
+    ad = next((f.statement for f in pr.list_facts(["kimlik"]) if f.fact_key == "ad"), hub.root.name)
+    return {"profil": {"ad": ad, "olay": toplam, "ilk": ilk, "son": son}, "bolgeler": bolgeler, "beyan": beyan}
 
 
-def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None) -> dict:
-    ad = next((b[1] for b in BOLGELER if b[0] == bolge_id), None)
-    if ad is None:
+def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None, filtre=None) -> dict:
+    if bolge_id not in BOLGELER:
         raise ValueError("Bilinmeyen bölge.")
-    hassas = next(b[3] for b in BOLGELER if b[0] == bolge_id)
+    ad, _kat, hassas, dims, birincil = BOLGELER[bolge_id]
     if hassas and bolge_id not in ac_hassas:
         return {"id": bolge_id, "ad": ad, "kilitli": True, "grafikler": [], "en_cok": [], "notlar": []}
-    if _olay_sayisi(hub) == 0:
-        return {"id": bolge_id, "ad": ad, "kilitli": False, "grafikler": [], "en_cok": [], "notlar": ["Henüz veri yok."]}
-    r = _rng(hub, "b" + bolge_id)
-    g: list[dict] = []
-    e: list[dict] = []
+    filtre = {k: v for k, v in (filtre or {}).items() if v not in (None, "")}
+    n, ilk, son = _toplam(hub, bolge_id, aralik, filtre)
+    n0, ilk0, son0 = _toplam(hub, bolge_id, None, None)
+    if n0 == 0:
+        return {"id": bolge_id, "ad": ad, "kilitli": False, "grafikler": [], "en_cok": [], "gruplar": [], "kpi": [],
+                "notlar": ["Henüz veri yok."], "toplam": 0}
+    g, gruplar = [], []
+    z = _zaman(hub, bolge_id, aralik, filtre)
+    if z:
+        g.append(z)
+    g.append(_saat(hub, bolge_id, aralik, filtre))
+    g.append(_hafta(hub, bolge_id, aralik, filtre))
+    g.append(_gunluk_dagilim(hub, bolge_id, aralik, filtre))
+    kpi = [{"ad": "Kayıt", "deger": n}]
+    if ilk:
+        gun_sayisi = max(1, (int(son[:4]) - int(ilk[:4])) * 365 + (int(son[5:7]) - int(ilk[5:7])) * 30 + (int(son[8:10]) - int(ilk[8:10])) + 1)
+        kpi.append({"ad": "Günlük ortalama", "deger": round(n / gun_sayisi, 1)})
+        kpi.append({"ad": "İlk kayıt", "deger": ilk[:10], "metin": True})
+        kpi.append({"ad": "Son kayıt", "deger": son[:10], "metin": True})
+    if not hassas:
+        for dim, (etiket, _i, _k) in dims.items():
+            rows = _dim_say(hub, bolge_id, aralik, filtre, dim, 14)
+            if not rows:
+                continue
+            ogeler = [{"ad": str(k), "sayi": c} for k, c in rows]
+            gruplar.append({"id": dim, "ad": etiket, "eylem": "ara" if dim == "terim" else "ac", "ogeler": ogeler})
+            sec = filtre.get(dim)
+            if dim == "terim":
+                g.append(_grafik("agac", "Aranan terimler", [o["ad"] for o in ogeler], [o["sayi"] for o in ogeler], dim, sec))
+            elif len(rows) <= 6 and dim in ("tur", "platform", "kategori"):
+                g.append(_grafik("pasta", etiket, [o["ad"] for o in ogeler], [o["sayi"] for o in ogeler], dim, sec))
+            else:
+                g.append(_grafik("cubuk", f"En çok: {etiket.lower()}", [o["ad"] for o in ogeler[:10]], [o["sayi"] for o in ogeler[:10]], dim, sec))
+            tekil = hub.query_one(f"SELECT count(DISTINCT {_i}) FROM events WHERE {_kosul(bolge_id, aralik, filtre, haric=(dim,))[0]}",
+                                  _kosul(bolge_id, aralik, filtre, haric=(dim,))[1])[0]
+            kpi.append({"ad": f"Tekil {etiket.lower()}", "deger": tekil})
+    else:
+        for dim, (etiket, _i, _k) in dims.items():
+            rows = _dim_say(hub, bolge_id, aralik, filtre, dim, 8)
+            if rows:   # yalnız sayı ve dağılım (yer adı/platform), içerik yok
+                g.append(_grafik("pasta", etiket, [str(k) for k, _ in rows], [c for _, c in rows], dim, filtre.get(dim)))
+    en_cok = gruplar[0]["ogeler"] if gruplar else []
     notlar = ["Veriden sayım: yorum ya da çıkarım içermez."]
-    if bolge_id == "bas":
-        g = [_zaman(r, "Aylık arama ve ziyaret"), _saat(r, "Günün saatleri"), _cubuk(r, "En çok gidilen siteler", SITELER)]
-        e = _en_cok(r, TERIMLER, 420)
-    elif bolge_id == "goz":
-        g = [_zaman(r, "Aylık izleme"), _hafta(r, "Hafta ısı haritası: izleme"), _pasta(r, "Video türü", ["Eğitim", "Müzik", "Belgesel", "Eğlence"])]
-        e = _en_cok(r, KANALLAR, 310)
-    elif bolge_id == "kulak":
-        g = [_zaman(r, "Aylık dinleme"), _cubuk(r, "En çok dinlenen sanatçılar", SANATCI, 700), _saat(r, "Dinleme saatleri")]
-        e = _en_cok(r, SANATCI, 500)
-    elif bolge_id == "agiz":
-        g = [_zaman(r, "Aylık gönderi ve yorum", 60), _pasta(r, "Gönderi / yorum", ["Yorum", "Gönderi", "Beğeni"]), _cubuk(r, "En çok subreddit", SUBREDDIT, 300)]
-        e = _en_cok(r, SUBREDDIT, 300)
-    elif bolge_id == "el":
-        g = [_pasta(r, "Dosya türleri", DOSYA_TURLERI), _zaman(r, "Aylık üretim", 40), _cubuk(r, "Depo etkinliği", ["kimlik-merkezi", "blog", "dotfiles", "araclar"], 200)]
-        e = _en_cok(r, DOSYA_TURLERI, 150)
-    elif bolge_id in ("kalp", "karin", "zihin"):
-        g = [_zaman(r, "Aylık sayı", 30), _hafta(r, "Hafta ısı haritası")]
+    if hassas:
         notlar.append("Yalnız sayı ve zaman dağılımı; içerik gösterilmez.")
-    elif bolge_id == "ayak":
-        g = [_zaman(r, "Aylık yer sayısı", 12), _cubuk(r, "Yer sayıları (ham koordinat yok)", ["İstanbul", "Ankara", "İzmir", "Diğer"], 120)]
-        notlar.append("Ham koordinat gösterilmez.")
-    else:  # ic
-        g = [_cubuk(r, "En çok kullanılan uygulamalar", UYGULAMALAR, 800), _saat(r, "Kullanım saatleri"), _zaman(r, "Aylık kullanım", 150)]
-        e = _en_cok(r, UYGULAMALAR, 800)
-    return {"id": bolge_id, "ad": ad, "kilitli": False, "grafikler": g, "en_cok": e, "notlar": notlar}
+    return {"id": bolge_id, "ad": ad, "kilitli": False, "grafikler": g, "en_cok": en_cok, "gruplar": gruplar, "kpi": kpi,
+            "notlar": notlar, "toplam": n, "filtre": filtre, "birincil": birincil}
+
+
+def _baslik(kind, payload, text):
+    p = payload or {}
+    for a in ("video", "terim", "parca", "uygulama", "depo", "dosya", "baslik"):
+        if p.get(a):
+            if a == "parca":
+                return f"{p['parca']} · {p.get('sanatci', '')}"
+            if a == "video":
+                return f"{p['video']} · {p.get('kanal', '')}"
+            return str(p[a])
+    return text[:80] if text else kind
+
+
+def kayitlar(hub, bolge_id, *, ac_hassas=frozenset(), filtre=None, aralik=None, limit=20, offset=0) -> dict:
+    ad, _k, hassas, _d, _p = BOLGELER[bolge_id]
+    if hassas and bolge_id not in ac_hassas:
+        return {"kilitli": True, "toplam": 0, "kayitlar": []}
+    filtre = {k: v for k, v in (filtre or {}).items() if v not in (None, "")}
+    w, a = _kosul(bolge_id, aralik, filtre)
+    toplam = hub.query_one(f"SELECT count(*) FROM events WHERE {w}", a)[0]
+    rows = hub.query(f"SELECT event_id, ts, kind, category, payload, text FROM events WHERE {w} "
+                     "ORDER BY ts DESC, seq DESC LIMIT ? OFFSET ?", [*a, int(limit), int(offset)])
+    out = [{"id": r[0], "ts": r[1], "tur": r[2], "kategori": r[3], "baslik": _baslik(r[2], json.loads(r[4] or "{}"), r[5]),
+            "alt": r[2]} for r in rows]
+    return {"kilitli": False, "toplam": toplam, "kayitlar": out}
+
+
+def _duz(p, onek=""):
+    for k, v in (p or {}).items():
+        if isinstance(v, dict):
+            yield from _duz(v, f"{onek}{k}.")
+        else:
+            yield f"{onek}{k}", v
+
+
+def ayrinti(hub, event_id) -> dict:
+    e = hub.get_event(event_id)
+    kaynak = next((s for s in hub.sources() if s.source_id == e.source_id), None)
+    dosyalar = [r.name for r in hub.raw_files(e.source_id)]
+    return {"id": e.event_id, "ts": e.ts, "ham_ts": e.ts, "kategori": e.category, "tur": e.kind, "metin": e.text,
+            "kaynak": {"id": e.source_id, "ad": kaynak.kind if kaynak else None, "surum": kaynak.version if kaynak else None,
+                       "alindi": kaynak.imported_at if kaynak else None},
+            "kaynak_dosya": dosyalar,
+            "alanlar": [{"ad": k, "deger": v} for k, v in _duz(e.payload)]}
 
 
 def kur():
     """Köprüye sahte sağlayıcıyı bağlar; eski değeri döner (testte geri konur)."""
     from kimlikwin import harita_kopru
     eski = harita_kopru.saglayici
-    harita_kopru.saglayici = (harita, bolge)
+    harita_kopru.saglayici = harita_kopru.Saglayici(harita=harita, bolge=bolge, kayitlar=kayitlar, ayrinti=ayrinti)
     return eski
