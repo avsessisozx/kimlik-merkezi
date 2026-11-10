@@ -17,7 +17,7 @@ from pathlib import Path
 from kimlikcore import EventIn, FormatError, Hub, RawFile, sha256_file
 
 from . import registry
-from .base import FormatReport, ImportFormatError, Origin
+from .base import FormatReport, ImportFormatError, Origin, clear_archive_cache
 
 ProgressFn = Callable[[str, int], None]
 
@@ -89,6 +89,7 @@ def run(
     if not path.exists():
         raise FormatError(f"Girdi yok: {path}")
     notify = progress or (lambda *_: None)
+    clear_archive_cache()
 
     # 1) detect
     notify("dogrula", 0)

@@ -27,6 +27,7 @@ from .common import chrome_visit_events
 from .mbox import iter_raw_messages, message_event
 from .base import (
     Archive,
+    open_archive,
     DetectResult,
     Entry,
     FormatReport,
@@ -166,7 +167,7 @@ class GoogleTakeout:
     def _scan(self, path: Path) -> tuple[Archive, _Found]:
         key = str(Path(path).resolve())
         if key not in self._cache:
-            arc = Archive(Path(path))
+            arc = open_archive(Path(path))
             found = _Found()
             found.bad_zips = arc.bad_zips
             for e in arc.entries:

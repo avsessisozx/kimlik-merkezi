@@ -17,7 +17,7 @@ import ijson
 from kimlikcore import Category, EventIn, FormatError
 
 from .base import (
-    Archive,
+    open_archive,
     DetectResult,
     FormatReport,
     Origin,
@@ -56,7 +56,7 @@ def _walk(path: Path):
         except (tarfile.TarError, EOFError, OSError) as e:
             raise FormatError(f"{path.name}: tar arşivi okunamadı/bozuk ({type(e).__name__}).") from None
         return
-    arc = Archive(path)
+    arc = open_archive(path)
     for e in arc.entries:
         if e.name.lower().endswith(".json"):
             with e.open() as f:

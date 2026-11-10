@@ -210,6 +210,24 @@ class Archive:
                 )
 
 
+_ARCHIVE_CACHE: dict[str, Archive] = {}
+
+
+def open_archive(path: Path) -> Archive:
+    """Aynı çalıştırma içinde (tanıma sırasında birden çok içe aktarıcı) arşiv listesi bir kez çıkarılır.
+    Önbellek `run()` başında temizlenir."""
+    key = str(Path(path).resolve())
+    if key not in _ARCHIVE_CACHE:
+        if len(_ARCHIVE_CACHE) >= 2:
+            _ARCHIVE_CACHE.clear()
+        _ARCHIVE_CACHE[key] = Archive(Path(path))
+    return _ARCHIVE_CACHE[key]
+
+
+def clear_archive_cache() -> None:
+    _ARCHIVE_CACHE.clear()
+
+
 # --------------------------------------------------------------------------- yardımcılar
 def strip_bom(f: IO[bytes]) -> IO[bytes]:
     """UTF-8 BOM varsa atlar. Okuyucu `peek` desteklemiyorsa sarar."""
@@ -361,7 +379,7 @@ class ScanImporter:
     def _scan(self, path: Path):
         key = str(Path(path).resolve())
         if key not in self._cache:
-            arc = Archive(Path(path))
+            arc = open_archive(Path(path))
             self._cache = {key: (arc, self._do_scan(arc))}
         return self._cache[key]
 

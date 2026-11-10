@@ -15,6 +15,7 @@ from kimlikcore import Category, EventIn, FormatError
 
 from .base import (
     Archive,
+    open_archive,
     DetectResult,
     Entry,
     FormatReport,
@@ -94,7 +95,7 @@ class Reddit:
     def _scan(self, path: Path):
         key = str(Path(path).resolve())
         if key not in self._cache:
-            arc = Archive(Path(path))
+            arc = open_archive(Path(path))
             good, bad = [], []  # good: (entry, spec, header); bad: (entry, neden)
             for e in arc.entries:
                 spec = _spec_for(e)
