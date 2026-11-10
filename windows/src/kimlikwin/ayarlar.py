@@ -11,7 +11,7 @@ from .yollar import ayar_dizini
 VARSAYILAN: dict[str, Any] = {
     "veri_klasoru": None,        # sihirbaz tamamlanınca dolar
     "ilk_acilis_tamam": False,
-    "tema": "sistem",            # sistem | acik | koyu
+    "tema": "koyu",              # koyu (varsayılan) | acik | sistem
     "otomatik_baslat": True,     # kurulumda açık; Ayarlar'dan kapatılır
     "kisiler": [],               # [{"id","ad","klasor"}]: her kişi ayrı veri klasörü
     "secili_kisi": None,

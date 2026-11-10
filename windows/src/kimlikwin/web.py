@@ -19,6 +19,10 @@ from . import gunluk
 from .cekirdek import IslemHatasi
 from .yonetici import Yonetici
 
+import re
+
+_AD_RE = re.compile(r"[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*")
+_STATIK_TUR = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8", "txt": "text/plain; charset=utf-8", "svg": "image/svg+xml"}
 ADRES = "127.0.0.1"
 MAKS_GOVDE = 1_000_000
 
@@ -73,11 +77,11 @@ class _Isleyici(BaseHTTPRequestHandler):
         host = (self.headers.get("Host") or "").lower()
         return host in (f"{ADRES}:{self.sunucu.port}", f"localhost:{self.sunucu.port}")
 
-    def _yanit(self, kod: int, govde: bytes, tur: str = "application/json; charset=utf-8") -> None:
+    def _yanit(self, kod: int, govde: bytes, tur: str = "application/json; charset=utf-8", onbellek: bool = False) -> None:
         self.send_response(kod)
         self.send_header("Content-Type", tur)
         self.send_header("Content-Length", str(len(govde)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-cache" if onbellek else "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
@@ -96,6 +100,14 @@ class _Isleyici(BaseHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             html = _statik("index.html").decode("utf-8").replace("__JETON__", self.sunucu.jeton)
             return self._yanit(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        if self.path.startswith("/statik/"):
+            ad = self.path[8:].split("?")[0]
+            tur = _STATIK_TUR.get(ad.rsplit(".", 1)[-1]) if _AD_RE.fullmatch(ad) else None
+            if tur:
+                try:
+                    return self._yanit(200, _statik(ad), tur, onbellek=True)
+                except (FileNotFoundError, OSError):
+                    pass
         self._json(404, {"hata": "Bulunamadı."})
 
     def do_POST(self) -> None:
