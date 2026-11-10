@@ -1,0 +1,5 @@
+paket/dist/
+paket/yapi/
+paket/cikti/
+paket/app.ico
+*.egg-info/

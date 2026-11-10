@@ -11,6 +11,8 @@ import json
 import os
 import subprocess
 import sys
+import zipfile
+from pathlib import Path
 
 import pytest
 from kimlikcore import Hub
@@ -55,7 +57,7 @@ def dunya(tmp_path):
     girdi.write_text("\n".join(json.dumps(s, ensure_ascii=False) for s in SATIRLAR) + "\n",
                      encoding="utf-8")
     _cli(root, "baslat")
-    ice = json.loads(_cli(root, "--json", "ice-al", girdi))
+    ice = json.loads(_cli(root, "--json", "ice-al", "--tur", "jsonl", girdi))
     return {"root": root, "girdi": girdi, "ice": ice}
 
 
@@ -65,7 +67,7 @@ def test_icealdan_kimlik_kartina(dunya):
     # 1. içe aktarma
     assert dunya["ice"]["eklenen"] == 4
     # aynı dosya ikinci kez: tekrar sayılır, çoğalmaz
-    ikinci = json.loads(_cli(root, "--json", "ice-al", dunya["girdi"]))
+    ikinci = json.loads(_cli(root, "--json", "ice-al", "--tur", "jsonl", dunya["girdi"]))
     assert ikinci["eklenen"] == 0 and ikinci["tekrar"] == 4
 
     # 2. CLI ile arama (Türkçe katlama: ISIK -> ışık)
@@ -155,3 +157,36 @@ def test_iptal_sonrasi_ve_gizleme_stdio_uzerinden(dunya):
     assert len(once.structured_content["kayitlar"]) == 1
     assert sonra.structured_content["kayitlar"] == []  # tombstone sorguda dönmez
     assert iptal.is_error
+
+
+FIX = Path(__file__).resolve().parents[1] / "importers" / "fixtures"
+
+
+def test_importers_zip_cli_mcp_zinciri(tmp_path):
+    """Gerçek içe aktarıcı: Takeout zip -> CLI otomatik tanıma -> izin -> stdio MCP -> erişim kaydı."""
+    pytest.importorskip("kimlikimport")
+    zp = tmp_path / "takeout.zip"
+    with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in sorted((FIX / "takeout_tr").rglob("*")):
+            if p.is_file():
+                z.write(p, p.relative_to(FIX / "takeout_tr").as_posix())
+    root = tmp_path / "veri"
+    _cli(root, "baslat")
+    ice = json.loads(_cli(root, "--json", "ice-al", zp))
+    assert ice["added"] > 0 and ice["importer"] == "google_takeout"
+    zaman = json.loads(_cli(root, "--json", "zaman", "--limit", "500"))
+    kategoriler = {z["category"] for z in zaman}
+    assert kategoriler  # en az bir kategori
+    hedef = sorted(kategoriler - {"eposta", "mesaj", "konum"})[0]
+    with Hub.open(root, write=True) as hub:
+        km = KeyManager(hub)
+        app, anahtar = km.create_key("Zincir")
+        km.grant(app, hedef)
+
+    async def go():
+        async with Client(_mcp(root, anahtar)) as c:
+            return await c.call_tool("zaman_cizelgesi", {"kategori": hedef, "limit": 5})
+    r = _run(go())
+    assert not r.is_error and r.structured_content["kayitlar"]
+    assert all(k["etiket"] == "veri" and k["kategori"] == hedef for k in r.structured_content["kayitlar"])
+    assert [s[5] for s in AccessLog(root).read_all()] == ["ok"]

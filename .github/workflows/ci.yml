@@ -31,10 +31,12 @@ jobs:
             core/pyproject.toml
             server/pyproject.toml
             importers/pyproject.toml
+            windows/pyproject.toml
       - name: Kurulum (core, server, varsa importers)
         run: |
           pkgs="-e core -e server"
           if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          if [ -f windows/pyproject.toml ]; then pkgs="$pkgs -e windows"; fi
           python -m pip install $pkgs pytest
       - name: core testleri
         run: python -m pytest core -m "not buyuk"
@@ -43,5 +45,8 @@ jobs:
       - name: importers testleri
         if: hashFiles('importers/pyproject.toml') != ''
         run: python -m pytest importers -m "not buyuk"
+      - name: windows (arayüzden bağımsız mantık) testleri
+        if: hashFiles('windows/pyproject.toml') != ''
+        run: python -m pytest windows
       - name: entegrasyon testleri
         run: python -m pytest entegrasyon -m "not buyuk"
