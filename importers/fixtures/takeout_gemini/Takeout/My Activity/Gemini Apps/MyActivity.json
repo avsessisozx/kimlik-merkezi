@@ -1,0 +1,39 @@
+[
+ {
+  "header": "Gemini Apps",
+  "title": "Prompted Gemini sorusu bir geminiozelkelime",
+  "time": "2025-03-01T10:00:00.000Z",
+  "products": [
+   "Gemini Apps"
+  ],
+  "activityControls": [
+   "Gemini Apps Activity"
+  ],
+  "safeHtmlItem": [
+   {
+    "html": "<p>Gemini <b>yaniti</b> bir</p>"
+   }
+  ]
+ },
+ {
+  "header": "Gemini Apps",
+  "title": "Prompted Gemini sorusu iki",
+  "time": "2025-03-02T10:00:00.000Z",
+  "products": [
+   "Gemini Apps"
+  ],
+  "safeHtmlItem": [
+   {
+    "html": "<p>Yanit iki</p>"
+   }
+  ]
+ },
+ {
+  "header": "Gemini Apps",
+  "title": "Prompted Yanitsiz soru",
+  "time": "2025-03-03T10:00:00.000Z",
+  "products": [
+   "Gemini Apps"
+  ]
+ }
+]

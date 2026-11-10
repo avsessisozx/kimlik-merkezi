@@ -12,10 +12,13 @@ import sys
 import textwrap
 import time
 import zipfile
+from pathlib import Path
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+_ROOT = Path(__file__).resolve().parents[2]
+SRC = os.pathsep.join([str(_ROOT / "core" / "src"), str(_ROOT / "importers" / "src")])
 TARGET_BYTES = 1024 * 1024 * 1024  # 1 GiB (sıkıştırılmamış JSON)
 MAX_RSS_MB = 300
 BASE = datetime(2020, 1, 1, tzinfo=UTC)
@@ -61,8 +64,10 @@ def make_big_zip(path, target=TARGET_BYTES) -> tuple[int, int]:
 CHILD = textwrap.dedent("""
     import resource, sys, json, time
     from pathlib import Path
-    from kimlikcore import Hub
+    from kimlikcore import Category, Hub
     from kimlikimport.run import run
+    if "sohbet" not in Category.ALL:  # çekirdek henüz tanımıyorsa taklit
+        Category.ALL = frozenset(Category.ALL | {"sohbet"})
     zip_path, veri = sys.argv[1], sys.argv[2]
     t = time.time()
     with Hub.open(Path(veri), write=True) as hub:
@@ -84,7 +89,7 @@ def test_1gib_zip_bellek(tmp_path):
     assert size >= TARGET_BYTES
     out = subprocess.run([sys.executable, "-c", CHILD, str(z), str(tmp_path / "veri")],
                          capture_output=True, encoding="utf-8", timeout=7200,
-                         env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                         env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONPATH": SRC})
     assert out.returncode == 0, out.stderr[-2000:]
     res = json.loads(out.stdout.strip().splitlines()[-1])
     print("sonuç:", res)
@@ -135,9 +140,58 @@ def test_1gib_mbox_bellek(tmp_path):
     child = CHILD.replace("hedefkayit777zz", "hedefmbox777zz")
     out = subprocess.run([sys.executable, "-c", child, str(z), str(tmp_path / "veri")],
                          capture_output=True, encoding="utf-8", timeout=7200,
-                         env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                         env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONPATH": SRC})
     assert out.returncode == 0, out.stderr[-2000:]
     res = json.loads(out.stdout.strip().splitlines()[-1])
     print("sonuç:", res)
     assert res["parsed"] == n and res["added"] == n and res["dup"] == 0 and res["found"] == 1
+    assert res["rss_mb"] < MAX_RSS_MB, res
+
+
+# ---------------------------------------------------------------- ChatGPT conversations.json (zip içinde)
+def _conversation(i: int) -> dict:
+    nodes, prev = {"r": {"id": "r", "parent": None, "children": ["m0"], "message": None}}, "r"
+    para = "Sentetik sohbet metni, Türkçe karakterler ışık şğüöç. " * 25
+    for k in range(20):
+        nid = f"m{k}"
+        nodes[nid] = {"id": nid, "parent": prev, "children": [f"m{k + 1}"] if k < 19 else [], "message": {
+            "id": f"msg-{i}-{k}", "author": {"role": "user" if k % 2 == 0 else "assistant"},
+            "create_time": 1700000000 + i * 100 + k, "metadata": {"model_slug": "gpt-4o"},
+            "content": {"content_type": "text", "parts": [para + (" hedefsohbet777zz" if (i, k) == (777, 4) else "")]}}}
+        prev = nid
+    return {"title": f"Sentetik konusma {i}", "create_time": 1700000000 + i * 100, "update_time": 1700000000 + i * 100,
+            "mapping": nodes, "current_node": "m19", "conversation_id": f"c{i}", "id": f"c{i}"}
+
+
+def make_big_chat_zip(path, target=TARGET_BYTES) -> tuple[int, int]:
+    n = size = 0
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        with zf.open("conversations.json", "w", force_zip64=True) as f:
+            f.write(b"[")
+            size = 1
+            while size < target:
+                data = ("," if n else "") + json.dumps(_conversation(n), ensure_ascii=False)
+                b = data.encode()
+                f.write(b)
+                size += len(b)
+                n += 1
+            f.write(b"]")
+    return n, size + 1
+
+
+@pytest.mark.buyuk
+def test_1gib_chatgpt_bellek(tmp_path):
+    z = tmp_path / "chat.zip"
+    t0 = time.time()
+    n, size = make_big_chat_zip(z)
+    print(f"\nüretim: {n} konuşma, {size / 2**30:.2f} GiB JSON, zip {z.stat().st_size / 2**20:.0f} MiB, "
+          f"{time.time() - t0:.0f} sn")
+    child = CHILD.replace("hedefkayit777zz", "hedefsohbet777zz")
+    out = subprocess.run([sys.executable, "-c", child, str(z), str(tmp_path / "veri")],
+                         capture_output=True, encoding="utf-8", timeout=7200,
+                         env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONPATH": SRC})
+    assert out.returncode == 0, out.stderr[-2000:]
+    res = json.loads(out.stdout.strip().splitlines()[-1])
+    print("sonuç:", res)
+    assert res["parsed"] == n * 21 and res["added"] == n * 21 and res["dup"] == 0 and res["found"] == 1
     assert res["rss_mb"] < MAX_RSS_MB, res

@@ -23,8 +23,9 @@ from urllib.parse import parse_qs, urlparse
 import ijson
 from kimlikcore import Category, EventIn, FormatError
 
+from . import chat
 from .common import chrome_visit_events
-from .mbox import iter_raw_messages, message_event
+from .mbox import html_to_text, iter_raw_messages, message_event
 from .base import (
     Archive,
     open_archive,
@@ -333,6 +334,12 @@ class GoogleTakeout:
             if ts is None:
                 self._skipped["etkinlik: time yok/okunamadı"] += 1
                 continue
+            if _is_gemini(rec):
+                if not chat.core_supports_sohbet():
+                    self._skipped["gemini: çekirdek 'sohbet' kategorisini tanımıyor, atlandı"] += 1
+                    continue
+                yield from _gemini_events(rec, ts)
+                continue
             yield from _activity_events(rec, ts)
 
     # --- chrome
@@ -399,6 +406,29 @@ def _host(url: str) -> tuple[str, str]:
         return (u.hostname or "").lower(), u.path or ""
     except ValueError:
         return "", ""
+
+
+def _is_gemini(rec: dict) -> bool:
+    names = [str(rec.get("header") or "")] + [str(p) for p in (rec.get("products") or [])]
+    return any(n.strip().lower().startswith("gemini") for n in names)
+
+
+def _gemini_events(rec: dict, ts: str) -> Iterator[EventIn]:
+    """Gemini Apps etkinliği: istem (title) + varsa yanıt (safeHtmlItem). Kategori `sohbet`.
+    DOĞRULANMADI: alan adları ikincil kaynaklardan/hafızadan; "Prompted " ön eki yalnız İngilizce
+    hesapta ayıklanır, başka dillerde başlık olduğu gibi kalır."""
+    title = chat.clean(rec.get("title"))
+    prompt = title.removeprefix("Prompted ").strip() if title.startswith("Prompted ") else title
+    conv = stable_key("gem", rec.get("time"))  # etkinlik kaydında konuşma kimliği yok: her dönüş ayrı
+    if prompt:
+        yield chat.message_event(platform="gemini", conv_id=conv, title=prompt[:80], role=chat.USER,
+                                 text=prompt, ts=ts, msg_id="istem")
+    html = " ".join(str(x.get("html")) for x in (rec.get("safeHtmlItem") or [])
+                    if isinstance(x, dict) and x.get("html"))
+    answer = chat.clean(html_to_text(html)) if html else ""
+    if answer:
+        yield chat.message_event(platform="gemini", conv_id=conv, title=prompt[:80], role=chat.ASSISTANT,
+                                 text=answer, ts=ts, msg_id="yanit")
 
 
 def _kind_for(rec: dict) -> tuple[str, str]:

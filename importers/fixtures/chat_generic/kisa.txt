@@ -1,0 +1,4 @@
+User: merhaba
+Assistant: selam
+User: nasılsın
+Assistant: iyiyim

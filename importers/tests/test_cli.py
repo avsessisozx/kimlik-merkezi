@@ -2,17 +2,21 @@
 from __future__ import annotations
 
 import os
-import shutil
+import sys
+from pathlib import Path
 import subprocess
 
 import pytest
 
-pytestmark = pytest.mark.skipif(shutil.which("kimlikmerkezi") is None, reason="kimlikmerkezi kurulu değil")
+# Alt süreç bu çalışma ağacının kimlikcore/kimlikimport kaynağını kullanır (ortamda başka bir
+# çalışma ağacından kurulu paketler olabilir).
+_ROOT = Path(__file__).resolve().parents[2]
+SRC = os.pathsep.join([str(_ROOT / "core" / "src"), str(_ROOT / "importers" / "src")])
 
 
 def cli(veri, *args):
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
-    return subprocess.run(["kimlikmerkezi", "--veri", str(veri), *args], env=env,
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "PYTHONPATH": SRC}
+    return subprocess.run([sys.executable, "-m", "kimlikcore", "--veri", str(veri), *args], env=env,
                           capture_output=True, encoding="utf-8")
 
 

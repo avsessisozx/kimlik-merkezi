@@ -283,3 +283,85 @@ wj(SPX + "Streaming_History_Audio_2023_0.json", [
      "offline_timestamp": None, "incognito_mode": False},
     {"ts": "2023-05-07T07:00:00Z", "username": "ornekkullanici", "platform": "x", "ms_played": 5, "master_metadata_track_name": None,
      "episode_name": None}])
+
+
+# ------------------------------------------------------------------ Sohbet geçmişi (ChatGPT, Claude, genel, Gemini)
+def node(nid, parent, children, role=None, parts=None, ct="text", ts=None, model=None, hidden=False, text=None):
+    n = {"id": nid, "parent": parent, "children": children, "message": None}
+    if role:
+        content = {"content_type": ct, "parts": parts or []}
+        if text is not None:
+            content = {"content_type": ct, "text": text}
+        n["message"] = {"id": nid, "author": {"role": role, "metadata": {}}, "create_time": ts, "content": content,
+                        "status": "finished_successfully", "end_turn": True, "weight": 1.0,
+                        "metadata": {**({"model_slug": model} if model else {}),
+                                     **({"is_visually_hidden_from_conversation": True} if hidden else {})},
+                        "recipient": "all"}
+    return n
+
+
+CG = "chat_chatgpt/"
+mapA = {n["id"]: n for n in [
+    node("n0", None, ["n1"]),
+    node("n1", "n0", ["n2"], role="system", parts=[""], ts=1700000000.0, hidden=True),
+    node("n2", "n1", ["n3"], role="user", parts=["Merhaba chatgptozelkelime, ışık İstanbul"], ts=1700000010.5),
+    node("n3", "n2", ["n4", "n5"], role="assistant", parts=["Selam, size nasıl yardımcı olabilirim?"], ts=1700000020.0, model="gpt-4o"),
+    node("n4", "n3", [], role="user", parts=["Eski dal kullanici mesaji"], ts=1700000030.0),
+    node("n5", "n3", ["n6"], role="user", ts=1700000040.0,
+         parts=[{"content_type": "image_asset_pointer", "asset_pointer": "file-service://x"}, "Yeni dal kullanıcı mesajı"],
+         ct="multimodal_text"),
+    node("n6", "n5", ["n7"], role="assistant", ct="code", text="print('merhaba')", ts=1700000050.0, model="gpt-4o"),
+    node("n7", "n6", [], role="tool", parts=["arac ciktisi"], ts=1700000060.0),
+]}
+mapB = {n["id"]: n for n in [
+    node("b0", None, ["b1"]),
+    node("b1", "b0", ["b2"], role="user", parts=["Emoji 😀 ve bozuk vekil \ud83d sonu"], ts=1700100000.0),
+    node("b2", "b1", ["b3"], role="assistant", ct="thoughts", parts=[], ts=1700100010.0),
+    node("b3", "b2", [], role="assistant", parts=["Ikinci sohbet cevabi"], ts=1700100020.0, model="gpt-4o-mini"),
+]}
+wm(CG + "conversations.json", [
+    {"title": "Ornek sohbet bir", "create_time": 1700000000.0, "update_time": 1700000060.0, "mapping": mapA,
+     "current_node": "n6", "conversation_id": "conv-a", "id": "conv-a", "is_archived": False, "default_model_slug": "gpt-4o"},
+    {"title": "Ikinci sohbet", "create_time": 1700100000.0, "update_time": 1700100020.0, "mapping": mapB,
+     "current_node": "b3", "id": "conv-b", "is_archived": False}])
+wm(CG + "user.json", {"id": "user-gizli", "email": "gizli@example.test"})
+
+CL = "chat_claude/"
+wm(CL + "conversations.json", [
+    {"uuid": "cl-1", "name": "Claude sohbeti bir", "created_at": "2025-02-01T10:00:00.000000Z",
+     "updated_at": "2025-02-01T10:05:00.000000Z", "account": {"uuid": "acc-gizli"}, "chat_messages": [
+        {"uuid": "cm-1", "text": "Merhaba claudeozelkelime", "content": [{"type": "text", "text": "Merhaba claudeozelkelime"}],
+         "sender": "human", "created_at": "2025-02-01T10:00:01.000000Z", "updated_at": "2025-02-01T10:00:01.000000Z",
+         "attachments": [{"file_name": "notlar.txt", "file_type": "txt", "file_size": 10, "extracted_content": "gizliekicerik"}],
+         "files": []},
+        {"uuid": "cm-2", "text": "", "sender": "assistant", "created_at": "2025-02-01T10:00:20.000000Z",
+         "content": [{"type": "thinking", "thinking": "gizli dusunce"}, {"type": "text", "text": "Merhaba! Nasıl yardımcı olabilirim?"},
+                     {"type": "tool_use", "name": "x", "input": {}}], "attachments": [], "files": []}]},
+    {"uuid": "cl-2", "name": "", "created_at": "2025-02-02T08:00:00.000000Z", "updated_at": "2025-02-02T08:01:00.000000Z",
+     "account": {"uuid": "acc-gizli"}, "chat_messages": [
+        {"uuid": "cm-3", "text": "İkinci konuşma soru", "content": [], "sender": "human",
+         "created_at": "2025-02-02T08:00:01.000000Z", "attachments": [], "files": []},
+        {"uuid": "cm-4", "text": "İkinci konuşma yanıt", "content": [], "sender": "assistant",
+         "created_at": "2025-02-02T08:00:30.000000Z", "attachments": [], "files": []}]}])
+wj(CL + "users.json", [{"uuid": "acc-gizli", "full_name": "Gizli Kisi", "email_address": "gizli@example.test"}])
+wj(CL + "projects.json", [])
+
+GN = "chat_generic/"
+wj(GN + "deepseek_elle.json", {"title": "DeepSeek elle", "id": "ds-1", "messages": [
+    {"role": "user", "content": "Soru deepseekozelkelime", "ts": "2025-01-05T10:00:00Z"},
+    {"role": "assistant", "content": [{"type": "text", "text": "Yanıt metni"}], "ts": "2025-01-05T10:00:30Z", "model": "deepseek-chat"},
+    {"role": "system", "content": "sistem"}]})
+w(GN + "sohbet.md", "# Notlar\n\nBu satır konuşmacı değil.\n\n## Kullanıcı\nTürkçe soru: ışık nedir?\nikinci satır\n\n"
+  "## Claude\nIşık bir elektromanyetik dalgadır.\n\n**Ben:** son soru mdozelkelime\n")
+w(GN + "kisa.txt", "User: merhaba\nAssistant: selam\nUser: nasılsın\nAssistant: iyiyim\n")
+w(GN + "sohbet.jsonl", '{"role": "user", "content": "jsonl sorusu", "timestamp": 1735000000}\n'
+  '{"role": "assistant", "content": "jsonl yaniti", "timestamp": 1735000010}\n')
+w(GN + "alakasiz.txt", "Bu bir sohbet değil.\nSadece düz yazı.\n")
+
+wj("takeout_gemini/Takeout/My Activity/Gemini Apps/MyActivity.json", [
+    {"header": "Gemini Apps", "title": "Prompted Gemini sorusu bir geminiozelkelime", "time": "2025-03-01T10:00:00.000Z",
+     "products": ["Gemini Apps"], "activityControls": ["Gemini Apps Activity"],
+     "safeHtmlItem": [{"html": "<p>Gemini <b>yaniti</b> bir</p>"}]},
+    {"header": "Gemini Apps", "title": "Prompted Gemini sorusu iki", "time": "2025-03-02T10:00:00.000Z",
+     "products": ["Gemini Apps"], "safeHtmlItem": [{"html": "<p>Yanit iki</p>"}]},
+    {"header": "Gemini Apps", "title": "Prompted Yanitsiz soru", "time": "2025-03-03T10:00:00.000Z", "products": ["Gemini Apps"]}])

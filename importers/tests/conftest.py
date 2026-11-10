@@ -6,6 +6,13 @@ from pathlib import Path
 import pytest
 from kimlikcore import Hub
 
+# Çekirdek `sohbet` kategorisini henüz tanımıyorsa (INTERFACES isteği bekliyor) testlerde taklit et.
+from kimlikcore import Category  # noqa: E402
+
+if "sohbet" not in Category.ALL:
+    Category.ALL = frozenset(Category.ALL | {"sohbet"})
+    Category.SENSITIVE = frozenset(Category.SENSITIVE | {"sohbet"})
+
 FIX = Path(__file__).resolve().parent.parent / "fixtures"
 
 

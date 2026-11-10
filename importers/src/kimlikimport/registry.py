@@ -7,6 +7,9 @@ from pathlib import Path
 from .base import Importer
 from .google_takeout import factory as _takeout
 from .browser import factory as _browser
+from .chat import chatgpt_factory as _chatgpt
+from .chat import claude_factory as _claude
+from .chat import generic_factory as _chatfile
 from .files import factory as _files
 from .github import factory as _github
 from .meta import factory as _meta
@@ -21,10 +24,14 @@ _REGISTRY: dict[str, Callable[[], Importer]] = {
     "spotify": _spotify,
     "browser_history": _browser,
     "computer_files": _files,
+    "chatgpt": _chatgpt,
+    "claude": _claude,
+    "chat_file": _chatfile,
 }
 # CLI'de kısa takma adlar (ice-al --tur takeout)
 ALIASES = {"takeout": "google_takeout", "google": "google_takeout", "instagram": "meta", "facebook": "meta",
-           "tarayici": "browser_history", "dosyalar": "computer_files", "chrome": "browser_history", "firefox": "browser_history"}
+           "tarayici": "browser_history", "dosyalar": "computer_files",
+           "deepseek": "chat_file", "gemini": "google_takeout", "sohbet": "chat_file", "chrome": "browser_history", "firefox": "browser_history"}
 
 
 def register(name: str, factory: Callable[[], Importer]) -> None:

@@ -1,0 +1,87 @@
+[
+ {
+  "uuid": "cl-1",
+  "name": "Claude sohbeti bir",
+  "created_at": "2025-02-01T10:00:00.000000Z",
+  "updated_at": "2025-02-01T10:05:00.000000Z",
+  "account": {
+   "uuid": "acc-gizli"
+  },
+  "chat_messages": [
+   {
+    "uuid": "cm-1",
+    "text": "Merhaba claudeozelkelime",
+    "content": [
+     {
+      "type": "text",
+      "text": "Merhaba claudeozelkelime"
+     }
+    ],
+    "sender": "human",
+    "created_at": "2025-02-01T10:00:01.000000Z",
+    "updated_at": "2025-02-01T10:00:01.000000Z",
+    "attachments": [
+     {
+      "file_name": "notlar.txt",
+      "file_type": "txt",
+      "file_size": 10,
+      "extracted_content": "gizliekicerik"
+     }
+    ],
+    "files": []
+   },
+   {
+    "uuid": "cm-2",
+    "text": "",
+    "sender": "assistant",
+    "created_at": "2025-02-01T10:00:20.000000Z",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "gizli dusunce"
+     },
+     {
+      "type": "text",
+      "text": "Merhaba! Nas\u0131l yard\u0131mc\u0131 olabilirim?"
+     },
+     {
+      "type": "tool_use",
+      "name": "x",
+      "input": {}
+     }
+    ],
+    "attachments": [],
+    "files": []
+   }
+  ]
+ },
+ {
+  "uuid": "cl-2",
+  "name": "",
+  "created_at": "2025-02-02T08:00:00.000000Z",
+  "updated_at": "2025-02-02T08:01:00.000000Z",
+  "account": {
+   "uuid": "acc-gizli"
+  },
+  "chat_messages": [
+   {
+    "uuid": "cm-3",
+    "text": "\u0130kinci konu\u015fma soru",
+    "content": [],
+    "sender": "human",
+    "created_at": "2025-02-02T08:00:01.000000Z",
+    "attachments": [],
+    "files": []
+   },
+   {
+    "uuid": "cm-4",
+    "text": "\u0130kinci konu\u015fma yan\u0131t",
+    "content": [],
+    "sender": "assistant",
+    "created_at": "2025-02-02T08:00:30.000000Z",
+    "attachments": [],
+    "files": []
+   }
+  ]
+ }
+]

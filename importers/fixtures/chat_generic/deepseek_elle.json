@@ -1,0 +1,26 @@
+{
+ "title": "DeepSeek elle",
+ "id": "ds-1",
+ "messages": [
+  {
+   "role": "user",
+   "content": "Soru deepseekozelkelime",
+   "ts": "2025-01-05T10:00:00Z"
+  },
+  {
+   "role": "assistant",
+   "content": [
+    {
+     "type": "text",
+     "text": "Yanıt metni"
+    }
+   ],
+   "ts": "2025-01-05T10:00:30Z",
+   "model": "deepseek-chat"
+  },
+  {
+   "role": "system",
+   "content": "sistem"
+  }
+ ]
+}
