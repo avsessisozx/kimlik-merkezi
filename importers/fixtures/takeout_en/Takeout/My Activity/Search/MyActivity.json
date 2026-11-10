@@ -1,0 +1,36 @@
+[
+ {
+  "header": "Search",
+  "title": "Searched for ornek google arama",
+  "titleUrl": "https://www.google.com/search?q=ornek+google+arama",
+  "time": "2024-04-01T08:00:00Z",
+  "products": [
+   "Search"
+  ],
+  "activityControls": [
+   "Web & App Activity"
+  ]
+ },
+ {
+  "header": "Search",
+  "title": "Searched for ornek yer",
+  "titleUrl": "https://www.google.com/search?q=ornek+yer",
+  "time": "2024-04-02T08:00:00Z",
+  "products": [
+   "Search"
+  ],
+  "locationInfos": [
+   {
+    "name": "Ornek konum",
+    "url": "https://www.google.com/maps/@41.123456,29.123456,15z?entry=s",
+    "source": "From your device",
+    "sourceUrl": "https://support.google.com/"
+   }
+  ]
+ },
+ {
+  "header": "Search",
+  "title": "Zamansiz kayit",
+  "titleUrl": "https://www.google.com/search?q=zamansiz"
+ }
+]

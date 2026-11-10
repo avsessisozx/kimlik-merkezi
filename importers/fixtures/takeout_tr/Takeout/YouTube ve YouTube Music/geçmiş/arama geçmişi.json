@@ -1,0 +1,26 @@
+[
+ {
+  "header": "YouTube",
+  "title": "Searched for ornek arama bir",
+  "titleUrl": "https://www.youtube.com/results?search_query=ornek+arama+bir",
+  "time": "2024-03-05T09:00:00Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube search history"
+  ]
+ },
+ {
+  "header": "YouTube",
+  "title": "Searched for ornek arama iki",
+  "titleUrl": "https://www.youtube.com/results?search_query=ornek+arama+iki",
+  "time": "2024-03-06T09:30:00Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube search history"
+  ]
+ }
+]

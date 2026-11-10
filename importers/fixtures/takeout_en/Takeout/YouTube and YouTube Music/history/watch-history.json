@@ -1,0 +1,62 @@
+[
+ {
+  "header": "YouTube",
+  "title": "Watched Ornek Video Bir",
+  "titleUrl": "https://www.youtube.com/watch?v=aaaaaaaaaaa",
+  "time": "2024-03-01T10:00:00.123Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube watch history"
+  ],
+  "subtitles": [
+   {
+    "name": "Kanal A",
+    "url": "https://www.youtube.com/channel/UCKKKKKKKKKKKKKKKKKKKKKK"
+   }
+  ]
+ },
+ {
+  "header": "YouTube",
+  "title": "Watched Ornek Video Iki",
+  "titleUrl": "https://www.youtube.com/watch?v=bbbbbbbbbbb",
+  "time": "2024-03-02T11:00:00Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube watch history"
+  ],
+  "subtitles": [
+   {
+    "name": "Kanal B",
+    "url": "https://www.youtube.com/channel/UCKKKKKKKKKKKKKKKKKKKKKK"
+   }
+  ]
+ },
+ {
+  "header": "YouTube",
+  "title": "Watched https://www.youtube.com/watch?v=ccccccccccc",
+  "titleUrl": "https://www.youtube.com/watch?v=ccccccccccc",
+  "time": "2024-03-03T12:00:00Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube watch history"
+  ]
+ },
+ {
+  "header": "YouTube",
+  "title": "Viewed Ornek topluluk gonderisi",
+  "titleUrl": "https://www.youtube.com/post/Ugkxornek",
+  "time": "2024-03-04T13:00:00Z",
+  "products": [
+   "YouTube"
+  ],
+  "activityControls": [
+   "YouTube watch history"
+  ]
+ }
+]

@@ -1,0 +1,3 @@
+id,permalink,date,ip,subreddit,gildings,title,url,body
+p1,/r/ornek/comments/p1/,2023-01-10 08:00:00 UTC,1.2.3.4,ornek,0,Ornek baslik bir,,Ornek govde bir
+p2,/r/diger/comments/p2/,2023-01-11 09:00:00 UTC,1.2.3.4,diger,0,Ornek baslik iki,https://example.test/x,
