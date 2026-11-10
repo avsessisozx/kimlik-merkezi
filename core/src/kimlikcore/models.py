@@ -22,12 +22,13 @@ class Category:
     EPOSTA = "eposta"
     MESAJ = "mesaj"
     KONUM = "konum"
+    SOHBET = "sohbet"
 
-    SENSITIVE = frozenset({"eposta", "mesaj", "konum"})
+    SENSITIVE = frozenset({"eposta", "mesaj", "konum", "sohbet"})
     ALL = frozenset(
         {
             "tarama", "video", "sosyal", "muzik", "kod", "notlar", "dosyalar",
-            "medya_meta", "uygulama", "persona", "eposta", "mesaj", "konum",
+            "medya_meta", "uygulama", "persona", "eposta", "mesaj", "konum", "sohbet",
         }
     )
 
