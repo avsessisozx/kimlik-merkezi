@@ -35,10 +35,12 @@ jobs:
             core/pyproject.toml
             server/pyproject.toml
             importers/pyproject.toml
+            windows/pyproject.toml
       - name: Kurulum
         run: |
           pkgs="-e core -e server"
           if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          if [ -f windows/pyproject.toml ]; then pkgs="$pkgs -e windows"; fi
           python -m pip install $pkgs pytest
       # Her paket ayrı koşulur ve biri başarısız olsa da diğerleri koşar: tüm Windows hataları tek seferde görünsün.
       - name: core testleri (kilit, dosya izni, yollar)
@@ -50,6 +52,9 @@ jobs:
       - name: importers testleri
         if: (success() || failure()) && hashFiles('importers/pyproject.toml') != ''
         run: python -m pytest importers -m "not buyuk"
+      - name: windows klasörü testleri (sihirbaz, Claude ayarı, kilit, yerel web)
+        if: (success() || failure()) && hashFiles('windows/pyproject.toml') != ''
+        run: python -m pytest windows
       - name: entegrasyon testleri
         if: success() || failure()
         run: python -m pytest entegrasyon -m "not buyuk"
@@ -68,10 +73,12 @@ jobs:
             core/pyproject.toml
             server/pyproject.toml
             importers/pyproject.toml
+            windows/pyproject.toml
       - name: Kurulum
         run: |
           pkgs="-e core -e server"
           if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          if [ -f windows/pyproject.toml ]; then pkgs="$pkgs -e windows"; fi
           python -m pip install $pkgs pytest
       - name: Boş disk
         run: df -h .

@@ -152,7 +152,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.sec:
         return sec(a.sec, a.cikti)
     if a.komut == "surum":
+        import ijson
         print(f"Kimlik Merkezi {__version__}")
+        print(f"ijson arka ucu: {ijson.backend}")   # C uzantısı pakette ise 'yajl2_c'
         return 0
     if a.komut == "saglik":
         return saglik_komutu(a.veri)

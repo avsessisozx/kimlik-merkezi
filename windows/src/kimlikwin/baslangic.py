@@ -75,3 +75,21 @@ class Otomatik:
             self.arka_uc.yaz(baslatma_komutu())
         else:
             self.arka_uc.sil()
+
+
+# ---------------------------------------------------------------------- kaldırıcı için veri yolu
+UYGULAMA_ANAHTARI = r"Software\KimlikMerkezi"
+
+
+def veri_yolunu_kaydet(yol: str) -> bool:
+    """Kaldırıcının "veriler de silinsin mi" sorusunda hangi klasörü sileceğini bilmesi için
+    HKCU\\Software\\KimlikMerkezi\\VeriKlasoru değerini yazar (yönetici izni gerekmez). Windows dışında no-op."""
+    if sys.platform != "win32":
+        return False
+    import winreg
+    try:
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, UYGULAMA_ANAHTARI, 0, winreg.KEY_SET_VALUE) as k:
+            winreg.SetValueEx(k, "VeriKlasoru", 0, winreg.REG_SZ, yol)
+        return True
+    except OSError:
+        return False

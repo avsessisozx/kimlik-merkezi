@@ -1,0 +1,4 @@
+# Paketleme araçları (CI). mcp sürümü server/pyproject.toml'da sabit (mcp==2.3.0).
+pyinstaller==6.22.3
+pystray==0.19.5
+pillow>=10

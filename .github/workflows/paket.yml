@@ -1,0 +1,56 @@
+name: paket
+
+# Windows kurulum paketi: PyInstaller + Inno Setup, sessiz kurulum, açılış, sağlık, MCP stdio, kaldırma.
+# Pahalı (Windows): yalnızca elle (workflow_dispatch) ve v* etiketinde. Her push'ta çalışmaz.
+# Varsayılan kabuk (Python + yerel web + tepsi) Karar B için GEÇİCİ varsayımdır.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    # GECICI-BASLA (doğrulama sonrası kaldırılacak): dispatch main'de yokken denemek için
+    branches: ["iscilik/ci"]
+    paths: [".github/TETIK-paket"]
+    # GECICI-BITIS
+
+concurrency:
+  group: paket-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  paket:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            core/pyproject.toml
+            server/pyproject.toml
+            importers/pyproject.toml
+            windows/pyproject.toml
+            windows/paket/gereksinim.txt
+      - name: Bağımlılıklar
+        shell: pwsh
+        run: |
+          python -m pip install ./core ./server ./importers "./windows[tepsi]" pytest -r windows/paket/gereksinim.txt
+      - name: Arayüz-bağımsız mantık testleri (Windows)
+        shell: pwsh
+        run: python -m pytest windows
+      - name: Paketle, kur, dene, kaldır
+        shell: pwsh
+        run: ./windows/paket/ci_paket.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kurulum-paketi
+          path: |
+            windows/paket/cikti/*.exe
+            windows/paket/cikti/SHA256SUMS
+            windows/paket/cikti/ozet.json
+            windows/paket/cikti/kur.log

@@ -1,0 +1,8 @@
+"""app.ico üretir (Pillow). Derlemeden önce çalıştırılır."""
+from pathlib import Path
+
+from kimlikwin.tepsi import simge_olustur
+
+hedef = Path(__file__).with_name("app.ico")
+simge_olustur(256).save(hedef, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+print("yazıldı:", hedef, hedef.stat().st_size, "bayt")

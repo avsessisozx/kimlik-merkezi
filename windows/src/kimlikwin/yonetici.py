@@ -12,7 +12,7 @@ from kimlikcore import KimlikError
 
 from . import APP_AD, __version__, claude_ayar, gunluk, hata_raporu, saglik, veri_klasoru
 from .ayarlar import Ayarlar
-from .baslangic import Otomatik
+from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
 
 # Uygulama'nın dışarıya açılan yöntemleri (ad -> yöntem). Başka hiçbir şey çağrılamaz.
@@ -104,6 +104,7 @@ class Yonetici:
         bilgi = veri_klasoru.olustur(yol)
         self.ayarlar.guncelle(veri_klasoru=bilgi["yol"], ilk_acilis_tamam=True, otomatik_baslat=bool(otomatik_baslat))
         self._otomatik_uygula(bool(otomatik_baslat))
+        veri_yolunu_kaydet(bilgi["yol"])
         self.baslat()
         gunluk.log().info("ilk açılış tamamlandı (şema %s)", bilgi["sema"])
         return {**bilgi, "baglanti": self.uygulama.baglanti_bilgisi() if self.uygulama else None}
