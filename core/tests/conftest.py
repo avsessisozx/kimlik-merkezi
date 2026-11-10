@@ -37,3 +37,11 @@ def run_child(code: str, env, *args, timeout=120):
         [sys.executable, "-c", code, *map(str, args)],
         env=env, capture_output=True, encoding="utf-8", timeout=timeout,
     )
+
+
+# Ağ koruması (kök ag_koruma.py): paket klasöründen tek başına koşulsa da devrede olsun.
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
+from ag_koruma import ag_korumasi, pytest_configure, pytest_unconfigure  # noqa: E402,F401

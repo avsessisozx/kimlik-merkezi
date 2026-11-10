@@ -65,8 +65,28 @@ if (-not $env:RUNNER_TEMP) { $calisma = Join-Path $env:TEMP 'km_dene' }
 Remove-Item $calisma -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $calisma | Out-Null
 $fixture = (Resolve-Path "$k\..\..\importers\fixtures\takeout_tr").Path
+# Ağ izleme: uygulama + MCP süreçleri yalnız 127.0.0.1 ile konuşuyor mu (docs/AG-GARANTISI.md; örnekleme, sınırları orada)
+$agCikti = Join-Path $calisma 'ag_sonuc.json'
+$agDurdur = Join-Path $calisma 'ag_durdur'
+$agIzleyici = Start-Process powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$k\ag_izle.ps1", '-Cikti', $agCikti, '-DurdurDosyasi', $agDurdur) -PassThru -WindowStyle Hidden
 python kurulu_dene.py $hedef $calisma $fixture $Surum
-if ($LASTEXITCODE) { throw 'kurulu_dene' }
+$deneKod = $LASTEXITCODE
+Start-Sleep -Milliseconds 600
+New-Item -ItemType File $agDurdur -Force | Out-Null
+[void]$agIzleyici.WaitForExit(30000)
+if ($deneKod) { throw 'kurulu_dene' }
+Dene 'ağ izleyici sonuç yazdı' { Test-Path $agCikti }
+$ag = Get-Content $agCikti -Raw | ConvertFrom-Json
+Write-Host ("ağ izleme: {0} yoklama, {1} süreç görüldü, {2} yerel bağlantı, {3} ihlal" -f $ag.yoklama_sayisi, $ag.izlenen_surec_sayisi, $ag.yerel_baglanti_sayisi, @($ag.ihlaller).Count)
+$ozet['ag_yoklama'] = $ag.yoklama_sayisi
+$ozet['ag_izlenen_surec'] = $ag.izlenen_surec_sayisi
+$ozet['ag_yerel_baglanti'] = $ag.yerel_baglanti_sayisi
+$ozet['ag_ihlal'] = @($ag.ihlaller).Count
+Dene 'ağ izleyici gerçekten çalıştı (yoklama yapıldı, uygulama süreci görüldü)' { ($ag.yoklama_sayisi -gt 5) -and ($ag.izlenen_surec_sayisi -gt 0) }
+if ($ag.yerel_baglanti_sayisi -eq 0) { Write-Host '::warning::İzleyici hiç yerel (127.0.0.1) bağlantı yakalamadı; örnekleme kısa ömürlü bağlantıları kaçırmış olabilir (bilgi, hata değil).' }
+if (@($ag.ihlaller).Count -gt 0) { $ag.ihlaller | ForEach-Object { Write-Host "::error::$_" } }
+Dene 'uygulama ve MCP yalnız 127.0.0.1 ile bağlandı (dış bağlantı görülmedi)' { @($ag.ihlaller).Count -eq 0 }
+Copy-Item $agCikti "$k\cikti\ag_sonuc.json" -Force
 
 # ekransız sağlık komutu (konsol exe)
 $o = & "$hedef\kimlikmerkezi-mcp.exe" saglik --veri "$calisma\veri" 2>&1 | Out-String

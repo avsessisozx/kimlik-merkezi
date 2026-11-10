@@ -66,7 +66,7 @@ jobs:
       - name: Arayüz-bağımsız mantık testleri (Windows)
         shell: pwsh
         run: python -m pytest windows
-      - name: Paketle, kur, dene, kaldır
+      - name: Paketle, kur, dene (yalnız 127.0.0.1 bağlantısı izlenir), kaldır
         shell: pwsh
         run: ./windows/paket/ci_paket.ps1 -Surum "${{ steps.surum.outputs.surum }}"
       - uses: actions/upload-artifact@v4
@@ -77,6 +77,7 @@ jobs:
             windows/paket/cikti/*.exe
             windows/paket/cikti/SHA256SUMS
             windows/paket/cikti/ozet.json
+            windows/paket/cikti/ag_sonuc.json
             windows/paket/cikti/kur.log
 
   yayin:
