@@ -6,6 +6,7 @@ açmadan akışla okur. Tepe bellek alt sürecin ru_maxrss değeriyle ölçülü
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import textwrap
@@ -82,7 +83,8 @@ def test_1gib_zip_bellek(tmp_path):
           f"{time.time() - t0:.0f} sn")
     assert size >= TARGET_BYTES
     out = subprocess.run([sys.executable, "-c", CHILD, str(z), str(tmp_path / "veri")],
-                         capture_output=True, text=True, timeout=7200)
+                         capture_output=True, encoding="utf-8", timeout=7200,
+                         env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     assert out.returncode == 0, out.stderr[-2000:]
     res = json.loads(out.stdout.strip().splitlines()[-1])
     print("sonuç:", res)

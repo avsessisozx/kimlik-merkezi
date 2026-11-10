@@ -1,6 +1,7 @@
 """Çekirdek CLI `ice-al --tur` çağrısı çalıştırıcıyla çalışıyor mu (uçtan uca, alt süreç)."""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 
@@ -10,7 +11,9 @@ pytestmark = pytest.mark.skipif(shutil.which("kimlikmerkezi") is None, reason="k
 
 
 def cli(veri, *args):
-    return subprocess.run(["kimlikmerkezi", "--veri", str(veri), *args], capture_output=True, text=True)
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+    return subprocess.run(["kimlikmerkezi", "--veri", str(veri), *args], env=env,
+                          capture_output=True, encoding="utf-8")
 
 
 def test_ice_al_tur_takeout_ve_tekrar(tmp_path, zipper):
