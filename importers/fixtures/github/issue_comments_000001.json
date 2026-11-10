@@ -1,0 +1,14 @@
+[
+ {
+  "type": "issue_comment",
+  "url": "https://github.com/ornekkullanici/ornek-depo/issues/1#issuecomment-1",
+  "body": "Ornek yorum metni",
+  "created_at": "2022-02-03T10:00:00Z"
+ },
+ {
+  "type": "issue_comment",
+  "url": "https://github.com/ornekkullanici/ornek-depo/issues/1#issuecomment-2",
+  "body": "Ikinci yorum",
+  "created_at": "2022-02-04T10:00:00Z"
+ }
+]

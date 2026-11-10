@@ -1,0 +1,21 @@
+[
+ {
+  "type": "repository",
+  "url": "https://github.com/ornekkullanici/ornek-depo",
+  "name": "ornek-depo",
+  "description": "Ornek depo aciklamasi",
+  "private": false,
+  "language": "Python",
+  "created_at": "2022-01-02T03:04:05Z",
+  "owner": "https://github.com/ornekkullanici"
+ },
+ {
+  "type": "repository",
+  "url": "https://github.com/ornekkullanici/gizli-depo",
+  "name": "gizli-depo",
+  "description": null,
+  "private": true,
+  "created_at": "2022-06-07T08:09:10Z",
+  "owner": "https://github.com/ornekkullanici"
+ }
+]

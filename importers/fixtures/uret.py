@@ -203,3 +203,35 @@ wm(FBD + "your_facebook_activity/messages/inbox/fbarkadas_456/message_1.json", {
                  {"sender_name": "Ornek Kisi", "timestamp_ms": 1700014060000, "content": "fb mesaj iki", "type": "Generic"}],
     "title": "Ornek Arkadas", "thread_path": "inbox/fbarkadas_456"})
 w("meta_html/instagram-ornek/your_instagram_activity/likes/liked_posts.html", "<html><body>begeniler</body></html>")
+
+
+# ------------------------------------------------------------------ GitHub (JSON dosyaları; testte tar.gz yapılır)
+GH = "github/"
+O = "https://github.com/ornekkullanici"
+wj(GH + "repositories_000001.json", [
+    {"type": "repository", "url": f"{O}/ornek-depo", "name": "ornek-depo", "description": "Ornek depo aciklamasi",
+     "private": False, "language": "Python", "created_at": "2022-01-02T03:04:05Z", "owner": O},
+    {"type": "repository", "url": f"{O}/gizli-depo", "name": "gizli-depo", "description": None, "private": True,
+     "created_at": "2022-06-07T08:09:10Z", "owner": O}])
+wj(GH + "issues_000001.json", [
+    {"type": "issue", "url": f"{O}/ornek-depo/issues/1", "repository": f"{O}/ornek-depo", "title": "Ornek issue basligi",
+     "body": "Ornek issue govdesi", "state": "open", "created_at": "2022-02-01T10:00:00Z"},
+    {"type": "issue", "url": f"{O}/ornek-depo/issues/2", "repository": f"{O}/ornek-depo", "title": "Ikinci issue",
+     "body": "govde", "state": "closed", "created_at": "2022-02-02T10:00:00Z"},
+    {"type": "issue", "url": f"{O}/ornek-depo/issues/3", "title": "Zamansiz issue"}])
+wj(GH + "issue_comments_000001.json", [
+    {"type": "issue_comment", "url": f"{O}/ornek-depo/issues/1#issuecomment-1", "body": "Ornek yorum metni",
+     "created_at": "2022-02-03T10:00:00Z"},
+    {"type": "issue_comment", "url": f"{O}/ornek-depo/issues/1#issuecomment-2", "body": "Ikinci yorum",
+     "created_at": "2022-02-04T10:00:00Z"}])
+wj(GH + "pull_requests_000001.json", [
+    {"type": "pull_request", "url": f"{O}/ornek-depo/pull/5", "title": "Ornek PR", "body": "PR govdesi",
+     "state": "merged", "created_at": "2022-03-01T10:00:00Z"}])
+wj(GH + "stars_000001.json", [
+    {"type": "star", "repository": "https://github.com/baska/yildizli-depo", "created_at": "2022-04-01T10:00:00Z"},
+    {"type": "star", "repository": "https://github.com/baska/ikinci-depo", "created_at": "2022-04-02T10:00:00Z"}])
+wj(GH + "users_000001.json", [{"type": "user", "login": "ornekkullanici", "emails": ["gizli@example.test"],
+                               "created_at": "2020-01-01T00:00:00Z"}])
+wj(GH + "public_keys_000001.json", [{"type": "public_key", "title": "laptop", "key": "ssh-rsa AAAAORNEK",
+                                     "created_at": "2021-01-01T00:00:00Z"}])
+wj(GH + "schema.json", {"version": "1.2.3", "ornek": True})
