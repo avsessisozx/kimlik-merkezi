@@ -20,10 +20,10 @@ def test_ice_al_tur_takeout_ve_tekrar(tmp_path, zipper):
     veri, z = tmp_path / "v", zipper("takeout_en")
     assert cli(veri, "baslat").returncode == 0
     a = cli(veri, "ice-al", str(z), "--tur", "google_takeout")
-    assert a.returncode == 0 and "Eklenen: 18" in a.stdout, a.stdout + a.stderr
+    assert a.returncode == 0 and "Eklenen: 22" in a.stdout, a.stdout + a.stderr
     b = cli(veri, "ice-al", str(z), "--tur", "takeout")  # takma ad
-    assert b.returncode == 0 and "Eklenen: 0" in b.stdout and "Zaten vardı: 19" in b.stdout
-    assert "source: 1" in cli(veri, "ozet").stdout and "event: 18" in cli(veri, "ozet").stdout
+    assert b.returncode == 0 and "Eklenen: 0" in b.stdout and "Zaten vardı: 23" in b.stdout
+    assert "source: 1" in cli(veri, "ozet").stdout and "event: 22" in cli(veri, "ozet").stdout
 
 
 def test_ice_al_reddit_ve_hata_cikis_kodu(tmp_path, zipper):

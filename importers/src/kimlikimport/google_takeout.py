@@ -4,7 +4,8 @@ Tanınanlar (dosya adına değil İÇERİĞE bakarak; hesap dili Türkçe olabil
 - YouTube izleme/arama geçmişi ve My Activity (JSON dizisi; kayıtlarda `time` + `title`/`header`)
 - Chrome geçmişi: `{"Browser History": [ ... ]}` (`History.json` ya da eski `BrowserHistory.json`)
 - YouTube abonelikleri: CSV (kanal kimliği `UC...` + `youtube.com/channel/...` adresi)
-Tanınıp işlenmeyenler rapora yazılır, sessizce atlanmaz: Gmail MBOX, HTML biçimi, eski biçim.
+- Gmail MBOX (`.mbox`, "From " ayırıcılı): `eposta` kategorisi (hassas), akışla; ekler alınmaz.
+Tanınıp işlenmeyenler rapora yazılır, sessizce atlanmaz: HTML biçimi, eski biçim.
 
 Biçim bilgisinin kaynakları ve doğrulama durumu: durum/importers.md.
 """
@@ -22,6 +23,8 @@ from urllib.parse import parse_qs, urlparse
 import ijson
 from kimlikcore import Category, EventIn, FormatError
 
+from .common import chrome_visit_events
+from .mbox import iter_raw_messages, message_event
 from .base import (
     Archive,
     DetectResult,
@@ -119,7 +122,12 @@ def _classify(entry: Entry, found: _Found) -> None:
         else:
             found.ignored += 1
     elif ext == "mbox":
-        found.unsupported.append(f"{entry.name}: Gmail MBOX, bu sürümde desteklenmiyor")
+        if peek(entry, 16).startswith(b"From "):
+            found.files.append(("mbox", entry))
+        elif entry.size == 0:
+            found.empty.append(entry)
+        else:
+            found.unsupported.append(f"{entry.name}: .mbox uzantılı ama 'From ' ayırıcısıyla başlamıyor")
     elif ext in ("html", "htm"):
         if b"mdl-grid" in peek(entry, 16384):
             found.unsupported.append(
@@ -202,7 +210,7 @@ class GoogleTakeout:
             rep.ok = False
             rep.missing.append(
                 "Takeout JSON içeriği: YouTube izleme/arama geçmişi, My Activity, "
-                "Chrome geçmişi ya da abonelik CSV'si (hiçbiri bulunamadı)"
+                "Chrome geçmişi, abonelik CSV'si ya da Gmail MBOX (hiçbiri bulunamadı)"
             )
         if f.ignored:
             rep.notes.append(f"{f.ignored} dosya tanınan Takeout içeriği olmadığı için yok sayıldı")
@@ -232,6 +240,9 @@ class GoogleTakeout:
                         bad += 1
                         continue
                     extra |= set(rec) - _CHROME_KNOWN
+            elif role == "mbox":
+                self._verify_mbox(e, rep)
+                return
             else:
                 return
         except (ijson.JSONError, UnicodeDecodeError):
@@ -247,6 +258,24 @@ class GoogleTakeout:
             )
         elif bad:
             rep.notes.append(f"{e.name}: ilk {total} kayıttan {bad} tanesi eksik/bozuk alanlı")
+
+    @staticmethod
+    def _verify_mbox(e: Entry, rep: FormatReport) -> None:
+        with e.open() as f:
+            first = next(iter_raw_messages(f), None)
+        if first is None or not first[1].strip():
+            rep.ok = False
+            rep.missing.append(f"{e.name}: MBOX'ta okunabilir ileti yok")
+            return
+        try:
+            ev = message_event(*first)
+        except Exception:
+            ev = None
+        if ev is None:
+            rep.ok = False
+            rep.missing.append(f"{e.name}: ilk iletide Date başlığı okunamadı")
+        else:
+            rep.notes.append(f"{e.name}: Gmail MBOX akışla okunur, ekler içe alınmaz (yalnız ad/boyut)")
 
     @staticmethod
     def _iter_json(e: Entry, prefix: str, limit: int | None = None):
@@ -278,6 +307,8 @@ class GoogleTakeout:
                 yield from self._parse_chrome(e)
             elif role == "subscriptions":
                 yield from self._parse_subscriptions(e)
+            elif role == "mbox":
+                yield from self._parse_mbox(e)
 
     def _stream(self, e: Entry, prefix: str):
         n = 0
@@ -320,25 +351,28 @@ class GoogleTakeout:
             except (OverflowError, OSError, ValueError):
                 self._skipped["chrome: time_usec aralık dışı"] += 1
                 continue
-            title = rec.get("title") or ""
-            key = stable_key("gt", "chrome", int(usec), url)
-            if has_coordinates(url):
-                yield EventIn(
-                    ts=ts, kind="chrome.ziyaret", category=Category.TARAMA, event_key=key,
-                    payload={"baslik": title, "gecis": rec.get("page_transition"),
-                             "url": None, "url_konum_ayrildi": True},
-                    text=title,
-                )
-                yield EventIn(
-                    ts=ts, kind="google.konum", category=Category.KONUM, event_key=key + ":konum",
-                    payload={"kaynak": "chrome", "url": url, "baslik": title}, text=title,
-                )
-            else:
-                yield EventIn(
-                    ts=ts, kind="chrome.ziyaret", category=Category.TARAMA, event_key=key,
-                    payload={"baslik": title, "url": url, "gecis": rec.get("page_transition")},
-                    text=f"{title} {url}".strip(),
-                )
+            yield from chrome_visit_events(
+                kind="chrome.ziyaret", ts=ts, unix_usec=int(usec), url=url,
+                title=rec.get("title") or "", transition=rec.get("page_transition"),
+            )
+
+    # --- Gmail MBOX
+    def _parse_mbox(self, e: Entry) -> Iterator[EventIn]:
+        with e.open() as f:
+            for from_line, raw, trunc in iter_raw_messages(f):
+                if not from_line and not raw.strip():
+                    continue
+                try:
+                    ev = message_event(from_line, raw, trunc)
+                except Exception:
+                    self._skipped["eposta: ileti ayrıştırılamadı"] += 1
+                    continue
+                if ev is None:
+                    self._skipped["eposta: tarih yok/okunamadı"] += 1
+                    continue
+                if trunc:
+                    self._skipped["eposta: ileti boyut sınırında kesildi (metin kısmi)"] += 1
+                yield ev
 
     # --- abonelikler
     def _parse_subscriptions(self, e: Entry) -> Iterator[EventIn]:
