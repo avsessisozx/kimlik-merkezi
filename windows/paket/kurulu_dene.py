@@ -36,6 +36,12 @@ onceki = {"theme": "dark", "mcpServers": {"baska": {"command": "x", "args": []}}
 claude_cfg.write_text(json.dumps(onceki), encoding="utf-8")
 
 
+# Sunucunun beklenen MCP araç kümesi. Sunucudaki gerçek listeyle eşleştiği server/tests/test_mcp_stdio.py::
+# test_kurulu_dene_arac_listesi_senkron ile denetlenir: araç eklenince/çıkarılınca BURASI da güncellenmeli.
+BEKLENEN_ARACLAR = {"kategorileri_listele", "ara", "zaman_cizelgesi", "say", "persona_getir", "kimlik_karti",
+                    "ornekle", "persona_oner"}
+
+
 def adim(m):
     print(f"[dene] {m}", flush=True)
 
@@ -191,7 +197,7 @@ try:
             ret = await cl.call_tool("ara", {"sorgu": "a", "kategori": "eposta"})
             return araclar, kat, ara, ret
     araclar, kat, ara, ret = asyncio.run(asyncio.wait_for(go(), 90))
-    kontrol({a.name for a in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle"},
+    kontrol({a.name for a in araclar} == BEKLENEN_ARACLAR,
             "MCP stdio araç listesi: " + ", ".join(sorted(a.name for a in araclar)))
     kontrol(len(kat.structured_content["kategoriler"]) > 0, "izinli kategoriler listelendi (uygulama yazan olarak açıkken)")
     kontrol(ret.is_error, "izinsiz (hassas) kategori reddedildi")
