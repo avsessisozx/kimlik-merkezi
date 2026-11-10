@@ -177,3 +177,21 @@ def test_cok_surecli_dogrudan_kayit_yazimi(world):
     ps = [subprocess.Popen([sys.executable, "-c", kod, str(world["root"])]) for _ in range(6)]
     assert all(p.wait(timeout=60) == 0 for p in ps)
     assert len(AccessLog(world["root"]).read_all()) == 600
+
+
+def test_kurulu_dene_arac_listesi_senkron(world):
+    """windows/paket/kurulu_dene.py'deki sabit araç kümesi sunucunun GERÇEK listesiyle aynı olmalı
+    (paket CI'sında 'say' unutulduğu için denetim düşmüştü)."""
+    import ast
+    from pathlib import Path
+    kaynak = Path(__file__).resolve().parents[2] / "windows" / "paket" / "kurulu_dene.py"
+    sabit = None
+    for n in ast.parse(kaynak.read_text(encoding="utf-8")).body:
+        if isinstance(n, ast.Assign) and any(getattr(h, "id", "") == "BEKLENEN_ARACLAR" for h in n.targets):
+            sabit = ast.literal_eval(n.value)
+    assert sabit is not None, "kurulu_dene.py'de BEKLENEN_ARACLAR bulunamadı"
+
+    async def go():
+        async with Client(params(world["root"], world["a_key"])) as c:
+            return {t.name for t in (await c.list_tools()).tools}
+    assert run(go()) == set(sabit)
