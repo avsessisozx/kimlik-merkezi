@@ -1,0 +1,81 @@
+name: tam
+
+# Pahalı koşu: Windows testleri ve büyük (`buyuk`) testler.
+# Yalnızca elle (workflow_dispatch) ya da v* etiketinde; her push'ta çalışmaz.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: tam-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            core/pyproject.toml
+            server/pyproject.toml
+            importers/pyproject.toml
+      - name: Kurulum
+        run: |
+          pkgs="-e core -e server"
+          if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          python -m pip install $pkgs pytest
+      # Her paket ayrı koşulur ve biri başarısız olsa da diğerleri koşar: tüm Windows hataları tek seferde görünsün.
+      - name: core testleri (kilit, dosya izni, yollar)
+        if: success() || failure()
+        run: python -m pytest core -m "not buyuk"
+      - name: server testleri
+        if: success() || failure()
+        run: python -m pytest server
+      - name: importers testleri
+        if: (success() || failure()) && hashFiles('importers/pyproject.toml') != ''
+        run: python -m pytest importers -m "not buyuk"
+      - name: entegrasyon testleri
+        if: success() || failure()
+        run: python -m pytest entegrasyon -m "not buyuk"
+
+  buyuk:
+    # ~2 GB sentetik dosya; test Windows'ta atlanır (resource modülü), bu yüzden yalnızca Linux.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            core/pyproject.toml
+            server/pyproject.toml
+            importers/pyproject.toml
+      - name: Kurulum
+        run: |
+          pkgs="-e core -e server"
+          if [ -f importers/pyproject.toml ]; then pkgs="$pkgs -e importers"; fi
+          python -m pip install $pkgs pytest
+      - name: Boş disk
+        run: df -h .
+      - name: büyük testler
+        run: |
+          python -m pytest core -m buyuk -s
+          if [ -f importers/pyproject.toml ]; then python -m pytest importers -m buyuk -s || [ $? -eq 5 ]; fi
