@@ -45,6 +45,26 @@ progress{width:100%;height:14px}
 #bildirim div{background:var(--panel);border:1px solid var(--cizgi);border-left:4px solid var(--vurgu);padding:10px 12px;margin-top:8px;border-radius:6px}
 #bildirim div.h{border-left-color:var(--tehlike)}
 pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;font-size:12px}
+/* terim ipuçları, sözlük, duyarlı tablo */
+.terim-i{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:4px;border:1px solid var(--soluk);border-radius:50%;font-size:11px;line-height:1;color:var(--soluk);cursor:help;vertical-align:middle;user-select:none;font-weight:600}
+.terim-i:hover,.terim-i:focus{color:var(--vurgu);border-color:var(--vurgu)}
+.terim-kutu{position:fixed;z-index:30;max-width:300px;background:var(--panel);color:var(--yazi);border:1px solid var(--vurgu);border-radius:8px;padding:8px 11px;font-size:13px;line-height:1.45;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.rozet{margin-left:6px}
+.not-utc{margin:2px 0 8px}
+.ayrinti-kutu{margin:8px 0}.ayrinti-kutu summary{cursor:pointer;color:var(--soluk);font-size:13px}
+.ozet-liste{margin:8px 0;padding-left:20px}.ozet-liste li{margin:3px 0}
+.sozluk dt{font-weight:600;margin-top:8px}.sozluk dd{margin:2px 0 0 0;color:var(--soluk)}
+.nedir-liste{margin:6px 0;padding-left:20px;font-size:13.5px}.nedir-liste li{margin:2px 0}
+details.nedir>summary{cursor:pointer;font-weight:600}
+.eklenemedi{border-left:4px solid var(--tehlike);padding:10px 12px;background:var(--panel);margin:8px 0}
+.eklendi-kutu{border-left:4px solid var(--ok);padding:10px 12px;background:var(--panel);margin:8px 0}
+.tablo-kap{overflow-x:auto}
+@media(max-width:700px){
+ table.duyarli,table.duyarli tbody{display:block;width:100%}table.duyarli tr:first-child{display:none}
+ table.duyarli tr{display:block;border:1px solid var(--cizgi);border-radius:8px;margin:0 0 8px;padding:4px 8px}
+ table.duyarli td{display:block;border:0;padding:3px 0;overflow-wrap:anywhere}
+ table.duyarli td[data-e]::before{content:attr(data-e) ": ";color:var(--soluk);font-size:12px}
+}
 @media(max-width:700px){header{flex-wrap:wrap;gap:8px;padding:8px 12px}header h1{font-size:16px;flex:1 1 100%}header .kisi{flex:1}header select{max-width:140px}nav{width:100%;display:flex;flex-wrap:wrap;border-right:0}.duzen{flex-direction:column}nav button{width:auto}}
 
 </style>
@@ -54,6 +74,7 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px;b
 <header><h1>Kimlik Merkezi</h1><div class="kisi" id="kisi-kutu"></div><button class="i" id="rapor-dugme">Hata raporunu kopyala</button></header>
 <div class="duzen"><nav id="nav"></nav><main id="ana"></main></div>
 <div id="kok-pencere"></div><div id="bildirim"></div>
+<script src="/statik/ortak.js"></script>
 <script src="/statik/echarts.min.js"></script>
 <script src="/statik/figur.js"></script>
 <script src="/statik/harita.js"></script>
@@ -94,11 +115,34 @@ function pencere(baslik,...icerik){const k=$('#kok-pencere');k.textContent='';
   const kapat=()=>{k.textContent='';};
   k.append(h('div',{class:'yer'},h('div',{class:'pencere',role:'dialog'},h('h2',{},baslik),...icerik)));return kapat;}
 function utc(yerel){return yerel?new Date(yerel).toISOString().slice(0,19)+'Z':null;}
-function tarih(s){return s?s.replace('T',' ').replace('Z',''):'-';}
+function tarih(s){if(!s)return '-';const t=s.replace('T',' ').replace('Z','');return t.includes(':')?t+' '+UTC_ETIKET:t;}
+// Kayıt saatleri UTC'dir (Harita da UTC gösterir); kullanıcıya her listede tek cümleyle söylenir.
+function utcNotu(){return h('div',{class:'soluk not-utc'},'Saatler UTC olarak gösterilir (yerel saatiniz değil). Türkiye saati için 3 saat ekleyin; tarih seçicileri de UTC gününü kullanır.');}
+// Terim sözlüğü: kısa Türkçe açıklamalar, "?" simgesiyle yanında gösterilir (fare, dokunma ya da klavye odağı).
+const SOZLUK={
+ mcp:['MCP','Claude gibi bir yapay zekâ uygulamasının, verdiğiniz izin kadar bilgiyi bu bilgisayardan okumasını sağlayan bağlantı biçimi. Okunan bilgi, sohbet sırasında o uygulamaya (ör. Claude) gider.'],
+ fts:['Arama dizini (FTS)','Kayıtlarınızı hızlı aramak için tutulan, bir kitabın içindekiler listesine benzer yardımcı tablo. Sağlık denetimi bunun çalıştığına bakar.'],
+ persona:['Persona','Sizin hakkınızda onayladığınız kalıcı bilgiler: nerede yaşadığınız, işiniz, cihazlarınız, tercihleriniz. Siz onaylamadan hiçbir öneri personaya eklenmez.'],
+ hassas:['Hassas','E-posta, özel mesajlar, konum ve yapay zekâ sohbetleri. Bu kategoriler ayrı onay ister ve "hepsini aç" düğmesiyle asla açılmaz.'],
+ harsiv:['Ham arşiv','İçe aktardığınız dosyanın veri klasörünüze alınan birebir kopyası (arsiv klasörü). Kayıtlar gerekirse buradan yeniden üretilir; "Kalıcı sil" bunu da siler.'],
+ anahtar:['Uygulama anahtarı','Bir uygulamanın verinize bağlanırken kullandığı, parolaya benzer gizli kod. Her uygulamaya ayrı üretilir ve istediğiniz an iptal edilebilir.'],
+ kimlikkarti:['Kimlik kartı','Onayladığınız persona bilgilerinin, bir yapay zekâ sohbetine yapıştırabileceğiniz kısa metin özeti.'],
+ bicimraporu:['Biçim raporu','Dosyanın yapısını anlatan teknik rapor (kayıt içeriğini değil). Tanınmayan bir dosya için geliştiriciye göndermek içindir.']};
+let TERIM_KUTU=null;
+function terimKapat(){if(TERIM_KUTU){TERIM_KUTU.remove();TERIM_KUTU=null;}}
+function terimAc(el,metin){terimKapat();const k=h('div',{class:'terim-kutu',role:'tooltip'},metin);document.body.append(k);TERIM_KUTU=k;
+  const r=el.getBoundingClientRect(),w=k.offsetWidth;k.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left-w/2+8))+'px';
+  const alt=r.bottom+6;k.style.top=(alt+k.offsetHeight>innerHeight-8?Math.max(8,r.top-k.offsetHeight-6):alt)+'px';}
+function ipucu(anahtar){const [ad,metin]=SOZLUK[anahtar];
+  return h('span',{class:'terim-i',tabindex:0,role:'button','aria-label':ad+': '+metin,onmouseenter:e=>terimAc(e.currentTarget,metin),onmouseleave:terimKapat,
+    onfocus:e=>terimAc(e.currentTarget,metin),onblur:terimKapat,onclick:e=>{e.stopPropagation();terimAc(e.currentTarget,metin);},onkeydown:e=>{if(e.key==='Escape')terimKapat();}},'?');}
+document.addEventListener('click',terimKapat);
+function terim(metin,anahtar){return h('span',{},metin,ipucu(anahtar));}
+function hassasRozet(){return h('span',{class:'rozet h'},'hassas',ipucu('hassas'));}
 function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
   const kap=h('div',{});KATEGORILER.filter(k=>hassasDahil||!k.hassas).forEach(k=>{
     const c=h('input',{type:'checkbox',value:k.kimlik,checked:secili?secili.includes(k.kimlik):false});kutular.push(c);
-    kap.append(h('label',{},c,' ',k.ad,k.hassas?h('span',{class:'rozet h'},'hassas'):null));});
+    kap.append(h('label',{},c,' ',k.ad,k.hassas?hassasRozet():null));});
   kap.sec=()=>kutular.filter(c=>c.checked).map(c=>c.value);return kap;}
 
 const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
@@ -143,13 +187,13 @@ SF.ana=async a=>{
   if(ac.yarim_is)a.append(h('div',{class:'uyari'},'Yarım kalmış bir içe aktarma var: '+ac.yarim_is.yol+' ',
     h('button',{class:'i',onclick:()=>{git('ice');setTimeout(()=>{const g=$('#ice-yol');if(g)g.value=ac.yarim_is.yol;},50);}},'Kaldığı yerden devam et')));
   const g=h('div',{class:'izgara'});
-  const say=(ad,n)=>h('div',{class:'kart'},h('div',{class:'sayi'},String(n)),h('div',{class:'soluk'},ad));
+  const say=(ad,n)=>h('div',{class:'kart'},h('div',{class:'sayi'},SAYI(n)),h('div',{class:'soluk'},ad));
   const c=d.ozet.counts||{};
-  g.append(say('Kayıt',c.event||0),say('Kaynak',d.kaynak_sayisi),say('Persona bilgisi',c.fact||0),say('Uygulama anahtarı',c.app_key||0));
-  a.append(g,h('div',{class:'kart'},h('div',{class:'soluk'},'Veri klasörü'),h('div',{},d.veri_klasoru)));
+  g.append(say('Kayıt',c.event||0),say('Kaynak',d.kaynak_sayisi),say(terim('Persona bilgisi','persona'),c.fact||0),say(terim('Uygulama anahtarı','anahtar'),c.app_key||0));
+  a.append(g,h('div',{class:'soluk',id:'kayit-aciklama',style:'margin:-4px 0 12px'},'Neden Harita\'daki toplamdan farklı olabilir? Buradaki "Kayıt" sayısı diskteki TÜM kayıtları sayar: Haritada KİLİTLİ görünen bölgelerdekileri (e-posta, özel mesaj, konum, yapay zekâ sohbeti; Ayaklar bölgesine bağlı fotoğraf/video bilgisi de) ve gizlenmiş ya da kaldırılmış kaynaklardan gelenleri de. Harita yalnızca kilidi açık bölgelerdeki, gizlenmemiş kayıtları (ve seçili zaman aralığını) sayar; bu yüzden daha düşük görünür.'),h('div',{class:'kart'},h('div',{class:'soluk'},'Veri klasörü'),h('div',{},d.veri_klasoru)));
   const sk=h('div',{class:'kart'},h('h3',{},'Sağlık denetimi'),h('div',{id:'saglik-sonuc',class:'soluk'},'Henüz çalıştırılmadı.'),
     h('button',{class:'i',onclick:async()=>{const s=await api('saglik');const k=$('#saglik-sonuc');k.textContent='';
-      s.kontroller.forEach(c=>k.append(h('div',{class:c.ok?'tamam':'kotu'},(c.ok?'✓ ':'✗ ')+c.ad+(c.ayrinti?': '+c.ayrinti:''))));}},'Denetle'));
+      s.kontroller.forEach(c=>k.append(h('div',{class:c.ok?'tamam':'kotu'},(c.ok?'✓ ':'✗ ')+c.ad+(c.ayrinti?': '+c.ayrinti:''),/FTS/.test(c.ad)?ipucu('fts'):null)));}},'Denetle'));
   a.append(sk);
 };
 // ------------------------------------------------------------------ içe aktar
@@ -157,7 +201,7 @@ SF.ice=async a=>{
   const turler=(await api('turler')).turler;
   const serit=h('div',{class:'kart seridi',id:'ice-serit'});
   const seritYenile=async()=>{const d=await api('durum');const c=d.ozet.counts||{};serit.textContent='';
-    [['Kayıt',c.event||0],['Kaynak',d.kaynak_sayisi],['Persona bilgisi',c.fact||0]].forEach(([ad,n])=>serit.append(h('div',{},h('b',{},SAYI(n)),' ',h('span',{class:'soluk'},ad))));};
+    [['Kayıt',c.event||0],['Kaynak',d.kaynak_sayisi],[terim('Persona bilgisi','persona'),c.fact||0]].forEach(([ad,n])=>serit.append(h('div',{},h('b',{},SAYI(n)),' ',h('span',{class:'soluk'},ad))));};
   await seritYenile();
   const yol=h('input',{type:'text',id:'ice-yol',placeholder:'Zip dosyası ya da klasör yolu'});
   const tur=h('select',{},h('option',{value:''},'Otomatik tanı'),turler.map(t=>h('option',{value:t},t)));
@@ -171,11 +215,12 @@ SF.ice=async a=>{
       if(s.durum!=='calisiyor'){clearInterval(yoklama);yoklama=null;seritYenile().catch(()=>{});}},700);}
   function ciz(s){alan.textContent='';
     if(s.durum==='calisiyor'){const ad={dogrula:'Dosya doğrulanıyor',kopyala:'Ham arşive kopyalanıyor',isle:'Kayıtlar işleniyor'}[s.asama]||s.asama;
-      alan.append(h('div',{class:'kart'},h('div',{},`${ad}… ${s.sayi?s.sayi+' kayıt':''}`),h('progress',{}),h('div',{class:'soluk'},'Kapatırsanız aynı dosyayı yeniden verin: tekrar eden kayıtlar eklenmez, kalan devam eder.')));}
+      alan.append(h('div',{class:'kart'},h('div',{},`${ad}… ${s.sayi?SAYI(s.sayi)+' kayıt':''}`,s.asama==='kopyala'?ipucu('harsiv'):null),h('progress',{}),h('div',{class:'soluk'},'Kapatırsanız aynı dosyayı yeniden verin: tekrar eden kayıtlar eklenmez, kalan devam eder.')));}
     else if(s.durum==='bitti')alan.append(h('div',{class:'kart'},h('h3',{class:'tamam'},'Tamamlandı'),h('pre',{},s.sonuc)));
     else if(s.durum==='hata'){
-      alan.append(h('div',{class:'hata'},s.hata));
-      if(s.bicim_raporu)alan.append(h('div',{class:'kart'},h('h3',{},'Biçim raporu'),yapistirmaKutusu(s.bicim_raporu),
+      const [ana,...teknik]=String(s.hata).split('\n\n');
+      alan.append(h('div',{class:'hata'},ana,teknik.length?h('details',{class:'ayrinti-kutu'},h('summary',{},'Teknik ayrıntı'),h('pre',{},teknik.join('\n\n'))):null));
+      if(s.bicim_raporu)alan.append(h('div',{class:'kart'},h('h3',{},terim('Biçim raporu','bicimraporu')),yapistirmaKutusu(s.bicim_raporu),
         h('button',{class:'d',onclick:()=>kopyala(s.bicim_raporu)},'Biçim raporunu kopyala')));
       if(s.hata_kodu==='daha_once_silinmis')alan.append(h('div',{class:'satir'},h('span',{},'Daha önce kalıcı sildiğiniz bir girdi. Yine de alınsın mı?'),
         h('button',{class:'d',onclick:()=>baslat(true).catch(hataGoster)},'Evet, yine de al')));
@@ -201,7 +246,7 @@ SF.ara=async a=>{
   const git_=async()=>{son.textContent='';son.append(kayitListesi((await api('ara',{sorgu:q.value,kategoriler:kat.sec()})).kayitlar,true));};
   q.addEventListener('keydown',e=>{if(e.key==='Enter')git_().catch(hataGoster);});
   if(window.ARAMA_SORGU){q.value=window.ARAMA_SORGU;window.ARAMA_SORGU=null;setTimeout(()=>git_().catch(hataGoster),0);}
-  a.append(h('h2',{},'Arama'),h('div',{class:'kart'},h('div',{class:'satir'},q,h('button',{class:'d',onclick:()=>git_().catch(hataGoster)},'Ara')),h('div',{class:'soluk'},'Kategori seçmezseniz hepsinde aranır.'),kat),son);};
+  a.append(h('h2',{},'Arama'),utcNotu(),h('div',{class:'kart'},h('div',{class:'satir'},q,h('button',{class:'d',onclick:()=>git_().catch(hataGoster)},'Ara')),h('div',{class:'soluk'},'Kategori seçmezseniz hepsinde aranır.'),kat),son);};
 SF.zaman=async a=>{
   if(!KATEGORILER.length)KATEGORILER=(await api('durum')).kategoriler;
   const kat=kategoriKutulari(null);const b=h('input',{type:'date'}),e=h('input',{type:'date'});const son=h('div',{});let atla=0;
@@ -209,7 +254,7 @@ SF.zaman=async a=>{
     const r=await api('zaman',{kategoriler:kat.sec(),baslangic:b.value?b.value+'T00:00:00Z':null,bitis:e.value?e.value+'T23:59:59Z':null,limit:100,atla});
     atla+=r.kayitlar.length;son.querySelector('.daha')?.remove();son.append(kayitListesi(r.kayitlar,true));
     if(r.kayitlar.length===100)son.append(h('button',{class:'i daha',onclick:()=>yukle(false).catch(hataGoster)},'Daha fazla'));};
-  a.append(h('h2',{},'Zaman çizelgesi'),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç ',b,' Bitiş ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
+  a.append(h('h2',{},'Zaman çizelgesi'),utcNotu(),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç (UTC günü) ',b,' Bitiş (UTC günü) ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
   yukle(true).catch(hataGoster);};
 // ------------------------------------------------------------------ persona
 let PERSONA_SEKME='bilgiler';
@@ -236,7 +281,7 @@ async function oneriPaneli(kok){
       h('div',{class:'oneri-meta'},h('span',{class:'rozet'},o.kategori_ad),h('span',{class:'guven',title:'Yapay zekânın kendi bildirdiği güven'},h('span',{class:'soluk'},'güven '),h('b',{},'%'+pct),h('i',{style:`--g:${pct}%`})),
         h('button',{class:'baglanti',onclick:async e=>{if(kanit.dataset.acik){kanit.textContent='';delete kanit.dataset.acik;return;}kanit.dataset.acik='1';kanit.textContent='Yükleniyor…';
           const k=await api('oneri_kanit',{oneri_id:o.id}).catch(x=>{hataGoster(x);return null;});kanit.textContent='';if(!k)return;
-          k.kanit.forEach(x=>kanit.append(x.yok?h('div',{class:'kanit-satir soluk'},'Kayıt artık yok.'):h('div',{class:'kanit-satir'},h('div',{class:'soluk'},new Date(x.zaman).toLocaleString('tr-TR',{timeZone:'UTC'})+' · ',h('span',{class:'rozet'+(x.hassas?' h':'')},x.kategori),' ',x.tur),h('div',{class:'m'},x.gizli?'(gizlenmiş kayıt)':(x.metin||'(metin yok)')))));}},`${o.kanit_sayisi} kanıt kaydı ▾`),
+          k.kanit.forEach(x=>kanit.append(x.yok?h('div',{class:'kanit-satir soluk'},'Kayıt artık yok.'):h('div',{class:'kanit-satir'},h('div',{class:'soluk'},new Date(x.zaman).toLocaleString('tr-TR',{timeZone:'UTC'})+' '+UTC_ETIKET+' · ',h('span',{class:'rozet'+(x.hassas?' h':'')},x.kategori),' ',x.tur),h('div',{class:'m'},x.gizli?'(gizlenmiş kayıt)':(x.metin||'(metin yok)')))));}},`${o.kanit_sayisi} kanıt kaydı ▾`),
         h('span',{class:'soluk'},`${o.uygulama} · ${new Date(o.ts).toLocaleDateString('tr-TR')}`)),
       kanit,duzen,
       h('div',{class:'oneri-eylem'},h('button',{class:'d',onclick:async()=>{const x=await api('oneri_onayla',{oneri_id:o.id}).catch(hataGoster);if(x)yenile('Persona\'ya eklendi.');}},'Onayla'),
@@ -251,7 +296,7 @@ SF.persona=async a=>{
   const metin=h('input',{type:'text',placeholder:'Örn. Windows 11 bilgisayarım var'});
   const kat=h('select',{},p.kategoriler.map(k=>h('option',{value:k.kimlik},k.ad)));
   const kay=h('select',{},h('option',{value:''},'Kendi beyanım'),p.kaynaklar.map(s=>h('option',{value:s.id},'Belgeden: '+s.ad)));
-  a.append(h('h2',{},'Persona'),sek,
+  a.append(h('h2',{},terim('Persona','persona')),sek,utcNotu(),
     h('div',{class:'kart'},h('h3',{},'Bilgi ekle'),h('div',{class:'satir'},metin),
       h('div',{class:'satir'},kat,kay,h('button',{class:'d',onclick:async()=>{await api('persona_ekle',{metin:metin.value,kategori:kat.value,kaynak_id:kay.value||null}).catch(hataGoster);git('persona');}},'Ekle')),
       h('div',{class:'soluk'},'"Belgeden" seçerseniz bilgi o kaynağa bağlanır ve kimlik kartında kaynak adıyla görünür.')));
@@ -261,38 +306,67 @@ SF.persona=async a=>{
         h('div',{class:'satir'},h('span',{},'Eski: '+x.eski.metin),h('button',{class:'i',onclick:()=>sec(x.eski.id)},'Bu geçerli')),
         h('div',{class:'satir'},h('span',{},'Yeni: '+x.yeni.metin),h('button',{class:'i',onclick:()=>sec(x.yeni.id)},'Bu geçerli'))));});
     a.append(k);}
-  const t=h('table',{},h('tr',{},h('th',{},'Bilgi'),h('th',{},'Kategori'),h('th',{},'Durum'),h('th',{},'Geçerlilik'),h('th',{},'')));
+  const katAd=Object.fromEntries(p.kategoriler.map(k=>[k.kimlik,k.ad]));
+  const t=h('table',{class:'duyarli'},h('tr',{},h('th',{},'Bilgi'),h('th',{},'Kategori'),h('th',{},'Durum'),h('th',{},'Geçerlilik bitişi (UTC)'),h('th',{},'')));
   const durumAd={beyan_edilen:'Beyan edilen',dosyadan_alinan:'Dosyadan alınan',cikarilan:'Çıkarılan',eskimis:'Eskimiş'};
-  p.bilgiler.forEach(f=>t.append(h('tr',{},h('td',{},f.metin),h('td',{},f.kategori),h('td',{},durumAd[f.durum]||f.durum),h('td',{},f.gecerlilik_bitis?tarih(f.gecerlilik_bitis):'süresiz'),
+  p.bilgiler.forEach(f=>t.append(h('tr',{},h('td',{'data-e':'Bilgi'},f.metin),h('td',{'data-e':'Kategori'},katAd[f.kategori]||f.kategori),h('td',{'data-e':'Durum'},durumAd[f.durum]||f.durum),h('td',{'data-e':'Geçerlilik bitişi (UTC)'},f.gecerlilik_bitis?tarih(f.gecerlilik_bitis):'süresiz'),
     h('td',{},f.durum==='beyan_edilen'||f.durum==='dosyadan_alinan'?h('button',{class:'i',onclick:()=>{
         const m=h('input',{type:'text',value:f.metin});const kapat=pencere('Bilgiyi düzelt',m,h('div',{class:'satir'},
           h('button',{class:'d',onclick:async()=>{await api('persona_guncelle',{bilgi_id:f.id,metin:m.value}).catch(hataGoster);kapat();git('persona');}},'Kaydet'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Düzelt'):null,' ',
       h('button',{class:'t',onclick:async()=>{if(!confirm('Bu bilgi silinsin mi?'))return;await api('persona_sil',{bilgi_id:f.id}).catch(hataGoster);git('persona');}},'Sil')))));
-  a.append(h('div',{class:'kart'},h('h3',{},'Bilgiler'),p.bilgiler.length?t:h('p',{class:'soluk'},'Henüz bilgi yok.'),
+  a.append(h('div',{class:'kart'},h('h3',{},'Bilgiler'),p.bilgiler.length?h('div',{class:'tablo-kap'},t):h('p',{class:'soluk'},'Henüz bilgi yok.'),
     h('div',{class:'satir'},h('button',{class:'i',onclick:async()=>{const r=await api('persona_sure_kontrol').catch(hataGoster);bildir(`${r.eskiyen} bilginin süresi doldu.`);if(r.eskiyen)git('persona');}},'Süreleri şimdi kontrol et'),
       h('span',{class:'soluk'},'Cihazlar, projeler ve iş bilgileri 180 gün sonra eskir; açılışta da kontrol edilir.'))));
-  a.append(h('div',{class:'kart'},h('h3',{},'Kimlik kartı'),h('button',{class:'i',onclick:async e=>{const r=await api('kimlik_karti');
+  a.append(h('div',{class:'kart'},h('h3',{},terim('Kimlik kartı','kimlikkarti')),h('button',{class:'i',onclick:async e=>{const r=await api('kimlik_karti');
     const yer=e.target.parentElement.querySelector('.kart-yer');yer.textContent='';yer.append(yapistirmaKutusu(r.markdown));}},'Oluştur'),h('div',{class:'kart-yer'})));
 };
 // ------------------------------------------------------------------ erişim
+let SON_CLAUDE=null;const ELLE_BEKLEYEN=new Set();   // yalnız bu oturumda: Claude'a eklenemeyen ama üretilmiş anahtarlar
+function claudeSonucuCiz(k,sn){k.textContent='';const r=sn.r;
+  if(sn.ok){
+    const ad=Object.fromEntries(KATEGORILER.map(x=>[x.kimlik,x.ad]));
+    const acik=(sn.acik||[]).map(x=>ad[x]||x),kapali=KATEGORILER.filter(x=>!(sn.acik||[]).includes(x.kimlik)).map(x=>x.ad);
+    k.append(h('div',{class:'eklendi-kutu'},h('b',{},r.durum==='guncellendi'?'Claude Desktop girişi güncellendi.':'Claude Desktop ayar dosyasına eklendi.'),' '+r.mesaj,
+      h('div',{},h('b',{},`Şu an AÇIK (${acik.length}, süresiz): `),acik.join(', ')||'hiçbiri'),
+      h('div',{},h('b',{},`KAPALI (${kapali.length}): `),kapali.join(', ')||'hiçbiri',' (hassas olanlar yalnızca ayrı onayla açılır)'),
+      h('div',{class:'soluk'},'İstemediğiniz kategorileri aşağıdaki Claude Desktop kartından tek tek kapatabilirsiniz.')));
+    if(r.dosya)k.append(h('div',{class:'soluk'},'Ayar dosyası: '+r.dosya));
+    if(r.yedek)k.append(h('div',{class:'soluk'},'Yedek: '+r.yedek));}
+  else{
+    k.append(h('div',{class:'eklenemedi'},h('b',{},'Claude Desktop\'a EKLENEMEDİ.'),' '+r.mesaj,
+      r.dosya?h('div',{class:'soluk'},'Dosya: '+r.dosya):null,
+      (r.aranan&&r.aranan.length)?h('div',{},h('b',{},'Uygulamanın aradığı yerler: '),h('ul',{class:'ozet-liste'},r.aranan.map(y=>h('li',{},h('code',{},y))))):null,
+      h('div',{},'Bu yollarda dosya yoksa ya da okunamıyorsa uygulama hiçbir dosyaya dokunmaz. Konum Claude\'un resmî belgesinden doğrulanmadı; ayar dosyasının yerini Claude Desktop\'un kendi belgelerinden de kontrol edin.'),
+      r.app_id?h('div',{},h('b',{},'Bir anahtar yine de üretildi'),' ve hassas olmayan kategoriler için izinler açıldı. Aşağıdaki metni kendiniz ayar dosyasına eklemezseniz bu anahtar hiçbir yerde kullanılmaz; kullanmayacaksanız aşağıdan iptal edin.',
+        h('div',{class:'satir'},h('button',{class:'t',onclick:async()=>{if(!confirm('Üretilen anahtar iptal edilsin mi? Geri alınamaz.'))return;await api('anahtar_iptal',{app_id:r.app_id}).catch(hataGoster);ELLE_BEKLEYEN.delete(r.app_id);SON_CLAUDE=null;bildir('Anahtar iptal edildi.');git('erisim');}},'Bu anahtarı şimdi iptal et'))):null));
+    if(r.yedek)k.append(h('div',{class:'soluk'},'Yedek: '+r.yedek));
+    if(r.metin)k.append(h('div',{},h('h4',{},terim('Elle eklenecek ayar metni (MCP)','mcp')),yapistirmaKutusu(r.metin)));}
+  k.append(h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{SON_CLAUDE=null;git('erisim');}},'Bu iletiyi kapat')));}
 SF.erisim=async a=>{
   const [e,l]=await Promise.all([api('erisim'),api('erisim_kaydi',{limit:200})]);KATEGORILER=e.kategoriler;
   a.append(h('h2',{},'Erişim'));
+  const hassasAd=KATEGORILER.filter(k=>k.hassas).map(k=>k.ad).join(', '),acikSay=KATEGORILER.filter(k=>!k.hassas).length;
   const cd=h('div',{class:'kart'},h('h3',{},'Claude Desktop\'a ekle'),
-    h('p',{class:'soluk'},'Ayar dosyasının yedeğini alır, bu uygulama için yeni anahtar üretir ve girişi ekler. Hassas kategoriler kapalı gelir. Dosya konumu resmî belgeden doğrulanamadı; bulunamazsa kopyalanabilir ayar metni verilir.'),
+    h('p',{class:'soluk'},'Ayar dosyasının yedeğini alır, bu uygulama için yeni bir ',terim('anahtar','anahtar'),' üretir ve ',terim('MCP','mcp'),' bağlantı girişini ekler. ',
+      h('b',{},`Dikkat: hassas olmayan ${acikSay} kategori (${KATEGORILER.filter(k=>!k.hassas).map(k=>k.ad).join(', ')}) süresiz olarak AÇIK gelir.`),
+      ` Hassas kategoriler (${hassasAd}) kapalı kalır; yalnızca ayrı onayla açılır. İstemediklerinizi eklemeden sonra aşağıdaki Claude Desktop kartından kapatabilirsiniz. (Yukarıdaki "Yeni anahtar" ise hiçbir izin vermeden başlar.)`),
     h('button',{class:'d',onclick:async()=>{const r=await api('claude_ekle').catch(hataGoster);if(!r)return;
-      const k=cd.querySelector('.sonuc');k.textContent='';k.append(h('div',{class:r.durum==='eklendi'||r.durum==='guncellendi'?'uyari':'hata'},r.mesaj));
-      if(r.yedek)k.append(h('div',{class:'soluk'},'Yedek: '+r.yedek));if(r.metin)k.append(yapistirmaKutusu(r.metin));setTimeout(()=>git('erisim'),r.metin?60000:1500);}},'Claude\'a ekle'),h('div',{class:'sonuc'}));
+      const ok=r.durum==='eklendi'||r.durum==='guncellendi';
+      let acik=null;if(r.app_id){try{const e2=await api('erisim');const u=e2.uygulamalar.find(x=>x.id===r.app_id);acik=u?u.izinler.map(i=>i.kategori):[];}catch(_){}}
+      if(!ok&&r.app_id)ELLE_BEKLEYEN.add(r.app_id);
+      SON_CLAUDE={r,ok,acik};git('erisim');}},'Claude\'a ekle'),h('div',{class:'sonuc'}));
+  if(SON_CLAUDE)claudeSonucuCiz(cd.querySelector('.sonuc'),SON_CLAUDE);
   a.append(cd);
   const ad=h('input',{type:'text',placeholder:'Uygulama adı (ör. Claude Code)'});
-  a.append(h('div',{class:'kart'},h('h3',{},'Yeni anahtar'),h('div',{class:'satir'},ad,h('button',{class:'d',onclick:async()=>{
+  a.append(h('div',{class:'kart'},h('h3',{},'Yeni anahtar'),h('p',{class:'soluk'},'Hiçbir izin açık olmadan başlar; izinleri sonra siz verirsiniz.'),h('div',{class:'satir'},ad,h('button',{class:'d',onclick:async()=>{
     const r=await api('anahtar_uret',{ad:ad.value}).catch(hataGoster);if(!r)return;const b=await api('baglanti_bilgisi',{anahtar:r.anahtar});
-    const kapat=pencere('Anahtar üretildi',h('p',{class:'uyari'},r.uyari),yapistirmaKutusu(r.anahtar),h('h3',{},'MCP bağlantı ayarı'),yapistirmaKutusu(b.metin),
+    const kapat=pencere('Anahtar üretildi',h('p',{class:'uyari'},r.uyari),yapistirmaKutusu(r.anahtar),h('h3',{},terim('MCP bağlantı ayarı','mcp')),yapistirmaKutusu(b.metin),
       h('button',{class:'d',onclick:()=>{kapat();git('erisim');}},'Tamam'));}},'Anahtar üret'))));
   e.uygulamalar.forEach(u=>{
     const kart=h('div',{class:'kart'},h('div',{class:'satir'},h('h3',{style:'margin:0;flex:1'},u.ad+(u.iptal?' (iptal edildi)':'')),
-      u.iptal?null:h('button',{class:'t',onclick:async()=>{if(!confirm('Bu anahtar iptal edilsin mi? Geri alınamaz.'))return;await api('anahtar_iptal',{app_id:u.id}).catch(hataGoster);git('erisim');}},'Anahtarı iptal et')),
-      h('div',{class:'soluk'},'Oluşturma: '+tarih(u.olusturma)));
+      u.iptal?null:h('button',{class:'t',onclick:async()=>{if(!confirm('Bu anahtar iptal edilsin mi? Geri alınamaz.'))return;await api('anahtar_iptal',{app_id:u.id}).catch(hataGoster);ELLE_BEKLEYEN.delete(u.id);git('erisim');}},'Anahtarı iptal et')),
+      h('div',{class:'soluk'},'Oluşturma: '+tarih(u.olusturma)),
+      !u.iptal&&ELLE_BEKLEYEN.has(u.id)?h('div',{class:'eklenemedi'},h('b',{},'Bu anahtar Claude Desktop\'a EKLENEMEDİ.'),' Ayar metnini kendiniz yapıştırmadıysanız hiçbir uygulama bu anahtarı kullanmıyor; aşağıdaki izinler açık görünse de kullanılmıyor. Kullanmayacaksanız anahtarı iptal edin.'):null);
     if(!u.iptal){const bitis=h('input',{type:'datetime-local'});
       const izinli=Object.fromEntries(u.izinler.map(i=>[i.kategori,i]));
       kart.append(h('div',{class:'satir'},'Süreli izin için bitiş (boşsa süresiz): ',bitis,
@@ -302,11 +376,11 @@ SF.erisim=async a=>{
           if(!ev.target.checked){await api('izin_kaldir',{app_id:u.id,kategori:k.kimlik}).catch(hataGoster);git('erisim');return;}
           if(k.hassas){ev.target.checked=false;hassasOnay(u,k,utc(bitis.value));return;}
           await api('izin_ver',{app_id:u.id,kategori:k.kimlik,bitis:utc(bitis.value)}).catch(hataGoster);git('erisim');}});
-        kart.append(h('label',{},c,' ',k.ad,k.hassas?h('span',{class:'rozet h'},'hassas'):null,var_&&var_.bitis?h('span',{class:'rozet'},'bitiş '+tarih(var_.bitis)):null));});}
+        kart.append(h('label',{},c,' ',k.ad,k.hassas?hassasRozet():null,var_&&var_.bitis?h('span',{class:'rozet'},'bitiş '+tarih(var_.bitis)):null));});}
     a.append(kart);});
-  const t=h('table',{},h('tr',{},['Zaman','Uygulama','Araç','Kategori','Sayı','Sonuç'].map(x=>h('th',{},x))));
-  l.satirlar.forEach(s=>t.append(h('tr',{},h('td',{},tarih(s.zaman)),h('td',{},s.uygulama),h('td',{},s.arac),h('td',{},s.kategori||'-'),h('td',{},String(s.sayi)),h('td',{class:s.sonuc==='ok'?'tamam':'kotu'},s.sonuc))));
-  a.append(h('div',{class:'kart'},h('h3',{},'Erişim kaydı (son 200)'),l.satirlar.length?t:h('p',{class:'soluk'},'Henüz erişim yok.')));
+  const t=h('table',{class:'duyarli'},h('tr',{},['Zaman (UTC)','Uygulama','Araç','Kategori','Sayı','Sonuç'].map(x=>h('th',{},x))));
+  l.satirlar.forEach(s=>t.append(h('tr',{},h('td',{'data-e':'Zaman (UTC)'},tarih(s.zaman)),h('td',{'data-e':'Uygulama'},s.uygulama),h('td',{'data-e':'Araç'},s.arac),h('td',{'data-e':'Kategori'},s.kategori||'-'),h('td',{'data-e':'Sayı'},SAYI(s.sayi)),h('td',{'data-e':'Sonuç',class:s.sonuc==='ok'?'tamam':'kotu'},s.sonuc))));
+  a.append(h('div',{class:'kart'},h('h3',{},'Erişim kaydı (son 200)'),l.satirlar.length?h('div',{class:'tablo-kap'},t):h('p',{class:'soluk'},'Henüz erişim yok.')));
 };
 function hassasOnay(u,k,bitis){
   const c=h('input',{type:'checkbox'});const dugme=h('button',{class:'t',disabled:true,onclick:async()=>{
@@ -316,9 +390,9 @@ function hassasOnay(u,k,bitis){
     h('label',{},c,' Ne açtığımı biliyorum ve bu uygulamaya güveniyorum.'),h('div',{class:'satir'},dugme,h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}
 // ------------------------------------------------------------------ kaynaklar
 SF.kaynak=async a=>{
-  const r=await api('kaynaklar');a.append(h('h2',{},'Kaynaklar'),h('p',{class:'soluk'},'"Kaldır" kayıtları gizler (geri alınabilir değildir ama veri diskte kalır). "Kalıcı sil" veriyi ve ham arşivi diskten siler.'));
+  const r=await api('kaynaklar');a.append(h('h2',{},'Kaynaklar'),h('p',{class:'soluk'},['"Kaldır" kayıtları gizler (geri alınabilir değildir ama veri diskte kalır). "Kalıcı sil" veriyi ve ',terim('ham arşivi','harsiv'),' diskten siler.']));
   if(!r.kaynaklar.length)a.append(h('p',{class:'soluk'},'Henüz kaynak yok.'));
-  r.kaynaklar.forEach(s=>a.append(h('div',{class:'kart'},h('div',{},h('b',{},s.tur+' '+s.surum),' · '+s.kayit+' kayıt · '+tarih(s.alindi),s.kaldirildi?h('span',{class:'rozet h'},'kaldırıldı '+tarih(s.kaldirildi)):null),
+  r.kaynaklar.forEach(s=>a.append(h('div',{class:'kart'},h('div',{},h('b',{},s.tur+' '+s.surum),' · '+SAYI(s.kayit)+' kayıt · alındı: '+tarih(s.alindi),s.kaldirildi?h('span',{class:'rozet h'},'kaldırıldı '+tarih(s.kaldirildi)):null),
     h('div',{class:'satir'},s.kaldirildi?null:h('button',{class:'i',onclick:async()=>{if(!confirm('Bu kaynağın kayıtları gizlensin mi?'))return;const x=await api('kaynak_kaldir',{kaynak_id:s.id}).catch(hataGoster);if(x)bildir(x.gizlenen+' kayıt gizlendi.');git('kaynak');}},'Kaldır'),
       h('button',{class:'t',onclick:()=>{const g=h('input',{type:'text',placeholder:'SİL'});const kapat=pencere('Kalıcı silme',
         h('p',{class:'hata'},'Bu kaynağın tüm kayıtları ve ham arşiv dosyaları diskten KALICI olarak silinir. Geri alınamaz.'),h('p',{},'Onaylamak için SİL yazın:'),g,
@@ -340,6 +414,7 @@ SF.hakkinda=async a=>{
   const r=await api('hakkinda');
   a.append(h('h2',{},'Hakkında'),h('div',{class:'kart'},h('div',{},`${r.ad} ${r.surum} (çekirdek ${r.cekirdek}, Python ${r.python})`),h('div',{},'Veri klasörü: '+r.veri_klasoru)),
     h('div',{class:'kart'},h('h3',{},'Güvenlik ve gizlilik'),h('p',{},'Arayüz yalnızca bu bilgisayarda (127.0.0.1) çalışır; hiçbir şey internete açılmaz.'),h('p',{},r.sifreleme_notu),h('p',{class:'uyari'},r.smartscreen_notu)),
+    h('div',{class:'kart'},h('h3',{},'Terimler sözlüğü'),h('dl',{class:'sozluk'},Object.values(SOZLUK).map(([ad,m])=>[h('dt',{},ad),h('dd',{},m)]).flat())),
     h('div',{class:'kart'},h('h3',{},'Lisanslar'),h('ul',{},r.lisanslar.map(x=>h('li',{},x)))));
 };
 // ------------------------------------------------------------------ ilk açılış sihirbazı
@@ -360,9 +435,15 @@ async function sihirbaz(ac){
       icerik=[h('p',{},'Seçtiğiniz klasör: '+yol),h('label',{},h('input',{type:'checkbox',checked:oto,onchange:e=>{oto=e.target.checked;}}),' Windows açılışında otomatik başlat (tepsi simgesiyle; sonra Ayarlar\'dan kapatılabilir)'),
         h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{adim=1;ciz();}},'Geri'),h('button',{class:'d',onclick:async e=>{e.target.disabled=true;
           son=await api('sihirbaz_tamamla',{yol,otomatik_baslat:oto,ad:kisiAd}).catch(x=>{hataGoster(x);return null;});if(son){adim=3;ciz();}else e.target.disabled=false;}},'Kur')) ];}
-    else{icerik=[h('p',{class:'tamam'},'Hazır. Veritabanı ve klasörler oluşturuldu.'),h('div',{class:'soluk'},son.dosyalar.join(', ')),
-        h('h3',{},'MCP bağlantı bilgisi'),h('p',{class:'soluk'},'Claude gibi uygulamaların verinize bağlanması için Erişim ekranından anahtar üretin ya da "Claude Desktop\'a ekle" düğmesini kullanın. Ayar şablonu:'),
-        yapistirmaKutusu(son.baglanti.metin),h('div',{class:'satir'},h('button',{class:'d',onclick:()=>{k.textContent='';start();}},'Başla'))];}
+    else{icerik=[h('p',{class:'tamam'},'Hazır. Kurulum tamamlandı.'),
+        h('ul',{class:'ozet-liste'},h('li',{},'Adınız: '+(kisiAd.trim()||'Ben')),h('li',{},'Veri klasörü: '+yol),h('li',{},'Windows açılışında otomatik başlama: '+(oto?'açık':'kapalı')+' (Ayarlar\'dan değiştirilebilir)'),
+          h('li',{},'Veritabanı ve alt klasörler oluşturuldu'+(son.dosyalar&&son.dosyalar.length?` (${son.dosyalar.length} dosya/klasör)`:'')+'.')),
+        h('h3',{},'Sıradaki adımlar'),
+        h('ol',{},h('li',{},'İçe aktar ekranından bir dışa aktarma dosyası (ör. Google Takeout zip) ekleyin.'),
+          h('li',{},h('span',{},'Claude gibi bir uygulamanın verinize bağlanmasını istiyorsanız Erişim ekranından "Claude Desktop\'a ekle" düğmesini kullanın ('),terim('MCP','mcp'),'). Bunu şimdi yapmanız gerekmez.')),
+        h('details',{class:'ayrinti-kutu'},h('summary',{},'Ayrıntı: bağlantı ayar şablonu (ileri düzey, şimdilik atlayabilirsiniz)'),
+          h('p',{class:'soluk'},'Elle kurulum için şablon. "<ANAHTAR>" yerine Erişim ekranında ürettiğiniz anahtar yazılır.'),yapistirmaKutusu(son.baglanti.metin)),
+        h('div',{class:'satir'},h('button',{class:'d',onclick:()=>{k.textContent='';start();}},'Başla'))];}
     k.append(h('div',{class:'yer'},h('div',{class:'pencere'},h('h2',{},`İlk açılış (${adim}/3)`),...icerik)));};
   ciz();}
 async function start(){

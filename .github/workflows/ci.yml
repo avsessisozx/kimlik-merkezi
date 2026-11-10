@@ -45,7 +45,14 @@ jobs:
       - name: importers testleri
         if: hashFiles('importers/pyproject.toml') != ''
         run: python -m pytest importers -m "not buyuk"
-      - name: windows (arayüzden bağımsız mantık) testleri
+      - name: Tarayıcı testi için Playwright (yalnız 3.13 işi; gerçek Chromium ile arayüz gezintisi)
+        if: matrix.python == '3.13'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright@1.49.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "KIMLIK_PLAYWRIGHT_YOLU=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+          echo "KIMLIK_TARAYICI_ZORUNLU=1" >> "$GITHUB_ENV"
+      - name: windows (arayüzden bağımsız mantık + gerçek tarayıcı) testleri
         if: hashFiles('windows/pyproject.toml') != ''
         run: python -m pytest windows
       - name: entegrasyon testleri

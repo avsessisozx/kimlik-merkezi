@@ -200,8 +200,10 @@ def cmd_parola_ekle(args):
     print("Parola eklenince Windows hesabına bağlı otomatik açılış KAPANIR: veri her açılışta "
           "parola ister. MCP/arka plan süreçleri için KIMLIK_PAROLA ortam değişkeni gerekir "
           "(parolayı bir yapılandırma dosyasına düz yazmak korumayı azaltır).")
-    if not args.anladim and not _evet_mi("Anladım, devam için ANLADIM yazın: ", "ANLADIM"):
-        raise FormatError("Onaylanmadı; parola eklenmedi.")
+    if not args.anladim and not _evet_mi(
+            "Devam etmek için büyük harflerle ANLADIM yazıp Enter'a basın (başka bir şey yazarsanız iptal edilir): ",
+            "ANLADIM"):
+        raise FormatError("Onaylanmadı (onay için tam olarak ANLADIM yazmalısınız, büyük harflerle); parola eklenmedi.")
     a, b = _iki_kez("Yeni parola: ", "Parolayı tekrar yazın: ")
     sif.parola_ekle(args.veri, dek, a, b)
     _out(args, {"parola": True}, "Parola eklendi.")

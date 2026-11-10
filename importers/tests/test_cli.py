@@ -38,3 +38,32 @@ def test_ice_al_reddit_ve_hata_cikis_kodu(tmp_path, zipper):
     assert bad.returncode != 0 and "beklenen biçimde değil" in (bad.stderr + bad.stdout)
     unk = cli(veri, "ice-al", str(zipper("reddit")), "--tur", "yok")
     assert unk.returncode != 0 and "Kullanılabilir" in (unk.stderr + unk.stdout)
+
+
+# ---- hata mesajları: bozuk dosya ile tanınmayan dosya ayrı söylenir (yabancı kullanıcı raporu #10)
+def test_bozuk_zip_ayri_mesajla_bildirilir(tmp_path):
+    import pytest
+    from kimlikcore import FormatError, Hub
+    from kimlikimport.run import run
+
+    bozuk = tmp_path / "takeout.zip"
+    bozuk.write_bytes(b"PK\x03\x04" + bytes(range(200)) * 3)   # zip imzası var, ama içi bozuk
+    with Hub.open(tmp_path / "v", write=True) as hub, pytest.raises(FormatError) as e:
+        run(hub, bozuk)
+    ilk = str(e.value).splitlines()[0]
+    assert "bozuk görünüyor" in ilk and "yeniden indirip" in ilk
+    assert "tanıyamadım" not in ilk
+
+
+def test_taninmayan_dosya_ayri_mesajla_bildirilir(tmp_path):
+    import pytest
+    from kimlikcore import FormatError, Hub
+    from kimlikimport.run import run
+
+    dosya = tmp_path / "notlar.txt"
+    dosya.write_text("rastgele bir metin dosyası", encoding="utf-8")
+    with Hub.open(tmp_path / "v", write=True) as hub, pytest.raises(FormatError) as e:
+        run(hub, dosya)
+    ilk = str(e.value).splitlines()[0]
+    assert "Bu dosyayı tanıyamadım" in ilk and "bozuk" not in ilk
+    assert "Teknik ayrıntı" in str(e.value)     # iç adlar listesi atılmadı, ayrıntıya taşındı

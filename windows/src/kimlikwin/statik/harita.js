@@ -2,19 +2,18 @@
    index.html'deki küresel yardımcıları kullanır: h, api, bildir, hataGoster, pencere, git, KISILER, kopyala. */
 "use strict";
 (function(){
-const SAYI=n=>Number(n).toLocaleString('tr-TR');
 const ONDALIK=n=>Number(n).toLocaleString('tr-TR',{maximumFractionDigits:1});
 const AY=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const AYK=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 const GUN=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 const GUNK=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
-const DIM_AD={ay:'Ay',gun:'Gün',saat:'Saat',kanal:'Kanal',video:'Video',tur:'Tür',terim:'Terim',site:'Site',sanatci:'Sanatçı',parca:'Parça',subreddit:'Subreddit',depo:'Depo',dosya_turu:'Dosya türü',kategori:'Kategori',uygulama:'Uygulama',yer:'Yer',platform:'Platform'};
+const DIM_AD={ay:'Ay',gun:'Gün (UTC)',saat:'Saat (UTC)',kanal:'Kanal',video:'Video',tur:'Tür',terim:'Terim',site:'Site',sanatci:'Sanatçı',parca:'Parça',subreddit:'Subreddit',depo:'Depo',dosya_turu:'Dosya türü',kategori:'Kategori',uygulama:'Uygulama',yer:'Yer',platform:'Platform'};
 const HAP_AD={bas:'Baş',goz:'Gözler',kulak:'Kulaklar',agiz:'Ağız',el:'Eller',kalp:'Kalp',karin:'Karın',ayak:'Ayaklar',ic:'Merkez',zihin:'Zihin'};
 const HASSAS=['kalp','karin','ayak','zihin'];
 const HAREKET_AZ=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const dimAd=k=>DIM_AD[k]||k;
-function degerMetin(k,v){if(k==='ay'){const [y,m]=String(v).split('-');return `${AY[+m-1]} ${y}`;}if(k==='gun')return GUN[+v]||v;if(k==='saat')return String(v).padStart(2,'0')+':00';return String(v);}
-function tarihMetin(ts){if(!ts)return '-';const d=new Date(ts);if(isNaN(d))return ts;return d.toLocaleString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'});}
+function degerMetin(k,v){if(k==='ay'){const [y,m]=String(v).split('-');return `${AY[+m-1]} ${y}`;}if(k==='gun')return GUN[+v]||v;if(k==='saat')return String(v).padStart(2,'0')+':00 '+UTC_ETIKET;return String(v);}
+function tarihMetin(ts){if(!ts)return '-';const d=new Date(ts);if(isNaN(d))return ts;return d.toLocaleString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+' '+UTC_ETIKET;}
 function gunMetin(ts){if(!ts)return '-';const d=new Date(ts);return isNaN(d)?ts:d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});}
 function ayEtiket(a){const [y,m]=a.split('-');return `${AYK[+m-1]} ${y.slice(2)}`;}
 
@@ -95,7 +94,7 @@ function grafikKur(g,r,tikla,baz){
     const mx=Math.max(1,...g.degerler);
     const veri=g.degerler.map((v,i)=>({value:v,itemStyle:{opacity:sec==null||+sec===i?1:.3,color:v===mx?r.v2:r.v}}));
     Object.assign(o,{polar:{radius:['16%','90%'],center:['50%','52%']},
-      tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${String(p.dataIndex).padStart(2,'0')}:00 – ${String(p.dataIndex).padStart(2,'0')}:59</b><br>${SAYI(p.value)} kayıt${yuzde(p.value,top)}`},
+      tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${String(p.dataIndex).padStart(2,'0')}:00 – ${String(p.dataIndex).padStart(2,'0')}:59 ${UTC_ETIKET}</b><br>${SAYI(p.value)} kayıt${yuzde(p.value,top)}`},
       angleAxis:{type:'category',data:g.etiketler,startAngle:90,clockwise:true,axisLabel:{color:r.soluk,interval:2,fontSize:10},axisLine:{lineStyle:{color:r.cizgi}},axisTick:{show:false},splitLine:{show:true,lineStyle:{color:hexA(r.cizgi,.4)}}},
       radiusAxis:{show:false,max:mx*1.05},
       series:[{type:'bar',coordinateSystem:'polar',data:veri,itemStyle:{borderRadius:3},emphasis:{itemStyle:{shadowBlur:12,shadowColor:hexA(r.v,.7)}}}]});
@@ -106,7 +105,7 @@ function grafikKur(g,r,tikla,baz){
     const veri=[];m.forEach((satir,gi)=>satir.forEach((v,hi)=>veri.push([hi,gi,v])));
     const mx=Math.max(1,...m.flat());const sg=g.secili&&g.secili.gun!=null?+g.secili.gun:null,ss=g.secili&&g.secili.saat!=null?+g.secili.saat:null;
     Object.assign(o,{grid:{left:36,right:8,top:6,bottom:58},
-      tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${GUN[p.value[1]]||''} ${String(p.value[0]).padStart(2,'0')}:00</b><br>${SAYI(p.value[2])} kayıt`},
+      tooltip:{...o.tooltip,trigger:'item',formatter:p=>`<b>${GUN[p.value[1]]||''} ${String(p.value[0]).padStart(2,'0')}:00 ${UTC_ETIKET}</b><br>${SAYI(p.value[2])} kayıt`},
       xAxis:{type:'category',data:[...Array(24).keys()].map(h=>String(h).padStart(2,'0')),splitArea:{show:false},axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk,interval:2,fontSize:10}},
       yAxis:{type:'category',data:GUNK.slice(0,m.length),inverse:true,axisLine:{show:false},axisTick:{show:false},axisLabel:{color:r.soluk}},
       visualMap:{min:0,max:mx,calculable:false,orient:'horizontal',left:'center',bottom:2,itemWidth:10,itemHeight:140,text:['çok','az'],textStyle:{color:r.soluk,fontSize:10},inRange:{color:[hexA(r.v,.06),hexA(r.v,.38),r.v,r.yazi]}},
@@ -155,10 +154,19 @@ async function ekran(a){
   const figKap=h('div',{class:'figur-kap hud'});
   const ust=h('div',{class:'ust'}),yol=h('div',{class:'yol',role:'navigation','aria-label':'Konum'}),panel=h('div',{id:'bolge-paneli',class:'bp'});
   HS.dom={kok,sol,sag,figKap,ust,yol,panel,ad};
-  sol.append(figKap,beyanKarti(v));sag.append(ust,yol,panel);kok.append(sol,sag);a.append(kok);
+  sol.append(figKap,nedirKutusu(v),beyanKarti(v));sag.append(ust,yol,panel);kok.append(sol,sag);a.append(kok);
   figurYenile();ustCiz();yolCiz();
   if(HS.bolge&&v.bolgeler.find(b=>b.id===HS.bolge))await bolgeYukle();else{HS.bolge=null;genelCiz();}
 }
+// "Bu harita nedir?": ilk bakışta figürün, bölge adlarının ve 'kilitli'nin anlamı. Kapatılırsa hatırlanır.
+function nedirKutusu(v){
+  let kapali=window.innerWidth<=700;try{const t=localStorage.getItem('harita-nedir-kapali');if(t!==null)kapali=t==='1';}catch(_){}
+  const d=h('details',{class:'kart hud nedir',open:!kapali},h('summary',{},'Bu harita nedir?'),
+    h('p',{},'İçe aktardığınız kayıtlar, ne türden oldukları göz önüne alınarak bir insan figürünün bölgelerine dağıtılır: ör. izlediğiniz videolar ',h('b',{},'Gözler'),', dinlediğiniz müzik ',h('b',{},'Kulaklar'),'. Bir bölgenin kartındaki sayı o bölgedeki kayıt sayısıdır; tıklayınca ayrıntısına inersiniz. Bu bir tıbbi ya da psikolojik değerlendirme değil, yalnızca sayımdır.'),
+    h('ul',{class:'nedir-liste'},v.bolgeler.map(b=>h('li',{},h('b',{},HAP_AD[b.id]||b.id),': ',String(b.ad||'').replace(/^[^:]+:\s*/,''),b.kilitli?h('span',{class:'rozet h'},'kilitli'):null))),
+    h('p',{},h('b',{},'Kilitli'),' ne demek? E-posta, özel mesajlar, konum ve yapay zekâ sohbetleri hassas sayılır. Bu bölgelerin sayısı bile siz onay vermeden görünmez. Bu bir parola kilidi değildir; yalnızca ekranda gösterimi kapatır. Onay verseniz de içerik değil yalnızca sayılar görünür ve uygulama kapanınca yeniden kilitlenir.'));
+  d.addEventListener('toggle',()=>{try{localStorage.setItem('harita-nedir-kapali',d.open?'0':'1');}catch(_){}});
+  return d;}
 function beyanKarti(v){const k=h('div',{class:'kart hud'},h('h3',{class:'k-baslik'},'Beyan edilen bilgiler'));
   if(v.beyan&&v.beyan.length){k.append(h('ul',{class:'beyan'},v.beyan.slice(0,8).map(f=>h('li',{},f.veri||f.statement||f.metin||'',' ',h('span',{class:'rozet'},f.kategori||f.category||'')))));
     if(v.beyan.length>8)k.append(h('div',{class:'soluk'},`+${v.beyan.length-8} bilgi daha`));}
@@ -209,7 +217,7 @@ function genelCiz(){const d=HS.dom,p=d.panel;temizle();p.textContent='';p.classN
   p.append(radar,h('div',{class:'kart hud'},h('h3',{class:'k-baslik'},'Bölgeler'),kartlar));
   const kap=radar.querySelector('.cgraf'),r=R();
   const mx=Math.max(...bl.map(b=>Math.sqrt(b.olay_sayisi)));
-  const o=temel(r);Object.assign(o,{radar:{indicator:bl.map(b=>({name:HAP_AD[b.id]||b.ad,max:mx*1.1,id:b.id})),radius:'66%',center:['50%','54%'],shape:'polygon',splitNumber:4,triggerEvent:true,
+  const o=temel(r);Object.assign(o,{radar:{indicator:bl.map(b=>({name:HAP_AD[b.id]||b.ad,max:mx*1.1,id:b.id})),radius:(kap.clientWidth||window.innerWidth)<400?'46%':'66%',center:['50%','54%'],shape:'polygon',splitNumber:4,triggerEvent:true,
       axisName:{color:r.yazi,fontSize:13,fontWeight:600,backgroundColor:hexA(r.v,.1),borderRadius:6,padding:[3,8]},axisLine:{lineStyle:{color:hexA(r.v,.3)}},splitLine:{lineStyle:{color:hexA(r.cizgi,.7)}},splitArea:{show:false}},
     tooltip:{...o.tooltip,trigger:'item',formatter:()=>bl.map(b=>`${HAP_AD[b.id]}: <b>${SAYI(b.olay_sayisi)}</b>`).join('<br>')},
     series:[{type:'radar',data:[{value:bl.map(b=>Math.sqrt(b.olay_sayisi)),name:'Profil'}],symbol:'circle',symbolSize:7,lineStyle:{color:r.v,width:2.4,shadowBlur:12,shadowColor:hexA(r.v,.6)},itemStyle:{color:r.v},areaStyle:{color:hexA(r.v,.22)}}]});
