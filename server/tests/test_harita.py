@@ -213,7 +213,7 @@ def test_tombstone_sayilmaz(hub):
     assert sec(h, "bas")["olay_sayisi"] == sec(onceki, "bas")["olay_sayisi"] - 1
     assert h["profil"]["olay"] == onceki["profil"]["olay"] - 1
     hub.remove_source(sid, "yanlış")
-    h = harita(hub, ac_hassas={"kalp", "karin", "ayak"})
+    h = harita(hub, ac_hassas={"kalp", "karin", "ayak", "zihin"})
     assert h["profil"]["olay"] == 0
     assert all(b["olay_sayisi"] == 0 for b in h["bolgeler"])
     assert bolge(hub, "goz")["notlar"][0] == "Henüz veri yok"
@@ -290,3 +290,73 @@ def test_200bin_olayda_sure(tmp_path):
     assert hh["profil"]["olay"] == 200_000  # kalp ve ayak açık, eposta üretilmedi
     assert t_harita < 3.0
     assert max(sure.values()) < 3.0
+
+
+# ---------------------------------------------------------------- sohbet (Zihin) ve yeni içe aktarıcılar
+def _ice_al(hub, *adlar):
+    for a in adlar:
+        ice_al(hub, FIX / a)
+
+
+def test_zihin_kilitli_icerik_yok(hub):
+    _ice_al(hub, "chat_chatgpt", "chat_claude", "takeout_gemini")
+    metinler = [r[0] for r in hub.query("SELECT text FROM events WHERE category = 'sohbet'") if r[0]]
+    basliklar = [r[0] for r in hub.query(
+        "SELECT json_extract(payload, '$.baslik') FROM events WHERE category = 'sohbet'") if r[0]]
+    assert len(metinler) >= 15 and basliklar
+    h = harita(hub)
+    z = sec(h, "zihin")
+    assert z["kilitli"] and z["olay_sayisi"] is None and z["ozet"] == "Kilitli"
+    assert z["kategoriler"] == ["sohbet"]
+    assert h["profil"]["olay"] == 0  # sohbet sayısı profil toplamına bile sızmaz
+    assert bolge(hub, "zihin") == {"id": "zihin", "ad": "Zihin: yapay zekâ sohbetleri",
+                                   "kilitli": True, "grafikler": [], "en_cok": [],
+                                   "notlar": ["Kilitli"]}
+    # başka bir hassas bölgeyi (ya da kategori adını) açmak zihni açmaz
+    assert sec(harita(hub, ac_hassas={"kalp", "karin", "ayak", "mesaj"}), "zihin")["kilitli"]
+    # açık: yalnız sayı, zaman, platform; içerik asla
+    acik = harita(hub, ac_hassas={"zihin"})
+    assert sec(acik, "zihin")["olay_sayisi"] == 19 and acik["profil"]["olay"] == 19
+    d = bolge(hub, "zihin", ac_hassas={"sohbet"})  # kategori adıyla da açılır
+    assert not d["kilitli"] and d["en_cok"] == []
+    sayilar = graf(d, "Sayılar")
+    assert sayilar["etiketler"] == ["Mesaj", "Konuşma", "Kullanıcı mesajı", "Asistan mesajı"]
+    assert sayilar["degerler"][0] == 15 and sayilar["degerler"][1] == 7
+    plat = graf(d, "platform")
+    assert dict(zip(plat["etiketler"], plat["degerler"])) == {"chatgpt": 8, "claude": 6, "gemini": 5}
+    assert graf(d, "Aylık") and graf(d, "saat") and graf(d, "Haftanın")
+    tum = json.dumps([acik, d], ensure_ascii=False)
+    for parca in metinler + basliklar:
+        assert parca not in tum, parca[:30]
+
+
+def test_kulak_spotify_alanlari(hub):
+    _ice_al(hub, "spotify_standart", "spotify_genisletilmis")
+    k = bolge(hub, "kulak")
+    san = graf(k, "sanatçı (dinleme sayısı)")
+    assert san["etiketler"] == sorted(san["etiketler"], key=lambda e: (-san["degerler"][san["etiketler"].index(e)], e))
+    assert "Ornek Sanatci" in san["etiketler"]
+    assert graf(k, "(dakika)")["degerler"][0] > 0  # sure_ms toplamı dakikaya çevrildi
+    assert {e["grup"] for e in k["en_cok"]} >= {"sanatçı", "parça", "podcast"}
+    assert any(e["grup"] == "podcast" and e["ad"] == "Ornek Podcast" for e in k["en_cok"])
+    assert graf(k, "Aylık")
+    assert any("gerçek zaman yok" in n for n in k["notlar"])  # kütüphane anlık görüntüsü
+
+
+def test_el_github_ve_dosya_turleri(hub):
+    _ice_al(hub, "github")
+    sid = hub.add_source("dosya", "1", None)
+    hub.add_events(sid, [
+        E("dosya.kayit", "dosyalar", "2026-01-01T10:00:00Z", "a.pdf", {"uzanti": ".pdf", "boyut": 2_097_152}, "d1"),
+        E("dosya.kayit", "dosyalar", "2026-01-02T10:00:00Z", "b.pdf", {"uzanti": ".pdf", "boyut": 1_048_576}, "d2"),
+        E("dosya.kayit", "dosyalar", "2026-01-03T10:00:00Z", "c.txt", {"uzanti": ".txt", "boyut": 1024}, "d3"),
+    ])
+    el = bolge(hub, "el")
+    assert any(e["grup"] == "depo" for e in el["en_cok"])
+    assert graf(el, "Programlama dilleri")["etiketler"] == ["Python"]
+    tur = graf(el, "Dosya türleri")
+    assert dict(zip(tur["etiketler"], tur["degerler"])) == {".pdf": 2, ".txt": 1}
+    boy = graf(el, "boyut")
+    assert dict(zip(boy["etiketler"], boy["degerler"]))[".pdf"] == 3.0
+    assert any("Notlar: bu alan yok" in n for n in el["notlar"])
+    assert not any("Depo" in n and "bu alan yok" in n for n in el["notlar"])

@@ -68,6 +68,27 @@ ayar biçimi için resmî belge bulunamadı (arama yalnız üçüncü taraf sayf
 MCP bağlantısının gerçekten çalıştığı kullanıcının kendi cihazında doğrulanmalıdır
 (GOREV 13'e eklenecek). MCP desteklemeyen uygulamalar için yedek yol: Kimlik Kartı Markdown metni.
 
+## Persona önerisi: Claude'a ne söyleyeceksin
+
+MCP araçları: `ornekle` (izinli kategoriden örnek kayıtlar), `persona_oner` (öneri kuyruğuna ekler),
+ayrıca `ara`, `zaman_cizelgesi`, `persona_getir`, `kimlik_karti`. `persona_oner` yalnızca öneri
+kuyruğuna yazar; **sen Kimlik Merkezi uygulamasında onaylamadan persona değişmez** (onayla, düzelt,
+reddet, "hiç doğru değil"). Önerinin dayanağı olan kayıtların kategorisine (ör. `sohbet`, `mesaj`)
+bu uygulamaya okuma izni vermen gerekir; hassas kategoriler ayrı onay ister, hiçbir şey varsayılan açık değil.
+
+Örnek komut (Claude'a yaz):
+
+> Sohbet geçmişimi tara ve persona önerileri yaz. Önce `kategorileri_listele` ile neye iznin olduğuna bak,
+> sonra `ornekle` ve `ara` ile sohbet kayıtlarından örnekler al. Benim hakkımda kalıcı, tekrar eden
+> bilgileri (nerede yaşadığım, işim, cihazlarım, projelerim, tercihlerim) bul ve her biri için
+> `persona_oner` ile öneri yaz; her öneride dayandığın kayıtların `id` değerlerini `kanit` olarak ver.
+> Tahmin yürütme, emin olmadığını yazma. Yazdıklarını onaylamadan persona değişmeyeceğini unutma;
+> daha önce reddettiğim öneriler kuyruğa girmez.
+
+Sınırlar: Claude'un öneriyi doğru çıkarıp çıkarmayacağı ya da kayıt içindeki metne kanıp kanmayacağı
+bu araçlarla garanti edilmez; onay ekranı bu yüzden vardır. Bu akışın gerçek Claude/DeepSeek ile
+çalıştığı bu çalışmada denenmedi (yalnız resmî Python MCP istemcisiyle).
+
 ## Web tabanlı yapay zekâlar
 
 Tarayıcıdaki ChatGPT/Gemini/Claude yerel stdio MCP'ye bağlanamaz. Yedek yol: kimlik kartı metni

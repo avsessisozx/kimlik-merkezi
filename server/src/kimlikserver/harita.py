@@ -15,6 +15,12 @@
     sosyal : reddit.gonderi / reddit.yorum (payload.subreddit), reddit.oy, reddit.kaydedilen,
              reddit.abone
     uygulama: payload.urun (Takeout "header")
+    muzik  : spotify.dinleme (payload.sanatci, payload.sarki, payload.sure_ms), spotify.podcast
+             (payload.program); kutuphane/liste kayıtları anlık görüntüdür
+    kod    : github.* (payload.depo ya da payload.ad, payload.dil)
+    dosyalar: dosya.kayit (payload.uzanti, payload.boyut)
+    sohbet : sohbet.mesaj / sohbet.konusma (payload.platform, payload.konusma_id, payload.rol);
+             hassas, içerik hiç dönmez
   Tarihi olmayan kayıtlar (payload.zaman_kaynagi = dosya_tarihi) zaman grafiklerine girmez.
 """
 from __future__ import annotations
@@ -28,7 +34,7 @@ from kimlikcore import Hub, NotFoundError, norm_ts
 from ._db import iso, utc_now
 from .persona import PersonaReader
 
-HASSAS_BOLGELER = frozenset({"kalp", "karin", "ayak"})
+HASSAS_BOLGELER = frozenset({"kalp", "karin", "ayak", "zihin"})
 EN_COK_LIMIT = 10
 MAX_AY = 36
 GUNLER = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
@@ -38,6 +44,7 @@ SAYIM_NOTU = "Veriden sayım; yorum ya da çıkarım içermez."
 # id -> (ad, kategoriler)
 VARSAYILAN_BOLGELER: dict[str, tuple[str, tuple[str, ...]]] = {
     "bas": ("Baş: ilgi ve merak", ("tarama",)),
+    "zihin": ("Zihin: yapay zekâ sohbetleri", ("sohbet",)),
     "goz": ("Gözler: izledikleri", ("video",)),
     "kulak": ("Kulaklar: dinledikleri", ("muzik",)),
     "agiz": ("Ağız: yazdıkları/söyledikleri", ("sosyal",)),
@@ -76,6 +83,7 @@ class _Q:
 
     def __init__(self, hub: Hub, kategoriler: tuple[str, ...], aralik):
         self.hub = hub
+        self.aralik = aralik
         self.where = "hidden = 0 AND category IN (%s)" % ",".join("?" * len(kategoriler))
         self.args: list[Any] = list(kategoriler)
         if aralik:
@@ -86,6 +94,9 @@ class _Q:
             if until is not None:
                 self.where += " AND ts <= ?"
                 self.args.append(norm_ts(until, assume_utc=True))
+
+    def alt(self, kategoriler: tuple[str, ...]) -> "_Q":
+        return _Q(self.hub, kategoriler, self.aralik)
 
     def rows(self, select: str, extra: str = "", tail: str = "", args: Iterable = ()) -> list[tuple]:
         # NOT INDEXED: 1M olayda dizinle tek tek satıra gitmekten tam tarama 3-5 kat hızlı ölçüldü
@@ -211,10 +222,40 @@ def _goz(q, kayma, notlar):
     return gr, top
 
 
+def _top_sure(q: _Q, ifade: str, extra: str, baslik: str) -> list[dict[str, Any]]:
+    """Süreye (sure_ms, dakika) göre ilk 10: tek çubuk grafik. Süre alanı yoksa boş."""
+    sure = "json_extract(payload, '$.sure_ms')"
+    rows = q.rows(f"{ifade} AS v, SUM({sure})", f"({extra}) AND {ifade} IS NOT NULL AND "
+                  f"{ifade} <> '' AND {sure} IS NOT NULL",
+                  f"GROUP BY v ORDER BY 2 DESC, v LIMIT {EN_COK_LIMIT}")
+    if not rows:
+        return []
+    return [_grafik("cubuk", baslik, [r[0] for r in rows], [round(r[1] / 60000) for r in rows])]
+
+
 def _kulak(q, kayma, notlar):
-    notlar.append("Sanatçı/şarkı: bu alan yok (müzik kategorisini üreten içe aktarıcı bu "
-                  "sürümde yok); yalnız zaman dağılımı gösterilir.")
-    return _zaman(q, kayma, notlar), []
+    gr, top = _zaman(q, kayma, notlar), []
+    dinleme = "kind = 'spotify.dinleme'"
+    sanatci = "json_extract(payload, '$.sanatci')"
+    t, bos = _top(q, sanatci, dinleme, "sanatçı")
+    top += t
+    gr += _cubuk("En çok dinlenen sanatçı (dinleme sayısı)", t)
+    gr += _top_sure(q, sanatci, dinleme, "En çok dinlenen sanatçı (dakika)")
+    if not t:
+        notlar.append("Sanatçı: bu alan yok (spotify.dinleme kaydı ya da sanatci alanı yok).")
+    elif bos:
+        notlar.append(f"{bos} dinleme kaydında sanatçı yok; sayıma girmedi.")
+    s, _ = _top(q, "json_extract(payload, '$.sarki')", dinleme, "parça",
+                ornek="MAX(json_extract(payload, '$.sanatci'))")
+    top += s
+    gr += _cubuk("En çok dinlenen parça", s)
+    if not s:
+        notlar.append("Parça: bu alan yok (sarki alanı yok).")
+    p, _ = _top(q, "json_extract(payload, '$.program')", "kind = 'spotify.podcast'", "podcast")
+    top += p
+    gr += _cubuk("En çok dinlenen podcast programı", p)
+    gr += _kind_pasta(q)
+    return gr, top
 
 
 def _agiz(q, kayma, notlar):
@@ -232,11 +273,46 @@ def _agiz(q, kayma, notlar):
 
 
 def _el(q, kayma, notlar):
-    notlar.append("Repo/yıldız sayısı ve dosya türü: bu alan yok (kod, dosyalar ve notlar için "
-                  "içe aktarıcı bu sürümde yok); yalnız kayıt sayıları ve zaman gösterilir.")
+    gr: list[dict[str, Any]] = []
+    top: list[dict[str, Any]] = []
     rows = q.rows("category, COUNT(*)", "", "GROUP BY category ORDER BY 2 DESC, category")
-    gr = [_grafik("pasta", "Kategoriler", [r[0] for r in rows], [r[1] for r in rows])]
-    return gr + _zaman(q, kayma, notlar), []
+    gr.append(_grafik("pasta", "Kategoriler", [r[0] for r in rows], [r[1] for r in rows]))
+    # kod (GitHub)
+    qk = q.alt(("kod",))
+    if qk.one("COUNT(*)")[0]:
+        gr += _kind_pasta(qk, "GitHub kayıt türleri")
+        depo, bos = _top(qk, "COALESCE(json_extract(payload, '$.depo'), json_extract(payload, '$.ad'))",
+                         "1", "depo")
+        top += depo
+        gr += _cubuk("En çok etkinlik olan depo", depo)
+        if not depo:
+            notlar.append("Depo: bu alan yok (kod kayıtlarında depo/ad alanı yok).")
+        dil, _ = _top(qk, "json_extract(payload, '$.dil')", "1", "dil")
+        gr += _cubuk("Programlama dilleri", dil)
+        if not dil:
+            notlar.append("Dil: bu alan yok (kod kayıtlarında dil alanı yok).")
+    else:
+        notlar.append("Depo/dil: bu alan yok (kod kategorisinde kayıt yok).")
+    # dosyalar
+    qd = q.alt(("dosyalar",))
+    if qd.one("COUNT(*)")[0]:
+        uz = "json_extract(payload, '$.uzanti')"
+        tur, _ = _top(qd, uz, "1", "dosya türü")
+        top += tur
+        gr += _cubuk("Dosya türleri (uzantı)", tur)
+        if not tur:
+            notlar.append("Dosya türü: bu alan yok (dosya kayıtlarında uzanti alanı yok).")
+        boy = qd.rows(f"{uz} AS v, SUM(json_extract(payload, '$.boyut'))",
+                      f"{uz} IS NOT NULL AND {uz} <> '' AND json_extract(payload, '$.boyut') "
+                      "IS NOT NULL", f"GROUP BY v ORDER BY 2 DESC, v LIMIT {EN_COK_LIMIT}")
+        if boy:
+            gr.append(_grafik("cubuk", "Türe göre toplam boyut (MB)", [r[0] for r in boy],
+                              [round(r[1] / 1_048_576, 1) for r in boy]))
+    else:
+        notlar.append("Dosya türü: bu alan yok (dosyalar kategorisinde kayıt yok).")
+    if not q.alt(("notlar",)).one("COUNT(*)")[0]:
+        notlar.append("Notlar: bu alan yok (notlar kategorisinde kayıt yok).")
+    return gr + _zaman(q, kayma, notlar), top
 
 
 def _ic(q, kayma, notlar):
@@ -262,14 +338,34 @@ def _hassas(q, kayma, notlar, *, yer: bool = False):
     return gr, []
 
 
+def _zihin(q, kayma, notlar):
+    """Yapay zekâ sohbetleri: yalnız sayı, zaman dağılımı, platform ve konuşma sayısı."""
+    gr = _zaman(q, kayma, notlar)
+    plat = q.rows("COALESCE(json_extract(payload, '$.platform'), 'bilinmeyen'), COUNT(*)", "",
+                  "GROUP BY 1 ORDER BY 2 DESC, 1")
+    gr.append(_grafik("pasta", "Kaynak (platform)", [r[0] for r in plat], [r[1] for r in plat]))
+    mesaj, konusma, kul, asist = q.one(
+        "SUM(kind = 'sohbet.mesaj'), COUNT(DISTINCT json_extract(payload, '$.konusma_id')), "
+        "SUM(json_extract(payload, '$.rol') = 'kullanici'), "
+        "SUM(json_extract(payload, '$.rol') = 'asistan')")
+    gr.append(_grafik("cubuk", "Sayılar", ["Mesaj", "Konuşma", "Kullanıcı mesajı",
+                                            "Asistan mesajı"],
+                      [mesaj or 0, konusma or 0, kul or 0, asist or 0]))
+    if not konusma:
+        notlar.append("Konuşma sayısı: bu alan yok (konusma_id alanı yok).")
+    notlar.append("İçerik gösterilmez; yalnız sayı ve zaman dağılımı.")
+    return gr, []
+
+
 _YOK_ALAN = {
-    "kulak": ("Sanatçı/şarkı: bu alan yok (müzik içe aktarıcısı bu sürümde yok).",),
-    "el": ("Repo/yıldız ve dosya türü: bu alan yok (içe aktarıcı bu sürümde yok).",),
+    "kulak": ("Sanatçı/şarkı: bu alan yok (müzik kaydı yok; Spotify arşivi alınmadı).",),
+    "el": ("Depo/dil ve dosya türü: bu alan yok (kod/dosya/not kaydı yok).",),
     "ic": ("Günlük kullanım süresi: bu alan yok.",),
 }
 
 _HESAP = {
     "bas": _bas, "goz": _goz, "kulak": _kulak, "agiz": _agiz, "el": _el, "ic": _ic,
+    "zihin": _zihin,
     "kalp": lambda q, k, n: _hassas(q, k, n),
     "karin": lambda q, k, n: _hassas(q, k, n),
     "ayak": lambda q, k, n: _hassas(q, k, n, yer=True),
