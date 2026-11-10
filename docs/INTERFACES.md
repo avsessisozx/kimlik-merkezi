@@ -152,3 +152,8 @@ Performans: 1 milyon olayda `harita` < 3 sn; ağır sayımlar SQL ile (Python'da
 
 ## 13. Ek 1.3
 - Yeni kategori `sohbet` (hassas: ayrı onay, toplu açmaya dahil değil). `kimlikcore.Category`, `permissions` CHECK kısıtı ve MCP kategori listesi bunu tanır (göçle). Persona Haritası'nda `sohbet` bölgesi: ağız bölgesine bağlı değil; ayrı "Zihin" (baş) alt grubu olarak, hassas kilitli.
+
+## 14. Ek 1.4 (Harita derinleşme ve persona kuyruğu; kod ve test: server/harita.py, server/oneri*.py)
+- `bolge(hub, bolge_id, *, ac_hassas, aralik=None, filtre=None, utc_kaydirma=0, bolgeler=None)`, `kayitlar(...)`, `ayrinti(...)`, `karsilastir(...)`. Her `en_cok` satırı ve grafik noktası `anahtar` (alan+değer) taşır; istemci bunu `filtre` olarak geri gönderir. Hassas bölgelerde içerik yok.
+- Bölge `zihin` (kategori `sohbet`, hassas, varsayılan kilitli); yalnız sayı, zaman, platform dağılımı.
+- Persona çıkarım kuyruğu: ayrı `oneri.db` (WAL); MCP `persona_oner` yalnız öneri yazar, `ornekle` izinli kategoriden örnek verir; onay/düzelt/reddet/"hiç doğru değil" servis fonksiyonları Windows uygulamasında çalışır; onaylananlar `facts`'e `beyan_edilen` olarak yazılır. Onaylanmamış öneri persona/kimlik kartına girmez.
