@@ -6,7 +6,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from kimlikcore import Hub, KimlikError, connect_erisim
+from kimlikcore import Hub, KimlikError
 
 from .veri_klasoru import bos_alan, boyut_metni
 
@@ -27,7 +27,9 @@ def denetle(veri: str | Path) -> dict:
 
     ekle("veri klasörü var", veri.is_dir(), str(veri) if veri.is_dir() else "yok")
     ekle("kimlik.db var", (veri / "kimlik.db").is_file())
-    ekle("erisim.db var", (veri / "erisim.db").is_file())
+    eski = [a for a in ("oneri.db", "erisim.db") if (veri / a).exists()]
+    ekle("eski şifresiz dosya yok (oneri.db, erisim.db)", not eski,
+         ", ".join(eski) + " duruyor: uygulama açılışında ana veritabanına taşınır, taşınamadıysa silinmez" if eski else "")
     for alt in ("arsiv", "cikti"):
         ekle(f"{alt}/ klasörü var", (veri / alt).is_dir())
     try:
@@ -39,13 +41,11 @@ def denetle(veri: str | Path) -> dict:
     except (KimlikError, OSError) as e:
         ekle("veritabanı açılıyor (salt okunur)", False, f"{type(e).__name__}: {e}")
     try:
-        c = connect_erisim(veri)
-        try:
-            n = c.execute("SELECT count(*) FROM access_log").fetchone()[0]
-        finally:
-            c.close()
-        ekle("erişim kaydı okunuyor", True, f"{n} satır")
-    except Exception as e:  # sqlite3.Error, OSError
+        with Hub.open(veri, write=False) as h:
+            n = h.query_one("SELECT count(*) FROM access_log")[0]
+        bekleyen = len(list((veri / "gelen").glob("*.gelen"))) if (veri / "gelen").is_dir() else 0
+        ekle("erişim kaydı okunuyor", True, f"{n} satır" + (f", {bekleyen} kayıt işlenmeyi bekliyor" if bekleyen else ""))
+    except Exception as e:  # KimlikError, sqlite3.Error, OSError
         ekle("erişim kaydı okunuyor", False, type(e).__name__)
     try:
         ekle("boş alan", True, boyut_metni(bos_alan(veri)))

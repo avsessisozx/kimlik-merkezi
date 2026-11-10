@@ -1,14 +1,22 @@
 # Veri şifreleme (Kimlik Merkezi)
 
-Durum: ilk sürüm (dal `tur/i1-sifre`). Bu belge neyin yapıldığını, neyin YAPILMADIĞINI ve neyin
+Durum: ilk sürüm (dal `tur/i1-sifre`) + `oneri.db`/`erisim.db` açıklarının kapatılması (dal `tur/i1-oneri`, şema v4, bölüm 11). Bu belge neyin yapıldığını, neyin YAPILMADIĞINI ve neyin
 doğrulanamadığını açıkça yazar. Kod: `core/src/kimlikcore/sifreleme.py` (anahtarlar, biçim, kurallar),
 `donusum.py` (şifrele / şifreyi kaldır), `hub.py` (şifreli açma), `cli.py` (komutlar).
 
 ## 1. Ne korunuyor, neye karşı
 
 Korunan (diskte şifreli, AES-256-GCM): `kimlik.db` içindeki HER ŞEY (olaylar, metinler, FTS arama
-dizini, persona, anahtar özetleri, izinler, kaynak üst verisi, zaman damgaları) ve `arsiv/` altındaki ham
-dışa aktarma dosyaları.
+dizini, persona, anahtar özetleri, izinler, kaynak üst verisi, zaman damgaları, **persona öneri kuyruğu ve
+erişim günlüğü**; şema v4'ten beri bunlar da `kimlik.db` içindedir), `arsiv/` altındaki ham dışa aktarma
+dosyaları ve `gelen/` altındaki henüz işlenmemiş erişim/öneri kayıtları (bölüm 11).
+
+ŞİFRELENMEYEN (dürüst liste): `cikti/` klasörü ve `disa-aktar` ile ya da başka yolla dışa aktarılan dosyalar
+(kullanıcının kendi düz metin çıktıları); `anahtar.json` (içeriği sarılı anahtarlardır, düz anahtar değil;
+onsuz veri açılmaz); Linux ve anahtar sağlayıcısı olmayan ortamlarda oluşturulan klasörler (varsayılan
+şifresiz, uyarı verilir); şifreleme eklenmeden önce oluşmuş ve `sifrele` komutuyla dönüştürülmemiş klasörler;
+dosya adları, boyutları ve değişme zamanları (dosya sistemi üst verisi: örn. `gelen/` içindeki kayıt SAYISI ve
+zamanı, `arsiv/<sha256>/` klasör adları dışarıdan görülebilir).
 
 Karşı konulan tehdit: diskin/yedeğin/klasörün kopyalanması, bilgisayarın çalınması, başka bir Windows
 kullanıcısının dosyaları okuması. Parola katmanı ek olarak: aynı Windows hesabına erişen biri.
@@ -139,7 +147,7 @@ Tüm okuyucular (`server` MCP süreci, harita, `windows` uygulaması) veriyi `Hu
 
 ## 7. Testler
 
-`core/tests/test_sifreleme.py` (biçim, kurallar, yaşam döngüsü, Hub, dönüşüm), `test_sifreleme_cli.py`
+`core/tests/test_gelen.py` (gelen kutusu: çok süreçli yazım, şifreli dosyalarda düz metin yok, eski oneri.db/erisim.db göçü ve doğrulama, bozuk dosya, dönüşümde gelen dosyaları), `core/tests/test_sifreleme.py` (biçim, kurallar, yaşam döngüsü, Hub, dönüşüm), `test_sifreleme_cli.py`
 (komutlar, alt süreç), `server/tests/test_sifreli.py` (QueryService, MCP stdio), `windows/tests/test_mantik.py`.
 Kapsananlar: yanlış parola reddi; kurtarma akışları; ifade/parola kuralları; parola-önce-ifade zorunluluğu;
 anahtarın diskte düz metin olmaması; veritabanı ve ham arşiv dosyalarında bilinen metin aranınca (Türkçe
@@ -149,14 +157,17 @@ hata durumunda geri alma; bozuk/kırpılmış dosya; eski şemadan göç; başka
 
 ## 8. Yapılmadı / doğrulanmadı
 
-- **`oneri.db` (persona öneri kuyruğu) ve `erisim.db` (erişim kaydı) ŞİFRELENMİYOR.** İkisi ayrı SQLite
-  dosyalarıdır ve birden çok süreç WAL ile aynı anda yazar; bellek içi kapsayıcı modeline uymaz. `oneri.db`
-  kişi hakkında öneri cümleleri taşıyabilir: bu, bu sürümün GERÇEK bir açığıdır. Çözüm önerisi: öneri
-  kuyruğunu `kimlik.db` içine taşımak (INTERFACES kararı gerekir) ya da sütun düzeyinde şifrelemek.
+- ~~`oneri.db` ve `erisim.db` şifrelenmiyor~~ — KAPATILDI (bölüm 11). Kalan sınırlar orada: yazan Hub hiç açılmazsa
+  `gelen/` dosyaları birikir; eski sürüm programlar yeni klasörü açamaz.
 - `cikti/` klasörü ve `disa-aktar` çıktısı düz kalır (kullanıcı istedi / kullanıcı verisi).
 - Anahtar döndürme (yeni DEK ile yeniden şifreleme) yok. `sifreyi-kaldir` + `sifrele` bunu dolaylı yapar.
-- Windows uygulamasında parola sorma arayüzü, kurtarma ifadesi sihirbazı ve şifreleme ayar sayfası YOK;
-  yalnız CLI. Uygulamada klasör oluşturma varsayılan şifreli olur, parolalı klasör uygulamadan açılamaz.
+- **Windows uygulamasında parola sorma ekranı, kurtarma ifadesi sihirbazı ve şifreleme ayar sayfası YOK.**
+  Parola, kurtarma ifadesi ve şifrele/şifreyi kaldır YALNIZ komut satırından (`kimlikmerkezi` komutu, §5) yönetilir.
+  Uygulamada yeni klasör varsayılan şifreli (DPAPI) oluşur; PAROLALI bir klasör uygulamadan AÇILAMAZ (parola
+  sorulmaz; `KIMLIK_PAROLA` ortam değişkeni gerekir). Ayrıca Windows kurulum paketinin (PyInstaller exe'leri)
+  `kimlikmerkezi` komut satırı aracını (sifrele, parola-ekle, kurtarma-kur...) İÇERDİĞİ doğrulanmadı: paketin giriş
+  noktaları yalnız uygulama, `mcp`, `saglik`, `surum`; bu komutlar şimdilik Python paketi kurulu bir ortamda
+  (`pip install` ile gelen `kimlikmerkezi`) çalışır. Bu bir eksiktir, giderilmedi.
 - **Gerçek Windows DPAPI burada denenemedi** (Linux). `DpapiSaglayici` ctypes kodu yazıldı ve Windows'ta
   koşacak bir test eklendi (`test_dpapi_gercek_gidis_donus`, Linux'ta atlanır) ama hiç çalıştırılmadı.
   Windows CI'da ve elle doğrulanmalı. `windows/paket` PyInstaller derlemesi de Windows'ta denenmedi.
@@ -187,3 +198,54 @@ birlikte tek başına veri açamaz, ama onsuz kurtarma da yapılamaz). Yedek al�
 `cryptography>=42` (Apache-2.0 OR BSD-3-Clause; tekerlekler OpenSSL içerir, Apache-2.0). Gerekçe: Python
 standart kütüphanesinde AEAD yok; kendi şifre yapımımızı yazmak güvensiz olurdu. Yalnız şifreleme
 kullanılırken içe aktarılır. `THIRD-PARTY-NOTICES.md` güncellendi.
+
+## 11. `oneri.db` ve `erisim.db` kararı (şema v4)
+
+**Sorun.** İki ayrı SQLite dosyası (WAL, çok süreç) şifrelenmiyordu: `oneri.db` kişi hakkında öneri cümleleri,
+`erisim.db` hangi yapay zekânın hangi kategoriye ne zaman baktığını (kullanım örüntüsü) taşıyordu.
+
+**Karar: ikisi de şifreli `kimlik.db` içine taşındı.** Tablolar `access_log`, `oneriler`, `bastirilan` (şema v4).
+Burada seçenekler ve gerekçe:
+| Seçenek | Sonuç |
+|---|---|
+| `oneri.db`/`erisim.db`'yi aynı kapsayıcıyla şifrelemek | Elendi: kapsayıcı her yazımda dosyanın tamamını yeniden yazar. Birden çok MCP süreci eşzamanlı oku-değiştir-yaz yaparsa güncelleme KAYBOLUR (ya da her biri bir kilit gerektirir); WAL de kapsayıcıyla bağdaşmaz. |
+| Süreçlerin `hub.lock` alıp doğrudan `kimlik.db`'ye yazması | Elendi: Windows uygulaması kilidi açık kaldığı sürece tutar; MCP yazamaz (öneri/erişim kaydı sürekli reddedilirdi). |
+| SQLCipher | Bölüm 2'deki lisans/ikili güven kararı bekliyor; bu turda eklenmedi. |
+| **Gelen kutusu (seçildi)** | Her MCP kaydı `gelen/` altında kendi dosyasına bırakır (benzersiz ad, geçici dosya + `fsync` + atomik yeniden adlandırma; şifreli klasörde aynı AES-GCM biçimiyle şifreli). İki yazar aynı dosyaya hiç dokunmaz: kayıp ve kilit çakışması yapısal olarak yoktur. Yazan Hub (uygulama açılışı, `baslat`, erişim/öneri ekranları) kayıtları şifreli `kimlik.db`'ye işler ve dosyaları siler. |
+
+**Erişim günlüğünün şifrelenmesi uygun muydu?** Evet, aynı mekanizmayla. Sözleşme korunur: günlük yazılamazsa
+sorgu REDDEDİLİR (kayıt `fsync`'li dosya olarak yazılamazsa `AccessLogError`). Günlük, yetkisiz biri tarafından
+sahtelenemez (dosyalar AES-GCM ile kimliklenir; anahtarsız geçerli dosya üretilemez).
+
+**Eşzamanlılık / kararsız testin nedeni.** `test_uc_mcp_sureci_ayni_anda_oneri_yazar_kayip_yok` eski tasarımda
+bazen düşüyordu. Neden bulundu ve tekrar üretildi: `OneriKuyrugu._read_conn` yalnız dosyanın VARLIĞINA bakıp
+salt okunur bağlanıyor, `connect_oneri` ise dosyayı önce oluşturup (WAL'a geçiş) şemayı sonra kuruyordu; ilk
+yazımda başka bir süreç tam bu aralıkta `on_kontrol` çalıştırırsa `sqlite3.OperationalError: no such table:
+bastirilan` alıyor ve MCP "Beklenmeyen bir hata" dönüyordu (yalnız yeni klasörde, ilk eşzamanlı yazımda).
+Doğrulama: eski kodla 4 paralel döngüde 48 koşunun 6'sı düştü (hata türü `OperationalError` olarak günlüklendi);
+iki aşamalı oluşturma elle yeniden üretilince `no such table: bastirilan` alındı. Yük altındaki 6 düşüşün HEPSİNİN
+aynı iletiyi taşıdığı ayrıca doğrulanmadı (günlükte yalnız tür vardı). Yeni tasarımda ortak dosya/şema olmadığı için bu yarış yoktur;
+`test_cok_surecli_ilk_yazim_yarisi_ve_eszamanli_okuyucu_kayip_yok` aynı koşulu (klasör yokken 6 süreç + sürekli
+okuyucu) sınar.
+
+**Göç (eski klasörler).** Yazan Hub ilk açılışta tabloları oluşturur, eski `oneri.db`/`erisim.db`'yi okur,
+içeriği kopyalar, HER satırı yeni tabloda karşılaştırarak doğrular (şifreliyse diskteki kapsayıcıyı geri çözüp
+`quick_check` de yapar), ancak sonra eski dosyayı ve `-wal/-shm`'ini sıfırla-üzerine-yaz + sil (şifreleme
+dönüşümündeki `guvenli_sil` yöntemi) ile kaldırır. Doğrulama tutmazsa dosya silinmez, uyarı verilir. `sifrele`
+komutu da eski dosyaları anahtar kurulunca hemen göç ettirir. SINIR: `guvenli_sil` en iyi çabadır; SSD/günlüklü
+dosya sistemi/yedekler/gölge kopyalar nedeniyle eski düz metnin fiziksel olarak yok olduğu GARANTİ EDİLMEZ
+(bölüm 8). Göç sırasında hâlâ çalışan eski sürüm MCP süreçleri dosyaları yeniden oluşturabilir; göçten önce
+kapatın.
+
+**Bilinen sınırlar (yeni).**
+- Yazan Hub hiç açılmazsa `gelen/` dosyaları birikir (her MCP çağrısı bir küçük dosya). Okuyucular bunları
+  görür, veri kaybolmaz; ama uygulama hiç açılmayan bir kurulumda dosya sayısı büyür. Uygulama açık kalırsa kayıtlar
+  yalnız erişim/öneri ekranları açıldığında (ve uygulama başlarken) işlenir; arka planda zamanlı birleştirme YOK.
+- Birleştirme sırasında çökme: öneriler `oneri_id` ile yinelenmez; erişim satırı dosya silinmeden önce süreç
+  ölürse bir kez çift yazılabilir (günlük şişer, kayıp olmaz).
+- Yazma anındaki yineleme ve `MAX_BEKLEYEN` denetimi, tam aynı anda gelen süreçler için kesin değildir
+  (birleştirmede yineleme atılır; kuyruk sınırı en fazla eşzamanlı süreç sayısı kadar aşılabilir).
+- Dışarıdan görülebilen üst veri: `gelen/` içindeki dosya sayısı ve zamanları (kaç çağrı yapıldığı). Her kayıt
+  dosyası hâlâ ayrı bir şifreli dosyadır; boyutları kayıt uzunluğunu az çok belli eder (öneri cümlesinin uzunluğu gibi).
+- `sifrele`/`sifreyi-kaldir` sırasında çalışan bir MCP süreci, o an kendi kipinde yazabilir; dönüşümden önce
+  MCP istemcilerini kapatın.

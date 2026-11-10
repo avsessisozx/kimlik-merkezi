@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, connect_erisim, fold
+from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, fold
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
 from kimlikserver.access import KeyManager
@@ -362,12 +362,9 @@ class Uygulama:
         return {"acilan": self.anahtarlar.grant_all_non_sensitive(app_id, expires_at=bitis or None)}
 
     def erisim_kaydi(self, limit: int = 200) -> dict:
-        c = connect_erisim(self.veri)
-        try:
-            satirlar = c.execute("SELECT ts, app_id, tool, category, result_count, outcome FROM access_log "
-                                 "ORDER BY id DESC LIMIT ?", (min(int(limit), 1000),)).fetchall()
-        finally:
-            c.close()
+        self.hub.gelen_birlestir()   # MCP süreçlerinin gelen kutusuna bıraktığı kayıtları işle
+        satirlar = self.hub.query("SELECT ts, app_id, tool, category, result_count, outcome FROM access_log "
+                                  "ORDER BY id DESC LIMIT ?", (min(int(limit), 1000),))
         adlar = {a[0]: a[1] for a in self.anahtarlar.list_keys()}
         return {"satirlar": [{"zaman": r[0], "uygulama": adlar.get(r[1], r[1]), "arac": r[2],
                               "kategori": r[3], "sayi": r[4], "sonuc": r[5]} for r in satirlar]}

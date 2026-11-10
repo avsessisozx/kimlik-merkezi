@@ -14,7 +14,7 @@ Windows uygulaması.
 - **İçe aktarır:** Google Takeout (arama, YouTube, Chrome, konum, Gmail MBOX, Gemini), Instagram/Facebook,
   Reddit, Spotify, GitHub hesap verisi, tarayıcı geçmişi dosyaları, ChatGPT ve Claude sohbet dışa aktarmaları,
   elle hazırlanmış sohbet dosyaları, yerel klasör taraması. Kaynak arşivler diske açılmadan akışla okunur.
-- **Yerelde saklar:** veriler seçtiğiniz klasörde SQLite dosyasında durur.
+- **Yerelde saklar:** veriler seçtiğiniz klasörde durur; Windows'ta yeni klasör varsayılan olarak **şifrelenir** (aşağıda "Şifreleme").
 - **Arama, zaman çizelgesi, "persona", harita:** yerel web arayüzünde (yalnızca bu bilgisayardan açılır).
 - **Yapay zekâ uygulamalarına izinli erişim (MCP):** her uygulama için ayrı anahtar; hangi kategorilerin
   okunabileceğini siz seçersiniz; hassas kategoriler (e-posta, özel mesajlar, konum, yapay zekâ sohbetleri) ayrı onay ister;
@@ -26,12 +26,39 @@ Windows uygulaması.
 
 - Bir bulut hizmeti, hesap ya da senkronizasyon aracı **değildir**. Sunucumuz yok; telemetri, güncelleme
   yoklaması ve hata raporu gönderimi yok.
-- Verinizi **şifrelemez** (bu sürümde). Bilgisayarınıza erişen biri dosyalarınızı okuyabilir. Veri klasörünü
-  BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir. Ayrıntı: [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md).
+- Her şeyi şifrelemez ve kötü amaçlı yazılıma karşı koruma değildir: aşağıdaki "Şifreleme" bölümü neyin
+  şifrelendiğini ve neyin ŞİFRELENMEDİĞİNİ açıkça yazar. Ek önlem olarak veri klasörünü BitLocker/VeraCrypt gibi
+  şifreli bir birimde tutmanız önerilir. Ayrıntı: [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md).
 - Bir yapay zekâ istemcisine verdiğiniz izin sonrasında o istemcinin veriyle ne yaptığını **denetleyemez**.
   İzin verdiğiniz kategorideki metin, o uygulamanın (ve onun modelinin sağlayıcısının) eline geçer.
 - Bir antivirüs, parola yöneticisi ya da yedekleme çözümü değildir.
 - Henüz **kod imzalı değildir** (bkz. Kısıtlar).
+
+## Şifreleme
+
+Teknik ayrıntı ve sınırlar: [docs/SIFRELEME.md](docs/SIFRELEME.md).
+
+- **Varsayılan açık (yeni klasörlerde).** Windows uygulamasıyla oluşturulan yeni veri klasörü AES-256-GCM ile
+  şifrelenir; anahtar Windows hesabınıza bağlıdır (DPAPI), ayrı parola sormaz.
+- **Şifrelenenler:** veritabanının tamamı (olaylar, arama dizini, persona, **persona öneri kuyruğu**, anahtar
+  özetleri, izinler, **erişim günlüğü**) ve `arsiv/` altındaki ham içe aktarma dosyaları.
+- **ŞİFRELENMEYENLER:** `cikti/` klasörü ve dışa aktardığınız her dosya (JSONL, kimlik kartı, vb.); Linux'ta ya da
+  anahtar sağlayıcısı olmayan ortamlarda oluşturulan klasörler (varsayılan şifresiz, uyarı verilir); şifreleme
+  gelmeden önce oluşturduğunuz klasörler (otomatik dönüştürülmez, `kimlikmerkezi sifrele` gerekir); dosya adları,
+  boyutları ve zamanları gibi dosya sistemi üst verisi. Aynı Windows hesabında çalışan bir program anahtarı
+  açtırabilir: yalnız isteğe bağlı parola katmanı buna karşı korur.
+- **Parola ve kurtarma ifadesi:** isteğe bağlı parola eklenebilir, ama önce bir **kurtarma ifadesi** kurmak ZORUNLUDUR
+  (en az 4 kelime ya da 20 karakter; kısa, "gizli soru" tarzı, tekrar eden ya da bilinen zayıf ifadeler reddedilir; iki
+  kez yazarak doğrulanır). **Parolayı ve kurtarma ifadesini ikisini birden unutursanız verinizi KİMSE kurtaramaz**
+  (biz de, kimse de). Kurtarma ifadesi gücü sezgiseldir, gerçek bir entropi ölçümü değildir.
+- **Windows uygulamasında parola ekranı YOK.** Parola, kurtarma ifadesi ve şifrele/şifreyi kaldır yalnız komut
+  satırından (`kimlikmerkezi parola-ekle`, `kurtarma-kur`, `kurtar`, `sifrele`, `sifreyi-kaldir`) yönetilir; uygulama
+  parola sormaz, parolalı bir klasörü kendiliğinden açamaz. Hazır Windows kurulum paketinin bu komut satırı aracını
+  içerdiği **doğrulanmadı**; kaynaktan kurulumda (`pip install`) vardır. Parola katmanı ayrıca MCP'yi de etkiler (MCP süreci parolayı
+  `KIMLIK_PAROLA` ortam değişkeninden alır; bu, parolayı yapılandırma dosyasında düz metin yapar).
+- **Doğrulanmadı:** gerçek Windows DPAPI bu geliştirme ortamında (Linux) denenmedi; Windows'ta paketlenmiş uygulamayla
+  şifreleme elle sınanmadı. Güvenli silme (eski düz dosyaları sıfırlayıp silme) SSD ve yedekler yüzünden fiziksel
+  silmeyi garanti etmez.
 
 ## Gizlilik ve yerel çalışma sözü
 
@@ -75,7 +102,7 @@ doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmış
   Kendi dışa aktarmanızla `kimlikmerkezi tanila <yol>` çalıştırırsanız içeriksiz bir yapı raporu çıkar;
   uyumsuzluk bildirimi için bunu kullanın (önce okuyup içinde kişisel şey kalmadığından emin olun).
 - **Kod imzası yok.** Araştırma ve plan: [docs/IMZA.md](docs/IMZA.md).
-- **Şifreleme yok** (bu sürümde), yalnızca Windows, yalnızca Türkçe arayüz. Android uygulaması yok.
+- **Şifreleme kısmi ve Windows'ta gerçek DPAPI ile denenmedi** (yukarıdaki "Şifreleme" bölümü), yalnızca Windows, yalnızca Türkçe arayüz. Android uygulaması yok.
 - **Test kapsamı:** otomatik testler Linux'ta ve Windows paket CI'sında çalışır; gerçek bir Windows
   masaüstünde elle uçtan uca deneme yapılan bir "doğrulandı" kaydı henüz yoktur.
 

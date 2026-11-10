@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import os
 import sys
 
 import pytest
@@ -38,15 +39,9 @@ def onerme(world, ifade="Kahve seviyor", kategori="tercihler", guven=0.8, kanit=
 
 
 def oneri_rows(world):
-    p = world["root"] / "oneri.db"
-    if not p.exists():
-        return []
-    c = sqlite3.connect(p)
-    try:
-        return c.execute("SELECT oneri_id, app_id, statement, category, durum, kanit_event_ids "
-                         "FROM oneriler ORDER BY ts, oneri_id").fetchall()
-    finally:
-        c.close()
+    """Tablodaki + henüz işlenmemiş (gelen kutusunda bekleyen) öneriler."""
+    return [(o.oneri_id, o.app_id, o.statement, o.category, o.durum, json.dumps(o.kanit_event_ids))
+            for o in OneriKuyrugu(world["root"]).listele(None, limit=10000)]
 
 
 def fact_count(world):
@@ -122,20 +117,20 @@ def test_dogrulama_hatalari(world):
     assert oneri_rows(world) == []
 
 
-def test_oneri_db_yazilamazsa_reddedilir(world):
-    (world["root"] / "oneri.db").mkdir()  # dosya yerine klasör
+def test_oneri_kuyrugu_yazilamazsa_reddedilir(world):
+    (world["root"] / "gelen").write_text("klasör yerine dosya")  # gelen kutusu açılamaz
     with pytest.raises(ServiceError) as e:
         svc(world).persona_oner([onerme(world)])
     assert "reddedildi" in str(e.value)
 
 
 def test_erisim_kaydi_yazilamazsa_kuyruga_da_yazilmaz(world):
-    c = sqlite3.connect(world["root"] / "erisim.db")
-    c.execute("DROP TABLE access_log")
-    c.commit()
-    c.close()
+    def kotu(root):
+        raise sqlite3.OperationalError("disk I/O error")
+    from kimlikserver.access import AccessLog
+    s = QueryService(world["root"], world["a_key"], access_log=AccessLog(world["root"], gelen=kotu))
     with pytest.raises(ServiceError):
-        svc(world).persona_oner([onerme(world)])
+        s.persona_oner([onerme(world)])
     assert oneri_rows(world) == []  # kayıt önce yazılır; kayıt yoksa yazma da yok
 
 
@@ -172,9 +167,8 @@ def test_tekrar_onerilen_kuyruga_girmez(world):
     # farklı kategoride aynı ifade ayrı öneridir
     assert ifade_ozeti("a b", "kimlik") != ifade_ozeti("a b", "ilgi")
     # bastirilan tablosu dolu
-    c = sqlite3.connect(world["root"] / "oneri.db")
-    assert c.execute("SELECT COUNT(*) FROM bastirilan").fetchone()[0] == 1
-    c.close()
+    with Hub.open(world["root"], write=False) as h:
+        assert h.query_one("SELECT COUNT(*) FROM bastirilan")[0] == 1
 
 
 # ------------------------------------------------------------------ onay akışı
@@ -315,8 +309,10 @@ def test_oneri_metni_talimat_icerse_de_yalniz_veri(world):
 
 # ------------------------------------------------------------------ gerçek stdio
 def params(world, key):
-    return StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"],
-                                 env={"KIMLIK_VERI": str(world["root"]), "KIMLIK_ANAHTAR": key})
+    env = {"KIMLIK_VERI": str(world["root"]), "KIMLIK_ANAHTAR": key}
+    if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
+        env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    return StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
 
 def run(coro):
@@ -368,3 +364,33 @@ def test_uc_mcp_sureci_ayni_anda_oneri_yazar_kayip_yok(world):
     assert len(rows) == 3 * N and len({r[2] for r in rows}) == 3 * N
     log = AccessLog(world["root"]).read_all()
     assert sum(1 for x in log if x[2] == "persona_oner" and x[5] == "ok") == 3 * N
+
+
+def test_cok_surecli_ilk_yazim_yarisi_ve_eszamanli_okuyucu_kayip_yok(world):
+    """Eski oneri.db tasarımındaki kararsızlığın (dosya oluştu ama şema henüz yok -> okuyucuda
+    'no such table') yeniden doğmadığını denetler: gelen/ klasörü yokken 6 süreç aynı anda ilk
+    yazımı yapar, bir okuyucu aralıksız on_kontrol çağırır. Hata ve kayıp olmamalı."""
+    kod = r"""
+import sys
+from kimlikserver.oneri import OneriKuyrugu
+k = OneriKuyrugu(sys.argv[1])
+for j in range(30):
+    r = k.ekle("app", [{"ifade": f"Süreç {sys.argv[2]} bilgi {j}", "kategori": "diger",
+                        "kanit": ["e"], "guven": 0.5, "anahtar": None}])
+    assert r[0]["sonuc"] == "eklendi", r
+"""
+    import subprocess
+    import time
+    ps = [subprocess.Popen([sys.executable, "-c", kod, str(world["root"]), str(i)]) for i in range(6)]
+    k = OneriKuyrugu(world["root"])
+    hatalar = 0
+    while any(p.poll() is None for p in ps):
+        try:
+            k.on_kontrol([{"ifade": "x", "kategori": "diger"}])
+        except Exception:  # noqa: BLE001
+            hatalar += 1
+        time.sleep(0.001)
+    assert all(p.wait() == 0 for p in ps) and hatalar == 0
+    assert len(oneri_rows(world)) == 180
+    with Hub.open(world["root"], write=True) as h:
+        assert h.query_one("SELECT COUNT(*) FROM oneriler")[0] == 180

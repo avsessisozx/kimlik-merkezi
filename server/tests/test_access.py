@@ -117,21 +117,18 @@ def test_her_istek_kayda_girer(world):
     assert rows[1][3] == "notlar" and rows[1][4] == len(r["kayitlar"]) == 1
 
 
-def test_erisim_kaydi_yazilamazsa_reddedilir_tablo_yok(world):
-    c = sqlite3.connect(world["root"] / "erisim.db")
-    c.execute("DROP TABLE access_log")
-    c.commit()
-    c.close()
+def test_erisim_kaydi_yazilamazsa_reddedilir_gelen_klasoru_acilamiyor(world):
+    (world["root"] / "gelen").mkdir(exist_ok=True)
+    (world["root"] / "gelen").rmdir()
+    (world["root"] / "gelen").write_text("klasör yerine dosya: kayıt bırakılamaz")
     with pytest.raises(ServiceError) as e:
         svc(world).ara("kahve", "notlar")
     assert "reddedildi" in str(e.value) and "kahve" not in str(e.value)
 
 
-def test_erisim_kaydi_yazilamazsa_reddedilir_dosya_acilamiyor(world):
-    (world["root"] / "erisim.db").unlink()
-    for f in world["root"].glob("erisim.db-*"):
-        f.unlink()
-    (world["root"] / "erisim.db").mkdir()  # dosya yerine klasör: bağlantı açılamaz
+def test_erisim_kaydi_yazilamazsa_reddedilir_dizin_yazilamaz(world, monkeypatch):
+    import os
+    monkeypatch.setattr(os, "fsync", lambda fd: (_ for _ in ()).throw(OSError("disk dolu")))
     with pytest.raises(ServiceError) as e:
         svc(world).ara("kahve", "notlar")
     assert "reddedildi" in str(e.value)
@@ -141,9 +138,22 @@ def test_erisim_kaydi_enjekte_hata(world):
     def kotu(root):
         raise sqlite3.OperationalError("disk I/O error")
     s = QueryService(world["root"], world["a_key"],
-                     access_log=AccessLog(world["root"], connect=kotu))
+                     access_log=AccessLog(world["root"], gelen=kotu))
     with pytest.raises(ServiceError):
         s.persona_getir()
+
+
+def test_erisim_kaydi_sifresiz_dosya_yok_ve_yazan_hub_isler(world):
+    """Kayıt önce gelen kutusuna düşer, yazan Hub açılınca tabloya geçer ve dosyalar silinir;
+    erisim.db oluşturulmaz."""
+    svc(world).ara("kahve", "notlar")
+    assert not (world["root"] / "erisim.db").exists()
+    assert len(list((world["root"] / "gelen").glob("erisim-*.gelen"))) == 1
+    assert len(AccessLog(world["root"]).read_all()) == 1
+    with Hub.open(world["root"], write=True) as h:
+        assert h.query("SELECT COUNT(*) FROM access_log")[0][0] == 1
+    assert list((world["root"] / "gelen").glob("*.gelen")) == []
+    assert len(AccessLog(world["root"]).read_all()) == 1   # birleştirilince de tek kayıt
 
 
 def test_tombstone_kayitlar_donmez(world):

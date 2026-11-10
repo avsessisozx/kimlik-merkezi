@@ -36,7 +36,8 @@ def test_denetle_durumlari(tmp_path):
 def test_olustur_yapiyi_kurar_ve_mevcudu_kabul_eder(tmp_path):
     p = tmp_path / "kurulum"
     r = veri_klasoru.olustur(p)
-    assert {"kimlik.db", "erisim.db", "arsiv", "cikti"} <= set(r["dosyalar"])
+    assert {"kimlik.db", "arsiv", "cikti"} <= set(r["dosyalar"])
+    assert "erisim.db" not in r["dosyalar"] and "oneri.db" not in r["dosyalar"]   # artık kimlik.db içinde
     assert not r["mevcut_idi"]
     assert veri_klasoru.denetle(p).durum == "mevcut"
     assert veri_klasoru.olustur(p)["mevcut_idi"]

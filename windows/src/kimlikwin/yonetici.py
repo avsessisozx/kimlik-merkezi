@@ -261,8 +261,12 @@ class Yonetici:
                 "lisanslar": ["Python (PSF)", "SQLite (kamu malı)", "mcp SDK (MIT)", "ijson (BSD-3-Clause)",
                               "PyInstaller (GPLv2+, paketlenen uygulama için istisnalı)",
                               "pystray (LGPL-3.0)", "Pillow (HPND)", "Inno Setup (kendi lisansı)"],
-                "sifreleme_notu": "Uygulama verileri şifrelemez. Veri klasörünü BitLocker/VeraCrypt gibi "
-                                  "şifreli bir birimde tutmanız önerilir.",
+                "sifreleme_notu": "Bu uygulamayla oluşturulan yeni veri klasörü varsayılan olarak şifrelenir "
+                                  "(anahtar Windows hesabınıza bağlıdır; bu hesapta çalışan başka bir program da "
+                                  "anahtarı açtırabilir). Dışa aktardığınız dosyalar ve cikti klasörü şifrelenmez. "
+                                  "Uygulamada parola ya da kurtarma ifadesi ekranı yoktur. Ek önlem olarak veri "
+                                  "klasörünü BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir. "
+                                  "Ayrıntı: docs/SIFRELEME.md.",
                 "smartscreen_notu": "Uygulama imzasızdır: Windows SmartScreen 'Windows bilgisayarınızı "
                                     "korudu' uyarısı gösterebilir ve bazı antivirüsler yanlış alarm "
                                     "verebilir. Kurulum dosyasının bütünlüğünü SHA256SUMS ile doğrulayın."}

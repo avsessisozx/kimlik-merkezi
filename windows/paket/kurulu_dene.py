@@ -107,7 +107,7 @@ try:
     d = api("sihirbaz_denetle", {"yol": str(veri)})
     kontrol(d["ok"] and d["bos_alan"] > 0, f"veri klasörü denetimi geçti, boş alan: {d['bos_alan_metni']}")
     t = api("sihirbaz_tamamla", {"yol": str(veri), "otomatik_baslat": True})
-    kontrol((veri / "kimlik.db").is_file() and (veri / "erisim.db").is_file() and (veri / "arsiv").is_dir(),
+    kontrol((veri / "kimlik.db").is_file() and not (veri / "erisim.db").exists() and (veri / "arsiv").is_dir(),
             "veritabanı ve klasörler oluştu: " + ", ".join(t["dosyalar"]))
     s = api("saglik")
     kontrol(s["ok"], "sağlık denetimi geçti\n" + s["metin"])

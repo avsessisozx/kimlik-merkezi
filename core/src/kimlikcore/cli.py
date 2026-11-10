@@ -72,6 +72,8 @@ def cmd_baslat(args):
         durum = "şifreli" if hub.sifreli else "şifresiz"
         if not yeni and not hub.sifreli:
             not_ = "\nBu klasör şifresiz. Şifrelemek için: kimlikmerkezi sifrele"
+        for u in hub.goc_uyarilari:
+            not_ += f"\nUYARI: {u}"
         _out(args, {"veri": str(args.veri), "sema_surumu": hub.schema_version, "sifreli": hub.sifreli},
              f"Veri klasörü hazır: {args.veri}\nŞema sürümü: {hub.schema_version}\nŞifreleme: {durum}{not_}")
 
@@ -127,6 +129,13 @@ def cmd_durum(args):
                      + " (yarım kalmış dönüşüm; 'kimlikmerkezi sifrele' yeniden çalıştırın).")
     if d["sifreli"] and d["ham_dosya_duz"]:
         satir.append("UYARI: bazı ham arşiv dosyaları düz; 'kimlikmerkezi sifrele' tamamlar.")
+    if d["eski_sifresiz_dosyalar"]:
+        satir.append("UYARI: eski " + ", ".join(d["eski_sifresiz_dosyalar"]) + " duruyor; bu dosyalar "
+                     "şifrelenmez. Yazan süreç açılınca (ör. 'kimlikmerkezi baslat') ana veritabanına "
+                     "taşınır, doğrulanır ve silinir.")
+    if d["bekleyen_gelen_kayit"]:
+        satir.append(f"Bilgi: {d['bekleyen_gelen_kayit']} erişim/öneri kaydı gelen kutusunda "
+                     "bekliyor; Windows uygulaması ya da yazan süreç açılınca veritabanına işlenir.")
     if not d["sifreli"]:
         satir.append("Şifrelemek için: kimlikmerkezi sifrele")
     _out(args, d, "\n".join(satir))

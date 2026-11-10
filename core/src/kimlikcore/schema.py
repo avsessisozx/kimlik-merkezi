@@ -162,7 +162,47 @@ _V3: Statements = [
     "ALTER TABLE permissions_yeni RENAME TO permissions",
 ]
 
-MIGRATIONS: dict[int, Statements] = {1: _V1, 2: _V2, 3: _V3}
+# v4: erişim günlüğü (`access_log`) ve persona öneri kuyruğu (`oneriler`, `bastirilan`) ana veritabanına
+# taşındı. Eskiden ayrı `erisim.db` / `oneri.db` dosyalarıydı ve ŞİFRELENMİYORDU. Eski dosyaların
+# içeriği yazan Hub açılırken göç ettirilir (hub.py, `_eski_dosyalari_goc`); burada yalnız tablolar var.
+_V4: Statements = [
+    """CREATE TABLE access_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL,
+        app_id TEXT NOT NULL,
+        tool TEXT NOT NULL,
+        category TEXT,
+        result_count INTEGER NOT NULL DEFAULT 0,
+        outcome TEXT NOT NULL CHECK (outcome IN ('ok', 'reddedildi', 'hata'))
+    )""",
+    "CREATE INDEX idx_access_ts ON access_log(ts)",
+    "CREATE INDEX idx_access_app ON access_log(app_id, ts)",
+    """CREATE TABLE oneriler (
+        oneri_id TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        app_id TEXT NOT NULL,
+        statement TEXT NOT NULL,
+        category TEXT NOT NULL,
+        fact_key TEXT,
+        kanit_event_ids TEXT NOT NULL,
+        guven REAL NOT NULL CHECK (guven >= 0 AND guven <= 1),
+        durum TEXT NOT NULL DEFAULT 'bekliyor' CHECK (
+            durum IN ('bekliyor', 'onaylandi', 'duzeltildi', 'reddedildi', 'hic_dogru_degil')),
+        ifade_hash TEXT NOT NULL,
+        karar_ts TEXT,
+        duzeltilmis_ifade TEXT,
+        fact_id TEXT
+    )""",
+    "CREATE INDEX idx_oneri_durum ON oneriler(durum, ts)",
+    "CREATE INDEX idx_oneri_hash ON oneriler(ifade_hash)",
+    """CREATE TABLE bastirilan (
+        ifade_hash TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        category TEXT
+    )""",
+]
+
+MIGRATIONS: dict[int, Statements] = {1: _V1, 2: _V2, 3: _V3, 4: _V4}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 

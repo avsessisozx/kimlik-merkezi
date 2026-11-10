@@ -3,8 +3,11 @@
 - `KeyManager` (yazan Hub): anahtar üretme/iptal, kategori izni verme/kaldırma.
 - `Authorizer` (salt okunur Hub yeter): anahtarı doğrular, izinleri çözer. Önbellek YOK;
   her çağrıda veritabanından yeniden okunur.
-- `AccessLog`: `erisim.db`'ye ekleme. Her çağrıda yeni bağlantı (çok süreçli yazım için
-  `kimlikcore.connect_erisim`: WAL + busy_timeout 5000 ms). Yazılamazsa `AccessLogError`.
+- `AccessLog`: erişim günlüğü (şema v4: `kimlik.db` içindeki `access_log`, şifreli klasörde şifreli).
+  MCP süreçleri ana veritabanına doğrudan yazamaz; `record` her kaydı `gelen/` altında kendi (şifreli)
+  dosyasına bırakır (kimlikcore.gelen: çok süreçli yazımda kayıp/kilit çakışması yok), yazan Hub
+  veritabanına işler. `read_all` tablo + henüz işlenmemiş kayıtları birlikte döner. Yazılamazsa
+  `AccessLogError`.
 """
 from __future__ import annotations
 
@@ -18,7 +21,8 @@ from datetime import datetime
 from pathlib import Path
 
 from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, PermissionDenied
-from kimlikcore import connect_erisim, norm_ts
+from kimlikcore import HubNotFoundError, norm_ts
+from kimlikcore.gelen import GelenKutusu
 
 from ._db import Clock, iso, utc_now
 
@@ -30,7 +34,7 @@ class SensitiveConfirmationRequired(KimlikError):
 
 
 class AccessLogError(KimlikError):
-    """Erişim kaydı (erisim.db) yazılamadı; sorgu reddedilmelidir."""
+    """Erişim kaydı yazılamadı; sorgu reddedilmelidir."""
 
 
 def hash_key(plain: str) -> str:
@@ -172,36 +176,43 @@ class Authorizer:
 
 
 class AccessLog:
-    """`erisim.db` / `access_log`. Yazma başarısızsa `AccessLogError`."""
+    """Erişim günlüğü. Yazma başarısızsa `AccessLogError`."""
 
     def __init__(self, root: Path | str, *, clock: Clock = utc_now,
-                 connect: Callable[[Path | str], sqlite3.Connection] = connect_erisim):
+                 gelen: Callable[[Path | str], GelenKutusu] = GelenKutusu.ac):
         self.root = Path(root)
         self._clock = clock
-        self._connect = connect
+        self._gelen = gelen
 
     def record(self, app_id: str, tool: str, category: str | None, result_count: int,
                outcome: str) -> None:
+        if outcome not in ("ok", "reddedildi", "hata"):
+            raise AccessLogError("Geçersiz erişim sonucu.")
         try:
-            conn = self._connect(self.root)
-            try:
-                conn.execute(
-                    "INSERT INTO access_log(ts, app_id, tool, category, result_count, outcome) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (iso(self._clock()), app_id, tool, category, int(result_count), outcome))
-            finally:
-                conn.close()
-        except (sqlite3.Error, OSError) as e:
+            self._gelen(self.root).yaz("erisim", {
+                "ts": iso(self._clock()), "app_id": app_id, "tool": tool, "category": category,
+                "result_count": int(result_count), "outcome": outcome})
+        except (KimlikError, sqlite3.Error, OSError) as e:
             raise AccessLogError("Erişim kaydı yazılamadı.") from e
 
     def read_all(self) -> list[tuple]:
-        """Yönetim/test için: (ts, app_id, tool, category, result_count, outcome)."""
-        conn = self._connect(self.root)
+        """Yönetim/test için: (ts, app_id, tool, category, result_count, outcome) — önce
+        veritabanındakiler (id sırası), sonra henüz işlenmemiş kayıtlar (oluşturulma sırası)."""
+        rows: list[tuple] = []
         try:
-            return conn.execute("SELECT ts, app_id, tool, category, result_count, outcome "
-                                "FROM access_log ORDER BY id").fetchall()
-        finally:
-            conn.close()
+            hub = Hub.open(self.root, write=False)
+        except HubNotFoundError:
+            hub = None
+        if hub is not None:
+            try:
+                rows = hub.query("SELECT ts, app_id, tool, category, result_count, outcome "
+                                 "FROM access_log ORDER BY id")
+            finally:
+                hub.close()
+        bekleyen, _bozuk = self._gelen(self.root).listele("erisim")
+        rows += [(k["ts"], k["app_id"], k["tool"], k.get("category"), k["result_count"], k["outcome"])
+                 for _ad, k in bekleyen]
+        return rows
 
 
 def categories_label(cats: Iterable[str]) -> str | None:

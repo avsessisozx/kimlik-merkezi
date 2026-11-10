@@ -354,7 +354,7 @@ async function sihirbaz(ac){
       const ileri=h('button',{class:'d',disabled:true,onclick:()=>{adim=2;ciz();}},'İleri');
       icerik=[h('div',{class:'satir'},h('label',{},'Adınız: '),h('input',{type:'text',value:kisiAd,style:'max-width:260px',oninput:e=>{kisiAd=e.target.value;}})),h('p',{},'Kimlik Merkezi verilerinizi tek bir klasörde, bu bilgisayarda tutar. Klasörü seçin (başka bir sürücü de olabilir). Veritabanı ve alt klasörler otomatik oluşturulur.'),
         h('div',{class:'satir'},g,h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'klasor'}).catch(hataGoster);if(r&&r.yol){yol=r.yol;g.value=yol;den();}}},'Seç…')),sonuc,
-        h('div',{class:'soluk'},'İpucu: klasörü BitLocker/VeraCrypt gibi şifreli bir birimde tutmanız önerilir; uygulama kendisi şifrelemez.'),h('div',{class:'satir'},ileri)];
+        h('div',{class:'soluk'},'Yeni klasör varsayılan olarak şifrelenir (anahtar Windows hesabınıza bağlı; bu uygulamada parola ekranı yok). cikti klasörü ve dışa aktardığınız dosyalar şifrelenmez. Ek önlem: BitLocker/VeraCrypt.'),h('div',{class:'satir'},ileri)];
       setTimeout(den,0);}
     else if(adim===2){
       icerik=[h('p',{},'Seçtiğiniz klasör: '+yol),h('label',{},h('input',{type:'checkbox',checked:oto,onchange:e=>{oto=e.target.checked;}}),' Windows açılışında otomatik başlat (tepsi simgesiyle; sonra Ayarlar\'dan kapatılabilir)'),

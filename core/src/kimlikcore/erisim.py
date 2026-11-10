@@ -1,7 +1,7 @@
-"""erisim.db: erişim kaydı (`access_log`) için ayrı SQLite dosyası.
-
-Yazan taraf İ2'dir (MCP süreçleri); çekirdek yalnız boş şemayı hazırlar.
-Çok sayıda süreç aynı anda yazabilmelidir: WAL + busy_timeout >= 5000 ms.
+"""ESKİ erisim.db (şema v4 ile kaldırıldı): erişim günlüğü artık `kimlik.db` içindeki `access_log`
+tablosudur ve şifreli klasörde şifrelidir (docs/SIFRELEME.md). Bu modül yalnız geriye dönük uyumluluk
+ve eski dosyayı okuyabilmek içindir; Hub artık erisim.db OLUŞTURMAZ. Eski dosya, yazan Hub açılırken
+ana veritabanına göç ettirilir, doğrulanır ve sıfırlanıp silinir (`Hub._eski_dosyalari_goc`).
 """
 from __future__ import annotations
 

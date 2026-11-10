@@ -19,7 +19,7 @@ from typing import Any
 
 from . import schema as _schema
 from . import sifreleme as _sif
-from .erisim import init_erisim_db
+from .gelen import GelenKutusu
 from .errors import (
     FormatError,
     HubNotFoundError,
@@ -138,6 +138,7 @@ class Hub:
         self._mutex = threading.RLock()
         self._closed = False
         self.schema_version = _schema.current_version(conn)
+        self.goc_uyarilari: list[str] = []   # açılışta eski dosya göçü / gelen kutusu uyarıları
 
     # ------------------------------------------------------------------ açma/kapama
     @classmethod
@@ -183,7 +184,6 @@ class Hub:
                     conn.execute("PRAGMA foreign_keys = ON")
                     conn.execute("PRAGMA cache_size = -65536")
                     _schema.migrate(conn)
-                    init_erisim_db(root)
                     if dek is not None and (durum != "sifreli" or conn.total_changes > 0):
                         _sif.bayt_sifrele_yaz(dek, conn.serialize(), db)   # yeni klasör ya da göç yapıldı
                 except BaseException:
@@ -192,7 +192,9 @@ class Hub:
             except BaseException:
                 lock.release()
                 raise
-            return cls(root, conn, True, lock, dek)
+            hub = cls(root, conn, True, lock, dek)
+            hub._acilista_isle()
+            return hub
         if durum == "yok":
             raise HubNotFoundError(f"Veri klasöründe {DB_NAME} yok: {root}")
         if dek is not None:
@@ -236,6 +238,179 @@ class Hub:
     @property
     def sifreli(self) -> bool:
         return self._dek is not None
+
+    # ------------------------------------------------------------------ gelen kutusu / eski dosyalar
+    @property
+    def gelen(self) -> GelenKutusu:
+        """Bu veri klasörünün gelen kutusu (okuyucu Hub'dan da yazılabilir; bkz. gelen.py)."""
+        return GelenKutusu(self.root, self._dek)
+
+    def _acilista_isle(self) -> None:
+        """Yazan Hub açılırken: eski `oneri.db`/`erisim.db`yi göç ettirir, gelen kutusunu işler.
+        Başarısızlık Hub'ın açılmasını engellemez; `goc_uyarilari`na yazılır (veri silinmez)."""
+        for ad, islev in (("eski dosyalar", self._eski_dosyalari_goc),
+                          ("gelen kutusu", self.gelen_birlestir)):
+            try:
+                islev()
+            except Exception as e:  # noqa: BLE001 - açılışı engelleme; neden uyarıda
+                self.goc_uyarilari.append(f"{ad} işlenemedi ({type(e).__name__}); veri silinmedi.")
+
+    @_write_only
+    def gelen_birlestir(self) -> dict[str, int]:
+        """`gelen/` altındaki erişim günlüğü ve öneri kayıtlarını veritabanına işler, sonra dosyaları
+        siler (önce kalıcı yazım). Yinelenen öneri atılır (aynı `oneri_id` ya da aynı `ifade_hash`
+        kuyrukta/bastırılmış/karara bağlanmışsa). Okunamayan dosyalar `gelen/bozuk/`a alınır."""
+        kutu = self.gelen
+        kayitlar, bozuk = kutu.listele()
+        sonuc = {"erisim": 0, "oneri": 0, "yinelenen": 0, "bozuk": 0}
+        for ad in bozuk:
+            kutu.karantina(ad)
+            sonuc["bozuk"] += 1
+        if not kayitlar:
+            return sonuc
+        islenen: list[str] = []
+        gecersiz: list[str] = []
+        c = self._conn
+        c.execute("PRAGMA synchronous = FULL")  # dosyalar silinmeden önce işlem diske insin
+        try:
+            with self._tx():
+                for ad, k in kayitlar:
+                    tur = ad.split("-", 1)[0]
+                    try:
+                        if tur == "erisim":
+                            c.execute(
+                                "INSERT INTO access_log(ts, app_id, tool, category, result_count, "
+                                "outcome) VALUES (?, ?, ?, ?, ?, ?)",
+                                (k["ts"], k["app_id"], k["tool"], k.get("category"),
+                                 int(k["result_count"]), k["outcome"]))
+                            sonuc["erisim"] += 1
+                        else:
+                            h = k["ifade_hash"]
+                            var = (c.execute("SELECT 1 FROM oneriler WHERE oneri_id = ? OR "
+                                             "ifade_hash = ?", (k["oneri_id"], h)).fetchone()
+                                   or c.execute("SELECT 1 FROM bastirilan WHERE ifade_hash = ?",
+                                                (h,)).fetchone())
+                            if var:
+                                sonuc["yinelenen"] += 1
+                            else:
+                                c.execute(
+                                    "INSERT INTO oneriler(oneri_id, ts, app_id, statement, category, "
+                                    "fact_key, kanit_event_ids, guven, durum, ifade_hash) "
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'bekliyor', ?)",
+                                    (k["oneri_id"], k["ts"], k["app_id"], k["statement"],
+                                     k["category"], k.get("fact_key"),
+                                     json.dumps(k["kanit_event_ids"]), float(k["guven"]), h))
+                                sonuc["oneri"] += 1
+                    except (KeyError, TypeError, ValueError, sqlite3.IntegrityError):
+                        # Biçimi bozuk kayıt diğerlerini engellemesin: atla, dosyayı karantinaya al.
+                        gecersiz.append(ad)
+                        continue
+                    islenen.append(ad)
+        finally:
+            c.execute("PRAGMA synchronous = NORMAL")
+        self._kalici_yaz()
+        for ad in islenen:
+            kutu.sil(ad)
+        for ad in gecersiz:
+            kutu.karantina(ad)
+            sonuc["bozuk"] += 1
+        return sonuc
+
+    def _eski_dosyalari_goc(self) -> None:
+        """Eski ayrı `oneri.db` ve `erisim.db` içeriğini ana veritabanına taşır, DOĞRULAR, sonra
+        eski dosyayı (-wal/-shm dahil) sıfırlayıp siler. Doğrulama tutmazsa dosya SİLİNMEZ."""
+        for ad, islev in (("oneri.db", self._oneri_db_goc), ("erisim.db", self._erisim_db_goc)):
+            yol = self.root / ad
+            if not yol.is_file():
+                continue
+            try:
+                ok = islev(yol)
+            except (sqlite3.Error, OSError) as e:
+                self.goc_uyarilari.append(f"{ad} göç ettirilemedi ({type(e).__name__}); dosya duruyor.")
+                continue
+            if not ok:
+                self.goc_uyarilari.append(f"{ad} göç doğrulaması tutmadı; dosya silinmedi.")
+                continue
+            for ek in ("", "-wal", "-shm", "-journal"):
+                p = self.root / (ad + ek)
+                if p.exists():
+                    _sif.guvenli_sil(p)
+
+    @staticmethod
+    def _eski_ac(yol: Path) -> sqlite3.Connection:
+        c = sqlite3.connect(yol, timeout=5, isolation_level=None)
+        c.execute("PRAGMA busy_timeout = 5000")
+        try:
+            c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.OperationalError:
+            pass
+        return c
+
+    def _sifreli_dogrula(self) -> bool:
+        """Şifreli klasörde diske yazılanı geri çözüp açılabildiğini denetler."""
+        if self._dek is None:
+            return True
+        self._kalici_yaz()
+        k = sqlite3.connect(":memory:")
+        try:
+            k.deserialize(_sif.bayt_coz_oku(self._dek, self.root / DB_NAME))
+            return k.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        finally:
+            k.close()
+
+    def _oneri_db_goc(self, yol: Path) -> bool:
+        eski = self._eski_ac(yol)
+        try:
+            if not eski.execute("SELECT 1 FROM sqlite_master WHERE name = 'oneriler'").fetchone():
+                return True  # boş/şemasız dosya: taşınacak bir şey yok
+            sutun = ("oneri_id, ts, app_id, statement, category, fact_key, kanit_event_ids, guven, "
+                     "durum, ifade_hash, karar_ts, duzeltilmis_ifade, fact_id")
+            satirlar = eski.execute(f"SELECT {sutun} FROM oneriler ORDER BY ts, oneri_id").fetchall()
+            bastirilan = (eski.execute("SELECT ifade_hash, ts, category FROM bastirilan").fetchall()
+                          if eski.execute("SELECT 1 FROM sqlite_master WHERE name = 'bastirilan'"
+                                          ).fetchone() else [])
+        finally:
+            eski.close()
+        with self.transaction() as c:
+            c.executemany(f"INSERT OR IGNORE INTO oneriler({sutun}) VALUES ({','.join('?' * 13)})",
+                          satirlar)
+            c.executemany("INSERT OR IGNORE INTO bastirilan(ifade_hash, ts, category) VALUES (?,?,?)",
+                          bastirilan)
+        c = self._conn
+        for r in satirlar:
+            if c.execute(f"SELECT {sutun} FROM oneriler WHERE oneri_id = ?", (r[0],)
+                         ).fetchone() != r:
+                return False
+        for r in bastirilan:
+            if c.execute("SELECT ifade_hash, ts, category FROM bastirilan WHERE ifade_hash = ?",
+                         (r[0],)).fetchone() != r:
+                return False
+        return self._sifreli_dogrula()
+
+    def _erisim_db_goc(self, yol: Path) -> bool:
+        eski = self._eski_ac(yol)
+        try:
+            if not eski.execute("SELECT 1 FROM sqlite_master WHERE name = 'access_log'").fetchone():
+                return True
+            satirlar = eski.execute("SELECT ts, app_id, tool, category, result_count, outcome "
+                                    "FROM access_log ORDER BY id").fetchall()
+        finally:
+            eski.close()
+        isaret = "goc_erisim_db"  # tek seferlik işaret: yarım kalan göç satırları ikiye katlamasın
+        with self.transaction() as c:
+            if c.execute("SELECT 1 FROM meta WHERE key = ?", (isaret,)).fetchone() is None:
+                c.executemany("INSERT INTO access_log(ts, app_id, tool, category, result_count, "
+                              "outcome) VALUES (?,?,?,?,?,?)", satirlar)
+                c.execute("INSERT INTO meta(key, value) VALUES (?, ?)", (isaret, str(len(satirlar))))
+        # Doğrulama: her eski satır yeni tabloda var mı (çoklu küme karşılaştırması).
+        c = self._conn
+        yeni = c.execute("SELECT ts, app_id, tool, category, result_count, outcome FROM access_log"
+                         ).fetchall()
+        from collections import Counter
+        eksik = Counter(satirlar) - Counter(yeni)
+        if eksik:
+            return False
+        return self._sifreli_dogrula()
 
     def _kalici_yaz(self, *, zamanli: bool = False) -> None:
         """Şifreli klasörde değişiklik varsa veritabanını şifreli kapsayıcıya atomik yazar.

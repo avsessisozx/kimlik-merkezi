@@ -258,7 +258,7 @@ class QueryService:
         return self._run("ornekle", kategori, fn)
 
     def persona_oner(self, onermeler: list[dict[str, Any]]) -> dict[str, Any]:
-        """Persona önerilerini YALNIZ öneri kuyruğuna (oneri.db) ekler; `facts` değişmez.
+        """Persona önerilerini YALNIZ öneri kuyruğuna (ana veritabanındaki `oneriler`; yazım gelen kutusu üzerinden) ekler; `facts` değişmez.
         Her önerinin kanıt olay kimlikleri geçerli olmalı ve kategorileri için okuma izni olmalı."""
         def fn(hub, auth, allowed):
             if not isinstance(onermeler, list) or not onermeler:
@@ -279,7 +279,7 @@ class QueryService:
                 raise PermissionDenied("Kanıt olay kimliği geçersiz ya da kategorisi için "
                                        "okuma izni yok; hiçbir öneri eklenmedi.")
             kuyruk = OneriKuyrugu(self.root, clock=self._clock)
-            durum, _ = kuyruk.on_kontrol(norm)
+            durum, _ = kuyruk.on_kontrol(norm, hub)
             planli = sum(1 for d in durum if d is None)
             app_id = auth.ident.app_id
             etiket = categories_label({bulunan[k] for k in ids})
