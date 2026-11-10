@@ -4,7 +4,6 @@ from __future__ import annotations
 import pytest
 from kimlikcore import FormatError, Hub, NotFoundError
 
-from kimlikserver._db import write_tx
 from kimlikserver.persona import Persona, PersonaReader
 
 
@@ -20,7 +19,7 @@ def persona(hub, clock):
 
 
 def _raw_insert(hub, statement, status, category="kimlik", valid_until=None):
-    with write_tx(hub) as c:
+    with hub.transaction() as c:
         c.execute(
             "INSERT INTO facts(fact_id, statement, source_id, date, status, valid_from, valid_until,"
             " category, fact_key, hidden, updated) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, NULL, 0, ?)",

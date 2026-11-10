@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 from kimlikcore import FormatError, Hub, NotFoundError, norm_ts
 
-from ._db import Clock, iso, read, utc_now, write_tx
+from ._db import Clock, iso, utc_now
 
 LIVE_STATUSES = ("beyan_edilen", "dosyadan_alinan")
 # Kart ve çıktılarda sabit sıra ve başlıklar.
@@ -109,8 +109,7 @@ class PersonaReader:
 
     # ---------------------------------------------------------------- okuma
     def get_fact(self, fact_id: str) -> Fact:
-        with read(self.hub) as c:
-            r = c.execute(f"SELECT {_COLS} FROM facts WHERE fact_id = ?", (fact_id,)).fetchone()
+        r = self.hub.query_one(f"SELECT {_COLS} FROM facts WHERE fact_id = ?", (fact_id,))
         if r is None:
             raise NotFoundError(f"Bilgi yok: {fact_id}")
         return _fact(r)
@@ -135,8 +134,7 @@ class PersonaReader:
             sql += f" AND f.category IN ({','.join('?' * len(cats))})"
             args += cats
         sql += " ORDER BY f.date DESC, f.fact_id"
-        with read(self.hub) as c:
-            facts = [_fact(r) for r in c.execute(sql, args).fetchall()]
+        facts = [_fact(r) for r in self.hub.query(sql, args)]
         order = {k: i for i, k in enumerate(FACT_CATEGORIES)}
         facts.sort(key=lambda f: order[f.category])  # sıralama kararlı: tarih yeniden eskiye kalır
         return facts
@@ -145,12 +143,11 @@ class PersonaReader:
         """Kaynak adı: `tür: dosya adı` (ham dosya varsa), yoksa yalnız tür."""
         if source_id is None:
             return None
-        with read(self.hub) as c:
-            s = c.execute("SELECT kind FROM sources WHERE source_id = ?", (source_id,)).fetchone()
-            if s is None:
-                return None
-            f = c.execute("SELECT name FROM raw_files WHERE source_id = ? "
-                          "ORDER BY stored_at, raw_id LIMIT 1", (source_id,)).fetchone()
+        s = self.hub.query_one("SELECT kind FROM sources WHERE source_id = ?", (source_id,))
+        if s is None:
+            return None
+        f = self.hub.query_one("SELECT name FROM raw_files WHERE source_id = ? "
+                               "ORDER BY stored_at, raw_id LIMIT 1", (source_id,))
         return f"{s[0]}: {f[0]}" if f else s[0]
 
     def list_contradictions(self, *, open_only: bool = True) -> list[Contradiction]:
@@ -159,8 +156,7 @@ class PersonaReader:
         if open_only:
             sql += " WHERE resolved_at IS NULL"
         sql += " ORDER BY opened, contradiction_id"
-        with read(self.hub) as c:
-            rows = c.execute(sql).fetchall()
+        rows = self.hub.query(sql)
         return [Contradiction(r[0], r[3], r[4], r[5], r[6], r[7],
                               self.get_fact(r[1]), self.get_fact(r[2])) for r in rows]
 
@@ -234,7 +230,7 @@ class Persona(PersonaReader):
         now_dt = self._clock()
         now = iso(now_dt)
         vu = self._valid_until(category, now_dt, valid_until)
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             if source_id is not None:
                 s = c.execute("SELECT removed_at FROM sources WHERE source_id = ?",
                               (source_id,)).fetchone()
@@ -276,7 +272,7 @@ class Persona(PersonaReader):
         `eskimis`/`cikarilan` bilgi güncellenmez (yeniden `add_fact` ile beyan edilir)."""
         now_dt = self._clock()
         now = iso(now_dt)
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             r = c.execute(f"SELECT {_COLS} FROM facts WHERE fact_id = ? AND hidden = 0",
                           (fact_id,)).fetchone()
             if r is None:
@@ -295,7 +291,7 @@ class Persona(PersonaReader):
     def delete_fact(self, fact_id: str) -> None:
         """Gizleme: satır silinmez, hiçbir çıktıda görünmez."""
         now = self._now()
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             if c.execute("SELECT 1 FROM facts WHERE fact_id = ?", (fact_id,)).fetchone() is None:
                 raise NotFoundError(f"Bilgi yok: {fact_id}")
             c.execute("UPDATE facts SET hidden = 1, updated = ? WHERE fact_id = ?", (now, fact_id))
@@ -304,7 +300,7 @@ class Persona(PersonaReader):
     def check_expiry(self, now: str | datetime | None = None) -> int:
         """Süresi dolan canlı bilgileri `eskimis` yapar; sayıyı döner. Açılışta çağrılır."""
         cutoff = self._now() if now is None else norm_ts(now, assume_utc=True)
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             cur = c.execute(
                 "UPDATE facts SET status = 'eskimis', updated = ? WHERE hidden = 0 "
                 "AND status IN ('beyan_edilen', 'dosyadan_alinan') "
@@ -317,7 +313,7 @@ class Persona(PersonaReader):
         `dosyadan_alinan`, yoksa `beyan_edilen`), aynı kategori+anahtardaki diğerleri
         `eskimis` kalır; ilgili açık çelişki satırları kapanır. Kapanan satır sayısını döner."""
         now = self._now()
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             row = c.execute(
                 "SELECT category, fact_key FROM contradictions WHERE resolved_at IS NULL "
                 "AND (old_fact_id = ? OR new_fact_id = ?) LIMIT 1", (chosen_id, chosen_id)).fetchone()

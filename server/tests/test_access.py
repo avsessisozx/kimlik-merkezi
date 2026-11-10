@@ -9,7 +9,6 @@ import pytest
 from kimlikcore import Hub, PermissionDenied
 
 from helpers import INJECTION, ev
-from kimlikserver._db import write_tx
 from kimlikserver.access import (AccessLog, Authorizer, KeyManager,
                                  SensitiveConfirmationRequired)
 from kimlikserver.persona import Persona
@@ -37,8 +36,8 @@ def test_anahtar_yalniz_hash_saklanir(world):
     assert world["a_key"].encode() not in raw
     assert world["a_key"].startswith("kim_") and len(world["a_key"]) == 4 + 64
     with Hub.open(world["root"], write=False) as hub:
-        h = hub._conn.execute("SELECT key_hash FROM app_keys WHERE app_id=?",
-                              (world["a_id"],)).fetchone()[0]
+        h = hub.query_one("SELECT key_hash FROM app_keys WHERE app_id=?",
+                          (world["a_id"],))[0]
     assert h == hashlib.sha256(world["a_key"].encode()).hexdigest()
 
 
@@ -49,7 +48,7 @@ def test_hassas_kategori_ayri_onay_ister(world):
             km.grant(world["a_id"], "konum")
         # çekirdek CHECK kısıtı da ham yazımı reddeder
         with pytest.raises(sqlite3.IntegrityError):
-            with write_tx(hub) as c:
+            with hub.transaction() as c:
                 c.execute("INSERT INTO permissions(app_id, category, granted_at, "
                           "confirmed_sensitive) VALUES (?, 'eposta', 'x', 0)", (world["a_id"],))
         km.grant(world["a_id"], "konum", confirmed_sensitive=True)

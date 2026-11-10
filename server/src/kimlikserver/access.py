@@ -20,7 +20,7 @@ from pathlib import Path
 from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, PermissionDenied
 from kimlikcore import connect_erisim, norm_ts
 
-from ._db import Clock, iso, read, utc_now, write_tx
+from ._db import Clock, iso, utc_now
 
 KEY_PREFIX = "kim_"
 
@@ -73,22 +73,21 @@ class KeyManager:
             raise FormatError("Uygulama adı boş olamaz.")
         plain = KEY_PREFIX + secrets.token_hex(32)  # 32 bayt rastgele
         app_id = str(uuid.uuid4())
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             c.execute("INSERT INTO app_keys(app_id, name, key_hash, created, revoked) "
                       "VALUES (?, ?, ?, ?, 0)", (app_id, name, hash_key(plain), iso(self._clock())))
         return app_id, plain
 
     def revoke_key(self, app_id: str) -> None:
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             cur = c.execute("UPDATE app_keys SET revoked = 1 WHERE app_id = ?", (app_id,))
             if cur.rowcount == 0:
                 raise NotFoundError(f"Uygulama yok: {app_id}")
 
     def list_keys(self) -> list[tuple[str, str, str, bool]]:
         """(app_id, ad, oluşturulma, iptal_edildi). Anahtarın kendisi/hash'i dönmez."""
-        with read(self.hub) as c:
-            return [(r[0], r[1], r[2], bool(r[3])) for r in c.execute(
-                "SELECT app_id, name, created, revoked FROM app_keys ORDER BY created, app_id")]
+        return [(r[0], r[1], r[2], bool(r[3])) for r in self.hub.query(
+            "SELECT app_id, name, created, revoked FROM app_keys ORDER BY created, app_id")]
 
     def grant(self, app_id: str, category: str, *, expires_at: str | datetime | None = None,
               confirmed_sensitive: bool = False) -> None:
@@ -101,7 +100,7 @@ class KeyManager:
                 f"'{category}' hassas bir kategoridir; ayrı onay olmadan açılamaz.")
         exp = None if expires_at is None else norm_ts(expires_at, assume_utc=True)
         now = iso(self._clock())
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             row = c.execute("SELECT revoked FROM app_keys WHERE app_id = ?", (app_id,)).fetchone()
             if row is None:
                 raise NotFoundError(f"Uygulama yok: {app_id}")
@@ -124,7 +123,7 @@ class KeyManager:
         return cats
 
     def revoke_grant(self, app_id: str, category: str) -> None:
-        with write_tx(self.hub) as c:
+        with self.hub.transaction() as c:
             c.execute("DELETE FROM permissions WHERE app_id = ? AND category = ?",
                       (app_id, category))
 
@@ -134,9 +133,8 @@ class KeyManager:
         if app_id:
             sql += " WHERE app_id = ?"
             args = (app_id,)
-        with read(self.hub) as c:
-            return [Grant(r[0], r[1], r[2], r[3], bool(r[4]))
-                    for r in c.execute(sql + " ORDER BY app_id, category", args)]
+        return [Grant(r[0], r[1], r[2], r[3], bool(r[4]))
+                for r in self.hub.query(sql + " ORDER BY app_id, category", args)]
 
 
 class Authorizer:
@@ -149,9 +147,8 @@ class Authorizer:
     def authenticate(self, plain_key: str | None) -> AppIdentity:
         if not plain_key or not plain_key.startswith(KEY_PREFIX):
             raise PermissionDenied("Anahtar yok ya da geçersiz.")
-        with read(self.hub) as c:
-            r = c.execute("SELECT app_id, name, revoked FROM app_keys WHERE key_hash = ?",
-                          (hash_key(plain_key),)).fetchone()
+        r = self.hub.query_one("SELECT app_id, name, revoked FROM app_keys WHERE key_hash = ?",
+                               (hash_key(plain_key),))
         if r is None or r[2]:
             raise PermissionDenied("Anahtar yok, geçersiz ya da iptal edilmiş.")
         return AppIdentity(r[0], r[1])
@@ -161,9 +158,8 @@ class Authorizer:
         Hassas kategori yalnız `confirmed_sensitive=1` ise sayılır."""
         now = iso(self._clock())
         out: dict[str, str | None] = {}
-        with read(self.hub) as c:
-            rows = c.execute("SELECT category, expires_at, confirmed_sensitive FROM permissions "
-                             "WHERE app_id = ?", (app_id,)).fetchall()
+        rows = self.hub.query("SELECT category, expires_at, confirmed_sensitive FROM permissions "
+                              "WHERE app_id = ?", (app_id,))
         for cat, exp, conf in rows:
             if cat not in Category.ALL:
                 continue
