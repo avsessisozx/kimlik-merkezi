@@ -1,0 +1,32 @@
+{
+ "tracks": [
+  {
+   "artist": "Ornek Sanatci",
+   "album": "Ornek Album",
+   "track": "Kutuphane Sarkisi",
+   "uri": "spotify:track:ccc"
+  },
+  {
+   "artist": "Baska Sanatci",
+   "album": "Ornek Album 2",
+   "track": "Kutuphane Sarkisi Iki",
+   "uri": "spotify:track:ddd"
+  }
+ ],
+ "albums": [
+  {
+   "artist": "Ornek Sanatci",
+   "album": "Begenilen Album",
+   "uri": "spotify:album:eee"
+  }
+ ],
+ "shows": [],
+ "episodes": [],
+ "bannedTracks": [],
+ "artists": [
+  {
+   "name": "Takip Edilen Sanatci",
+   "uri": "spotify:artist:fff"
+  }
+ ]
+}

@@ -13,8 +13,8 @@ from kimlikimport.google_takeout import GoogleTakeout
 from kimlikimport.run import run
 
 # Fixture içeriği: izleme 4 + arama 2 + abonelik 3 + MyActivity/YouTube 2 (1'i tekrar)
-# + MyActivity/Search 2 + 1 konum (3. kayıt zamansız -> atlanır) + Chrome 3 + 1 + 1 konum = 19 ayrıştırılan, 18 eklenen.
-EXPECT_PARSED, EXPECT_ADDED, EXPECT_DUP = 19, 18, 1
+# + MyActivity/Search 2 + 1 konum (3. kayıt zamansız -> atlanır) + Chrome 3 + 1 + 1 konum + Gmail 4 = 23 ayrıştırılan, 22 eklenen.
+EXPECT_PARSED, EXPECT_ADDED, EXPECT_DUP = 23, 22, 1
 
 
 def sha_tree(root):
@@ -33,7 +33,7 @@ def test_klasor_kayit_sayisi_ve_kategoriler(hub):
     assert kinds["google.arama"] == 2 and kinds["chrome.ziyaret"] == 4
     assert kinds["google.konum"] == 2
     cats = Counter(e.category for e in hub.timeline(limit=1000))
-    assert cats["konum"] == 2 and cats["video"] == 10 and cats["tarama"] == 6
+    assert cats["konum"] == 2 and cats["video"] == 10 and cats["tarama"] == 6 and cats["eposta"] == 4
     assert r.skipped == {"etkinlik: time yok/okunamadı": 1}
 
 
@@ -87,7 +87,7 @@ def test_klasor_ham_arsiv_ve_degismez(hub):
     r = run(hub, FIX / "takeout_en", "google_takeout")
     assert sha_tree(FIX / "takeout_en") == snap
     names = sorted(x.name for x in r.raw_files)
-    assert len(names) == 6 and len(set(names)) == 6  # aynı adlı MyActivity.json dosyaları ayrışır
+    assert len(names) == 7 and len(set(names)) == 7  # aynı adlı MyActivity.json dosyaları ayrışır
     assert any(n.endswith("MyActivity.json") and "Search" in n for n in names)
 
 
@@ -118,22 +118,37 @@ def test_eski_chrome_adi(hub):
     assert r.added == 5  # 4 ziyaret + 1 konum
 
 
-def test_gmail_mbox_raporlanir_atlanir(hub):
+def test_gmail_mbox_eposta_kategorisi(hub):
     rep = GoogleTakeout().verify_format(FIX / "takeout_en")
-    assert any("MBOX" in u and "desteklenmiyor" in u for u in rep.unsupported)
-    r = run(hub, FIX / "takeout_en")
-    assert "desteklenmiyor" in str(r)
-    assert count_events(hub, categories=["eposta"]) == 0
+    assert not any("MBOX" in u for u in rep.unsupported)
+    assert any("mbox" in f for f in rep.found_files)
+    run(hub, FIX / "takeout_en")
+    ev = hub.timeline(categories=["eposta"], limit=100)
+    assert len(ev) == 4 and all(e.kind == "gmail.ileti" for e in ev)
+    by = {e.payload["ileti_kimligi"]: e for e in ev}
+    m1, m2, m3 = by["<msg-1@example.test>"], by["<msg-2@example.test>"], by["<msg-3@example.test>"]
+    assert m1.payload["konu"] == "Örnek konu şık" and "ö" in m1.payload["govde"]
+    assert m1.payload["etiketler"] == ["Inbox", "Important", "Category Updates"]
+    assert m1.ts == "2024-03-04T10:00:00Z" and m2.ts == "2024-03-05T11:00:00Z"  # +0300 -> UTC
+    assert "HTML govde metni" in m2.payload["govde"] and "x{}" not in m2.payload["govde"]
+    assert m3.payload["ekler"] == [{"ad": "ornek.pdf", "tur": "application/pdf", "boyut": 30}]
+    assert "SENTETIK" not in json.dumps(m3.payload)  # ek içeriği alınmaz
+    assert any(e.ts == "2024-03-07T13:00:00Z" for e in ev)  # Date yok -> From_ satırı
+    assert hub.search("epostaozelkelime", categories=["eposta"])
 
 
-def test_yalniz_mbox_durur(hub, tmp_path):
+def test_yalniz_mbox_alinir_ve_mbox_olmayan_reddedilir(hub, tmp_path):
     d = tmp_path / "m"
     d.mkdir()
-    (d / "Mail.mbox").write_text("From a@b.test Mon Jan 1 00:00:00 2024\nSubject: x\n\ny\n")
+    (d / "Mail.mbox").write_text("From a@b.test Mon Jan 1 00:00:00 2024\nDate: Mon, 1 Jan 2024 00:00:00 +0000\n"
+                                 "Subject: x\nMessage-ID: <a@b>\n\ny\n")
+    assert run(hub, d, "google_takeout").added == 1
+    e = tmp_path / "n"
+    e.mkdir()
+    (e / "Mail.mbox").write_text("bu mbox degil\n")
     with pytest.raises(ImportFormatError) as ei:
-        run(hub, d, "google_takeout")
-    assert "desteklenmiyor" in str(ei.value) and "Mail.mbox" in str(ei.value)
-    assert count_events(hub) == 0
+        run(hub, e, "google_takeout")
+    assert "'From ' ayırıcısıyla başlamıyor" in str(ei.value)
 
 
 def test_html_bicimi_acik_hata(hub):

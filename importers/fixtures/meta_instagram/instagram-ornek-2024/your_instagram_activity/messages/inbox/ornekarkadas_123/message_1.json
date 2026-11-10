@@ -1,0 +1,45 @@
+{
+ "participants": [
+  {
+   "name": "ornekarkadas"
+  },
+  {
+   "name": "ornekkullanici"
+  }
+ ],
+ "messages": [
+  {
+   "sender_name": "ornekarkadas",
+   "timestamp_ms": 1700005000000,
+   "content": "Merhaba \u00c5\u009f\u00c4\u00b1k mesaj",
+   "type": "Generic"
+  },
+  {
+   "sender_name": "ornekkullanici",
+   "timestamp_ms": 1700005060000,
+   "content": "Ozel mesaj iki",
+   "type": "Generic",
+   "photos": [
+    {
+     "uri": "x.jpg"
+    }
+   ]
+  },
+  {
+   "sender_name": "ornekarkadas",
+   "timestamp_ms": 1700005120000,
+   "content": "Ozel mesaj uc",
+   "type": "Generic",
+   "share": {
+    "link": "https://example.test/p",
+    "share_text": "paylasim"
+   }
+  },
+  {
+   "sender_name": "ornekarkadas",
+   "content": "zamansiz mesaj"
+  }
+ ],
+ "title": "ornekarkadas",
+ "thread_path": "inbox/ornekarkadas_123"
+}

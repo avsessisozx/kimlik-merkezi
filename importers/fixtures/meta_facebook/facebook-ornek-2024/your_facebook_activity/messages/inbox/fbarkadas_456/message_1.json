@@ -1,0 +1,23 @@
+{
+ "participants": [
+  {
+   "name": "Ornek Arkadas"
+  }
+ ],
+ "messages": [
+  {
+   "sender_name": "Ornek Arkadas",
+   "timestamp_ms": 1700014000000,
+   "content": "fb mesaj bir",
+   "type": "Generic"
+  },
+  {
+   "sender_name": "Ornek Kisi",
+   "timestamp_ms": 1700014060000,
+   "content": "fb mesaj iki",
+   "type": "Generic"
+  }
+ ],
+ "title": "Ornek Arkadas",
+ "thread_path": "inbox/fbarkadas_456"
+}
