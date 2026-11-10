@@ -18,7 +18,7 @@ adımı çalıştığı varsayma.
   python -m kimlikserver --veri "C:\yol\veri" anahtar-uret --ad "Claude Desktop" --izin notlar --izin persona
   ```
   Düz anahtar yalnızca bir kez yazılır; veritabanında yalnız hash'i durur. Hassas kategoriler
-  (`eposta`, `mesaj`, `konum`) için ayrıca `--hassas-onay` gerekir ve toplu açmaya dahil değildir.
+  (`eposta`, `mesaj`, `konum`, `sohbet`) için ayrıca `--hassas-onay` gerekir ve toplu açmaya dahil değildir.
   Varsayılan olarak hiçbir kategori açık değildir. İptal: `anahtar-iptal --app-id ...`.
 - Sınır (bir kez): anahtar, yapay zekâ uygulamasının ayar dosyasında düz metin durur; aynı
   Windows kullanıcısında çalışan başka bir program o dosyayı okuyabilir.

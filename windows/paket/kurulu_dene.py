@@ -47,6 +47,15 @@ if BEKLENEN_SURUM:
     kontrol(f"Kimlik Merkezi {BEKLENEN_SURUM}\n" in r.stdout.replace("\r\n", "\n"), f"exe sürümü {BEKLENEN_SURUM} (Release sürümüyle eşleşiyor)")
 kontrol(r.returncode == 0 and "ijson arka ucu: yajl2_c" in r.stdout, "pakette ijson C uzantısı (yajl2_c) var")
 
+# ---- lisans dosyaları ve pystray (LGPL) değiştirilebilirliği: kurulu pakette ayrı dosyalar olarak durmalı
+lis = [p for p in kurulum.rglob("*") if p.is_file() and "lisanslar" in p.parts]
+adlar = {p.name for p in lis}
+kontrol({"LICENSE", "THIRD-PARTY-NOTICES.md"} <= adlar, "lisans dosyaları kurulu pakette var (LICENSE, THIRD-PARTY-NOTICES.md)")
+kontrol(any(p.name == "COPYING.LGPL" and p.parent.name == "pystray" for p in lis), "pystray LGPL metni (COPYING.LGPL) kurulu pakette var")
+pys = [p for p in kurulum.rglob("*") if p.is_file() and p.suffix in (".pyc", ".py") and "pystray" in p.parts and "lisanslar" not in p.parts]
+kontrol(any(p.stem == "_base" for p in pys) and any(p.stem == "_win32" for p in pys),
+        "pystray modülleri ayrı dosya (.pyc) olarak kurulu pakette (kullanıcı değiştirebilir)")
+
 # ---- uygulamayı başlat
 env = dict(os.environ, KIMLIK_AYAR_DIZINI=str(ayar), APPDATA=str(appdata), PYTHONIOENCODING="utf-8")
 env.pop("KIMLIK_VERI", None)

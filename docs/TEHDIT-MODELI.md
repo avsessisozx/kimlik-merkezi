@@ -82,15 +82,16 @@ Tarayıcınızda açık başka bir sitenin, `127.0.0.1` üzerindeki Kimlik Merke
   - Gövde en çok 1 MB; yalnızca bilinen işlemler çağrılabilir (açık izin listesi); statik dosya yolu
     katı bir ad desenine uyar (`..` geçmez).
   - Yanıt başlıkları: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`,
-    `Content-Security-Policy` (`default-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`),
+    `Content-Security-Policy` (`default-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`,
+    `base-uri 'none'`, `form-action 'none'`, `object-src 'none'`),
     erişim günlüğü tutulmaz.
 - **Kalan risk:** CSP `script-src 'unsafe-inline'` içerir (arayüz satır içi betik kullanır); bu, olası
-  bir XSS'e karşı CSP'nin sağladığı korumayı zayıflatır. `base-uri`, `form-action`, `object-src`
-  tanımlı değildir. Jeton sayfa HTML'ine gömülüdür; **aynı bilgisayardaki herhangi bir yerel süreç**
+  bir XSS'e karşı CSP'nin sağladığı korumayı zayıflatır (satır içi betiklerin dışarı taşınması
+  ayrı bir iştir; şimdilik yalnızca belgelenmiştir). Jeton sayfa HTML'ine gömülüdür; **aynı bilgisayardaki herhangi bir yerel süreç**
   (ve çok kullanıcılı bir Windows'ta başka kullanıcı hesapları) varsayılan sabit porttan sayfayı
   isteyip jetonu alabilir: jeton yerel süreçlere karşı koruma sağlamaz, yalnızca tarayıcıdaki
   başka sitelere karşıdır. "Hassas ayrı onay" arayüzde bir onay adımıdır; arayüz API'sini jetonla
-  çağıran biri onay bayrağını kendisi gönderebilir (2.5).
+  çağıran biri onay bayrağını kendisi gönderebilir (2.5 ve aşağıdaki bilinen kısıt).
 
 ### 2.5 Aynı kullanıcı hesabında çalışan kötü amaçlı yazılım
 - **Önlem:** Yok. Aynı kullanıcı olarak çalışan bir program veri dosyalarını, ayar dosyasındaki
@@ -120,6 +121,15 @@ Tarayıcınızda açık başka bir sitenin, `127.0.0.1` üzerindeki Kimlik Merke
 | Ağa çıkış yok testleri ve CI izleme | [AG-GARANTISI.md](AG-GARANTISI.md) |
 | Kayıt içeriğinin günlüğe yazılmaması | `gunluk.py`, `hata_raporu.py` (kullanıcı adı maskelenir) |
 | Arşivler diske açılmaz, belge boyut sınırları | `importers/` |
+
+### Bilinen kısıt / v0.2 önerisi: "hassas ayrı onay" yalnızca arayüz bayrağıdır
+Hassas kategoriler (`eposta`, `mesaj`, `konum`, `sohbet`) için ikinci onay, yerel API'de istemcinin
+gönderdiği bir bayraktır (`hassas_onay`); sunucu bunun gerçekten bir insanın ayrı bir eylemiyle verildiğini
+doğrulayamaz. Oturum jetonuna sahip bir yerel süreç bayrağı kendisi gönderebilir. Yapay zekâ istemcileri
+(MCP) bu API'ye erişmez, bu yüzden 2.2'deki kendi kendine izin verme senaryosu için bu yalnızca aynı
+kullanıcı hesabındaki bir programın sorunudur (2.5, kapsam dışı). **Bu sürümde düzeltilmedi.**
+v0.2 önerisi: hassas izin verme işlemini, yalnızca insanın görebileceği bir kanaldan (ör. ayrı bir
+sistem iletişim penceresi ya da tek kullanımlık, ekranda gösterilen bir onay kodu) doğrulatmak.
 
 ## 4. Kapsam dışı olanlar
 
