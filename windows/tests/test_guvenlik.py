@@ -158,7 +158,8 @@ def test_parolali_klasor_acilista_kilitli_ve_diger_api_kapali(tmp_path, ym, saat
         assert ac["kilit"]["tur"] == "parola" and ac["kilit"]["kurtarma_var"] and not ac["sihirbaz"]
         assert PAROLA not in json.dumps(ac)
         for ad, g in [("durum", {}), ("ara", {"sorgu": "x"}), ("guvenlik_durum", {}), ("kaynaklar", {}),
-                      ("claude_ekle", {}), ("kisiler", {}), ("harita", {})]:
+                      ("claude_ekle", {}), ("kisiler", {}), ("harita", {}),
+                      ("tanila_baslat", {"yol": "x"}), ("tanila_durum", {})]:
             assert hata_kodu(y.api, ad, g) == "kilitli_parola", ad
     finally:
         y.kapat()

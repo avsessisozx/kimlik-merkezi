@@ -75,6 +75,32 @@ async function sonuclariTopla(b) {
     }
     await c.close(); }
 
+  // ---- dosya denetimi (tanila): düğme, rapor, kopyalama, temizleme
+  { const c = await b.newContext({ viewport: { width: 1280, height: 850 }, permissions: ['clipboard-read', 'clipboard-write'] }), p = await c.newPage(); await toplayici(p);
+    await p.goto(ayar.url); await bekle(1200);
+    await git(p, 'İçe aktar');
+    const t = { bildirimler: [] };
+    t.dugme_var = (await p.locator('#tanila-dugme', { hasText: 'Dosyayı denetle (içerik göstermez)' }).count()) === 1;
+    const kayitOnce = await p.evaluate(async () => (await api('durum')).ozet.counts.event || 0);
+    await p.locator('#tanila-dugme').click();                      // yol boşken
+    await bekle(500);
+    t.bos_yol_hatasi = (await bildirimHatalari(p)).length > 0;
+    await p.fill('#ice-yol', ayar.tanila_dosyasi);
+    await p.locator('#tanila-dugme').click();
+    t.rapor_var = await p.waitForSelector('#tanila-rapor', { timeout: 30000 }).then(() => true).catch(() => false);
+    if (t.rapor_var) {
+      t.aciklama_var = (await p.evaluate(() => document.querySelector('#tanila-alan').innerText)).includes('Bu rapor dosya içeriğini içermez, yalnız alan adları, türler ve sayılar.');
+      t.rapor = await p.inputValue('#tanila-rapor');
+      await p.locator('#tanila-kopyala').click(); await bekle(400);
+      t.panoda = await p.evaluate(() => navigator.clipboard.readText()).catch(() => null);
+      t.eklenen_kayit = (await p.evaluate(async () => (await api('durum')).ozet.counts.event || 0)) - kayitOnce;
+      await p.locator('#tanila-temizle').click(); await bekle(400);
+      t.temizlendi = (await p.locator('#tanila-rapor').count()) === 0 && (await p.evaluate(() => api('tanila_durum'))).durum === 'yok';
+    }
+    t.bildirimler = await bildirimHatalari(p);
+    sonuc.tanila = t;
+    await c.close(); }
+
   // ---- mobil 390px
   { const c = await b.newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(); await toplayici(p);
     await p.goto(ayar.url); await bekle(1200);

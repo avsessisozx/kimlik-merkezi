@@ -59,7 +59,7 @@ Dene 'girişte başlama kaydı (HKCU Run) yazıldı' { [bool](Get-ItemProperty '
 Dene 'kurulum kaydındaki sürüm (Inno) = istenen sürüm' { (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object { $_.DisplayName -eq 'Kimlik Merkezi' } | Select-Object -First 1).DisplayVersion -eq $Surum }
 Dene 'başlat menüsü kısayolu var' { Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Kimlik Merkezi.lnk" }
 
-Adim 'Kurulu uygulamayı dene (açılış, sihirbaz, içe aktarma, Claude ekle, MCP stdio, sağlık)'
+Adim 'Kurulu uygulamayı dene (açılış, sihirbaz, dosya denetimi/tanila, içe aktarma, Claude ekle, MCP stdio, sağlık)'
 $calisma = Join-Path $env:RUNNER_TEMP 'km_dene'
 if (-not $env:RUNNER_TEMP) { $calisma = Join-Path $env:TEMP 'km_dene' }
 Remove-Item $calisma -Recurse -Force -ErrorAction SilentlyContinue

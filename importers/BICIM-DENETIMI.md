@@ -169,3 +169,6 @@ Kullanıcı dışa aktarma dosyasında/klasöründe çalıştırır, çıkan kı
 - Sınama: `tests/test_tanila.py` iki sentinelle (yalnız değerlerde, yalnız adlarda) JSON, JSONL, CSV, MBOX, SQLite, düz metin, zip, tar.gz üzerinde
   sızıntı olmadığını gösterir; ağ çağrıları engellenip çalıştırılır; kaynakta ağ modülü bulunmadığı denetlenir. **Bu sahte veriyle yapılan
   bir kanıttır**; gerçek bir dışa aktarmada veri taşıyan olağandışı bir yapının sızmayacağına dair garanti değildir.
+- Kurulu Windows paketinde iki yol: (1) arayüzde İçe aktar > "Dosyayı denetle (içerik göstermez)" düğmesi (rapor ekranda, "Kopyala" ile); (2) konsolda
+  `kimlikmerkezi-mcp.exe tanila <yol> [--adlari-goster] [--ayrinti]`. İkisi de aynı `tanila` kodunu çağırır, veritabanına yazmaz.
+  Paket CI'sı (`windows/paket/kurulu_dene.py`) kurulu exe'de sahte örnekle sentinel sızıntısını ve çıkış kodunu sınar; ilk gerçek Windows CI koşusuna kadar bu adım ÇALIŞTIRILMAMIŞTIR.

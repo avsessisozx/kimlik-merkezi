@@ -3,6 +3,8 @@
   KimlikMerkezi.exe               tepsi + yerel web arayüzü, tarayıcıyı açar
   KimlikMerkezi.exe --arka-plan   aynısı, tarayıcıyı açmadan (girişte başlama)
   KimlikMerkezi.exe saglik        sağlık denetimi (ekransız; çıkış kodu 0/1)
+  KimlikMerkezi.exe tanila <yol> [--adlari-goster] [--ayrinti]
+                                  dışa aktarma dosyasının İÇERİKSİZ yapı raporu (konsolda: kimlikmerkezi-mcp.exe tanila ...)
   KimlikMerkezi.exe mcp           MCP (stdio); pencere/tepsi açmaz
   KimlikMerkezi.exe --sec dosya|klasor   (iç kullanım) seçme penceresi
 Kurulu pakette MCP için ayrıca konsol exe'si `kimlikmerkezi-mcp.exe` vardır (Claude buna bağlanır).
@@ -69,6 +71,16 @@ def saglik_komutu(veri: str | None) -> int:
         pass
     print(saglik.metin(s))
     return 0 if s["ok"] else 1
+
+
+def tanila_komutu(yol: str | None, adlari_goster: bool, ayrinti: bool) -> int:
+    """`tanila <yol>`: çekirdek komut satırındaki mevcut `tanila` komutunu çağırır (veritabanı açmaz, ağa bağlanmaz)."""
+    if not yol:
+        print("Kullanım: kimlikmerkezi-mcp.exe tanila <dosya-veya-klasör> [--adlari-goster] [--ayrinti]", file=sys.stderr)
+        return 2
+    from kimlikcore.cli import main as cli_main
+    argv = ["tanila", yol] + (["--adlari-goster"] if adlari_goster else []) + (["--ayrinti"] if ayrinti else [])
+    return cli_main(argv)
 
 
 def calistir(arka_plan: bool) -> int:
@@ -143,7 +155,10 @@ def main(argv: list[str] | None = None) -> int:
         from kimlikserver.mcp.__main__ import main as mcp_main
         return mcp_main()
     p = argparse.ArgumentParser(prog="KimlikMerkezi", description="Kimlik Merkezi (Windows)")
-    p.add_argument("komut", nargs="?", choices=["saglik", "surum"])
+    p.add_argument("komut", nargs="?", choices=["saglik", "surum", "tanila"])
+    p.add_argument("yol", nargs="?", help="tanila komutu için dışa aktarma dosyası/klasörü")
+    p.add_argument("--adlari-goster", action="store_true", help="tanila: dosya/klasör adlarını maskesiz yaz (kişi adı içerebilir)")
+    p.add_argument("--ayrinti", action="store_true", help="tanila: uzun, ayrıntılı rapor")
     p.add_argument("--arka-plan", action="store_true", help="tarayıcıyı açma, tepside başla")
     p.add_argument("--sec", choices=["dosya", "klasor"], help=argparse.SUPPRESS)
     p.add_argument("--cikti", help=argparse.SUPPRESS)
@@ -155,7 +170,15 @@ def main(argv: list[str] | None = None) -> int:
         import ijson
         print(f"Kimlik Merkezi {__version__}")
         print(f"ijson arka ucu: {ijson.backend}")   # C uzantısı pakette ise 'yajl2_c'
+        for modul in ("pypdf", "docx"):              # belge okuyucular (dosya denetimi/içe aktarma); pakette olmalı
+            try:
+                __import__(modul)
+                print(f"{modul}: var")
+            except ImportError:
+                print(f"{modul}: YOK")
         return 0
+    if a.komut == "tanila":
+        return tanila_komutu(a.yol, a.adlari_goster, a.ayrinti)
     if a.komut == "saglik":
         return saglik_komutu(a.veri)
     return calistir(a.arka_plan)

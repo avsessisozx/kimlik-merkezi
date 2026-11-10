@@ -17,6 +17,7 @@ from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_rapor
 from .ayarlar import Ayarlar
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
+from .tanila_is import TanilaIsi
 from .guvenlik import DEGERLENDIRICILER, GUVENLIK_API, KILITLI_IZINLI, MESGUL_IZINLI, Guvenlik
 
 # Uygulama'nın dışarıya açılan yöntemleri (ad -> yöntem). Başka hiçbir şey çağrılamaz.
@@ -64,6 +65,7 @@ class Yonetici:
         self.cikis_istegi = False
         self.kilit: dict | None = None        # parolalı klasör açılamadı: kilit ekranı bilgisi
         self.mesgul: str | None = None        # "donusum": şifreleme dönüşümü sürüyor, veritabanı kapalı
+        self.tanila: TanilaIsi | None = None  # 'Dosyayı denetle' işi (salt okunur, veritabanına dokunmaz)
         self.guvenlik = Guvenlik(self)
         self._api_kilit = threading.RLock()   # kişi değişimi ve sorgular aynı SQLite bağlantısında çakışmasın
 
@@ -163,6 +165,43 @@ class Yonetici:
             raise IslemHatasi("Kişi adı 1-60 karakter olmalı.")
         self.ayarlar.guncelle(kisiler=[{**k, "ad": ad} if k["id"] == kisi_id else k for k in self.ayarlar["kisiler"]])
         return self.api_kisiler()
+
+    # ------------------------------------------------------------------ dosya denetimi (tanila)
+    def _ice_aktar_suruyor(self) -> bool:
+        return bool(self.uygulama and self.uygulama.is_ and self.uygulama.is_.durum == "calisiyor")
+
+    def api_ice_aktar_baslat(self, yol: str, tur: str | None = None, yine_de: bool = False) -> dict:
+        """Uygulama.ice_aktar_baslat'a gider; yalnız tanila ile aynı anda çalışmasın (paylaşılan arşiv önbelleği)."""
+        if self.uygulama is None:
+            raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
+        if self.tanila is not None and self.tanila.canli:
+            raise IslemHatasi("Bir dosya denetimi sürüyor; bitmesini bekleyin.", "mesgul")
+        return self.uygulama.ice_aktar_baslat(yol, tur, yine_de)
+
+    def api_tanila_baslat(self, yol: str, adlari_goster: bool = False, ayrinti: bool = False) -> dict:
+        """Dosyanın içeriksiz yapı raporunu arka planda üretir. Veritabanına yazmaz, kilit gerektirmez."""
+        yol = (yol or "").strip().strip('"') if isinstance(yol, str) else ""
+        if not yol:
+            raise IslemHatasi("Denetlenecek bir dosya ya da klasör seçin.")
+        if not os.path.exists(yol):
+            raise IslemHatasi("Bu dosya ya da klasör bulunamadı.")
+        if self.tanila is not None and self.tanila.canli:
+            raise IslemHatasi("Önceki dosya denetimi hâlâ sürüyor; bitmesini bekleyin.", "mesgul")
+        if self._ice_aktar_suruyor():
+            raise IslemHatasi("Bir içe aktarma sürüyor; bitince dosyayı denetleyebilirsiniz.", "mesgul")
+        self.tanila = TanilaIsi(yol, bool(adlari_goster), bool(ayrinti))
+        self.tanila.baslat()
+        gunluk.log().info("dosya denetimi başladı")      # yol/ad günlüğe yazılmaz
+        return self.tanila.to_dict()
+
+    def api_tanila_durum(self) -> dict:
+        return self.tanila.to_dict() if self.tanila else {"durum": "yok"}
+
+    def api_tanila_temizle(self) -> dict:
+        """Ekrandan çıkarken raporu bellekten at (rapor yapı bilgisi içerir)."""
+        if self.tanila is not None and not self.tanila.canli:
+            self.tanila = None
+        return {"ok": True}
 
     def kapat(self) -> None:
         if self.uygulama:

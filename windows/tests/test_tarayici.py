@@ -26,6 +26,7 @@ from kimlikwin.web import Sunucu
 from kimlikwin.yonetici import Yonetici
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "paket"))
 import demo_veri  # noqa: E402
 
 BETIK = Path(__file__).parent / "tarayici" / "gezinti.js"
@@ -88,10 +89,13 @@ def sonuc(tmp_path_factory):
     bozuk.write_bytes(b"PK\x03\x04" + bytes(range(256)) * 4)
     tanin = kok / "notlar.txt"
     tanin.write_text("bu bir dışa aktarma dosyası değil", encoding="utf-8")
+    import tanila_dene
+    sentinel = tanila_dene.sahte_zip(kok / "sentinel.zip")
     s = Sunucu(y, 0)
     s.baslat()
     ayar = kok / "ayar.json"
-    ayar.write_text(json.dumps({"url": s.url, "ice_dosyalari": {"bozuk": str(bozuk), "taninmayan": str(tanin), "saglam": str(ok)}}), encoding="utf-8")
+    ayar.write_text(json.dumps({"url": s.url, "ice_dosyalari": {"bozuk": str(bozuk), "taninmayan": str(tanin), "saglam": str(ok)},
+                                "tanila_dosyasi": str(sentinel)}), encoding="utf-8")
     try:
         p = subprocess.run([node, str(BETIK), str(ayar)], capture_output=True, text=True, timeout=300, env=_node_ortami())
     finally:
@@ -157,3 +161,16 @@ def test_utc_ve_aciklamalar_gorunur(sonuc):
     assert sonuc["harita_nedir"] and sonuc["harita_nedir"]["acik"] and "Kilitli" in sonuc["harita_nedir"]["metin"]
     assert sonuc["ipucu_metni"] and len(sonuc["ipucu_metni"]) > 20
     assert "Terimler sözlüğü" in sonuc["sayfalar"]["Hakkında"]["metin"]
+
+
+def test_dosya_denetle_dugmesi_rapor_ve_kopyala(sonuc):
+    t = sonuc["tanila"]
+    assert t["bildirimler"] == [], t["bildirimler"]
+    assert t["aciklama_var"] and t["dugme_var"], "açıklama/düğme yok"
+    assert t["rapor_var"], "rapor görünmedi"
+    import tanila_dene
+    assert tanila_dene.sizinti_var_mi(t["rapor"]) is None
+    assert t["panoda"] == t["rapor"], "Kopyala düğmesi raporu panoya koymadı"
+    assert t["eklenen_kayit"] == 0, "denetim bir şey içe aktardı"
+    assert t["temizlendi"], "Raporu temizle çalışmadı"
+    assert t["bos_yol_hatasi"], "yol boşken anlaşılır hata verilmedi"
