@@ -19,6 +19,10 @@ on:
         type: boolean
   push:
     tags: ["v*"]
+    # GECICI-BASLA (doğrulama sonrası kaldırılacak)
+    branches: ["iscilik/ci"]
+    paths: [".github/TETIK-paket"]
+    # GECICI-BITIS
 
 concurrency:
   group: paket-${{ github.ref }}
