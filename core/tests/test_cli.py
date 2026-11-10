@@ -56,6 +56,9 @@ def test_cli_uctan_uca(cli, tmp_path, root):
     assert "KALDIRILDI" in cli("kaynaklar").stdout
     denied = cli("kaynak-sil", sid, ok=False, stdin=subprocess.DEVNULL)
     assert denied.returncode == 1 and "--onayla" in denied.stderr
+    # stdin boş boru: EOFError traceback'i yerine anlaşılır hata
+    pipe = cli("kaynak-sil", sid, ok=False, input="")
+    assert pipe.returncode == 1 and "--onayla" in pipe.stderr and "Traceback" not in pipe.stderr
     assert json.loads(cli("--json", "kaynak-sil", sid, "--onayla").stdout)["silinen_kayit"] == 15
     # silinmiş dosyayı yeniden almak onay ister
     blocked = cli("ice-al", f, "--tur", "jsonl", ok=False)
@@ -104,3 +107,23 @@ def test_cli_ice_al_klasor_ve_otomatik_tanima(cli, tmp_path):
     bos.mkdir()
     r = cli("ice-al", bos, ok=False)
     assert r.returncode == 1 and "tanınmadı" in r.stderr
+
+
+def test_kaynak_sil_tty_stdin_eof(monkeypatch, root, capsys):
+    """Windows'ta NUL/kapalı stdin isatty()=True görünür; input() EOFError verir."""
+    import io
+
+    from kimlikcore import cli as climod
+    from kimlikcore import Hub
+
+    with Hub.open(root, write=True) as h:
+        sid = h.add_source("x", "1", None)
+    class FakeIn(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr("sys.stdin", FakeIn(""))
+    assert climod.main(["--veri", str(root), "kaynak-sil", sid]) == 1
+    err = capsys.readouterr().err
+    assert "--onayla" in err and "Traceback" not in err
+    with Hub.open(root, write=False) as r:
+        assert len(r.sources()) == 1  # silinmedi

@@ -169,7 +169,13 @@ def cmd_kaynak_sil(args):
     if not args.onayla:
         if sys.stdin.isatty():
             print("Bu işlem GERİ ALINAMAZ: kaynağın kayıtları ve ham dosyası kalıcı silinir.")
-            if input("Devam için SIL yazın: ").strip() != "SIL":
+            try:
+                yanit = input("Devam için SIL yazın: ").strip()
+            except (EOFError, OSError):
+                raise FormatError(
+                    "Onay okunamadı (girdi kapalı); hiçbir şey silinmedi. Kalıcı silme için --onayla kullanın."
+                ) from None
+            if yanit != "SIL":
                 raise FormatError("Onaylanmadı; hiçbir şey silinmedi.")
         else:
             raise FormatError("Kalıcı silme için --onayla gerekir.")
