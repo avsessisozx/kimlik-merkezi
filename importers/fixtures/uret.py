@@ -235,3 +235,51 @@ wj(GH + "users_000001.json", [{"type": "user", "login": "ornekkullanici", "email
 wj(GH + "public_keys_000001.json", [{"type": "public_key", "title": "laptop", "key": "ssh-rsa AAAAORNEK",
                                      "created_at": "2021-01-01T00:00:00Z"}])
 wj(GH + "schema.json", {"version": "1.2.3", "ornek": True})
+
+
+# ------------------------------------------------------------------ Spotify
+SP = "spotify_standart/Spotify Account Data/"
+wj(SP + "StreamingHistory_music_0.json", [
+    {"endTime": "2023-05-01 10:01", "artistName": "Ornek Sanatci", "trackName": "Ornek Sarki Bir", "msPlayed": 200000},
+    {"endTime": "2023-05-01 10:05", "artistName": "Ornek Sanatci", "trackName": "Ornek Sarki Iki", "msPlayed": 180000},
+    {"endTime": "2023-05-02 21:30", "artistName": "Baska Sanatci", "trackName": "Turkce Sarkı Şık", "msPlayed": 1500}])
+wj(SP + "StreamingHistory_podcast_0.json", [
+    {"endTime": "2023-05-03 08:00", "podcastName": "Ornek Podcast", "episodeName": "Ornek Bolum", "msPlayed": 900000}])
+wj(SP + "Playlist1.json", {"playlists": [{"name": "Ornek Liste", "lastModifiedDate": "2023-04-01", "items": [
+    {"track": {"trackName": "Liste Sarkisi Bir", "artistName": "Ornek Sanatci", "albumName": "Ornek Album",
+               "trackUri": "spotify:track:aaa"}, "episode": None, "localTrack": None, "addedDate": "2023-03-01"},
+    {"track": {"trackName": "Liste Sarkisi Iki", "artistName": "Baska Sanatci", "albumName": "Ornek Album 2",
+               "trackUri": "spotify:track:bbb"}, "episode": None, "localTrack": None, "addedDate": "2023-03-02"}],
+    "description": None, "numberOfFollowers": 0}]})
+wj(SP + "YourLibrary.json", {"tracks": [
+    {"artist": "Ornek Sanatci", "album": "Ornek Album", "track": "Kutuphane Sarkisi", "uri": "spotify:track:ccc"},
+    {"artist": "Baska Sanatci", "album": "Ornek Album 2", "track": "Kutuphane Sarkisi Iki", "uri": "spotify:track:ddd"}],
+    "albums": [{"artist": "Ornek Sanatci", "album": "Begenilen Album", "uri": "spotify:album:eee"}],
+    "shows": [], "episodes": [], "bannedTracks": [], "artists": [{"name": "Takip Edilen Sanatci", "uri": "spotify:artist:fff"}]})
+wj(SP + "SearchQueries.json", [
+    {"platform": "ANDROID", "searchTime": "2023-05-04T09:00:00.000Z", "searchQuery": "ornek arama sarki",
+     "searchInteractionURIs": ["spotify:track:aaa"]},
+    {"platform": "ANDROID", "searchTime": "2023-05-04T09:05:00.000Z", "searchQuery": "ikinci arama", "searchInteractionURIs": []}])
+wj(SP + "Userdata.json", {"username": "ornekkullanici", "email": "gizli@example.test", "birthdate": "1990-01-01"})
+SPX = "spotify_genisletilmis/Spotify Extended Streaming History/"
+wj(SPX + "Streaming_History_Audio_2023_0.json", [
+    {"ts": "2023-05-01T10:01:30Z", "username": "ornekkullanici", "platform": "Android OS 12", "ms_played": 200000,
+     "conn_country": "TR", "ip_addr_decrypted": "1.2.3.4", "user_agent_decrypted": "ornek", "master_metadata_track_name": "Ornek Sarki Bir",
+     "master_metadata_album_artist_name": "Ornek Sanatci", "master_metadata_album_album_name": "Ornek Album",
+     "spotify_track_uri": "spotify:track:aaa", "episode_name": None, "episode_show_name": None,
+     "spotify_episode_uri": None, "reason_start": "trackdone", "reason_end": "trackdone", "shuffle": False,
+     "skipped": False, "offline": False, "offline_timestamp": None, "incognito_mode": False},
+    {"ts": "2023-05-05T12:00:10Z", "username": "ornekkullanici", "platform": "Android OS 12", "ms_played": 100,
+     "conn_country": "TR", "ip_addr_decrypted": "1.2.3.4", "user_agent_decrypted": "ornek", "master_metadata_track_name": "Genisletilmis Sarki",
+     "master_metadata_album_artist_name": "Baska Sanatci", "master_metadata_album_album_name": "A",
+     "spotify_track_uri": "spotify:track:ggg", "episode_name": None, "episode_show_name": None,
+     "spotify_episode_uri": None, "reason_start": "clickrow", "reason_end": "fwdbtn", "shuffle": True,
+     "skipped": True, "offline": False, "offline_timestamp": None, "incognito_mode": False},
+    {"ts": "2023-05-06T07:00:00Z", "username": "ornekkullanici", "platform": "Android OS 12", "ms_played": 600000,
+     "conn_country": "TR", "ip_addr_decrypted": "1.2.3.4", "user_agent_decrypted": "ornek", "master_metadata_track_name": None,
+     "master_metadata_album_artist_name": None, "master_metadata_album_album_name": None, "spotify_track_uri": None,
+     "episode_name": "Genisletilmis Bolum", "episode_show_name": "Ornek Podcast", "spotify_episode_uri": "spotify:episode:hhh",
+     "reason_start": "clickrow", "reason_end": "endplay", "shuffle": False, "skipped": False, "offline": False,
+     "offline_timestamp": None, "incognito_mode": False},
+    {"ts": "2023-05-07T07:00:00Z", "username": "ornekkullanici", "platform": "x", "ms_played": 5, "master_metadata_track_name": None,
+     "episode_name": None}])

@@ -1,0 +1,34 @@
+{
+ "playlists": [
+  {
+   "name": "Ornek Liste",
+   "lastModifiedDate": "2023-04-01",
+   "items": [
+    {
+     "track": {
+      "trackName": "Liste Sarkisi Bir",
+      "artistName": "Ornek Sanatci",
+      "albumName": "Ornek Album",
+      "trackUri": "spotify:track:aaa"
+     },
+     "episode": null,
+     "localTrack": null,
+     "addedDate": "2023-03-01"
+    },
+    {
+     "track": {
+      "trackName": "Liste Sarkisi Iki",
+      "artistName": "Baska Sanatci",
+      "albumName": "Ornek Album 2",
+      "trackUri": "spotify:track:bbb"
+     },
+     "episode": null,
+     "localTrack": null,
+     "addedDate": "2023-03-02"
+    }
+   ],
+   "description": null,
+   "numberOfFollowers": 0
+  }
+ ]
+}

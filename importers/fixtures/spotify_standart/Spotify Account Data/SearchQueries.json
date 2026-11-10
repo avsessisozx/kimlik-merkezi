@@ -1,0 +1,16 @@
+[
+ {
+  "platform": "ANDROID",
+  "searchTime": "2023-05-04T09:00:00.000Z",
+  "searchQuery": "ornek arama sarki",
+  "searchInteractionURIs": [
+   "spotify:track:aaa"
+  ]
+ },
+ {
+  "platform": "ANDROID",
+  "searchTime": "2023-05-04T09:05:00.000Z",
+  "searchQuery": "ikinci arama",
+  "searchInteractionURIs": []
+ }
+]

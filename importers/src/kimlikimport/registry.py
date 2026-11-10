@@ -8,6 +8,7 @@ from .base import Importer
 from .google_takeout import factory as _takeout
 from .github import factory as _github
 from .meta import factory as _meta
+from .spotify import factory as _spotify
 from .reddit import factory as _reddit
 
 _REGISTRY: dict[str, Callable[[], Importer]] = {
@@ -15,6 +16,7 @@ _REGISTRY: dict[str, Callable[[], Importer]] = {
     "reddit": _reddit,
     "meta": _meta,
     "github": _github,
+    "spotify": _spotify,
 }
 # CLI'de kısa takma adlar (ice-al --tur takeout)
 ALIASES = {"takeout": "google_takeout", "google": "google_takeout", "instagram": "meta", "facebook": "meta"}
