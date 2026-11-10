@@ -85,14 +85,14 @@ def denetle(yol: str | Path) -> Denetim:
     return Denetim(True, "bos", "Boş klasör; veritabanı burada oluşturulacak.", bos, metin)
 
 
-def olustur(yol: str | Path) -> dict:
+def olustur(yol: str | Path, parola: str | None = None) -> dict:
     """Veritabanını ve klasör yapısını (kimlik.db, arsiv/, cikti/) kendisi oluşturur."""
     d = denetle(yol)
     if not d.ok:
         raise ValueError(d.mesaj)
     p = Path(str(yol).strip().strip('"'))
     # Yeni klasör varsayılan ŞİFRELİ (anahtar Windows hesabına bağlı); sağlayıcı yoksa şifresiz.
-    with Hub.open(p, write=True, sifreli=True if d.durum != "mevcut" and varsayilan_acik_mi() else None) as hub:
+    with Hub.open(p, write=True, parola=parola, sifreli=True if d.durum != "mevcut" and varsayilan_acik_mi() else None) as hub:
         surum = hub.schema_version
         sifreli = hub.sifreli
     return {"yol": str(p), "sema": surum, "mevcut_idi": d.durum == "mevcut", "sifreli": sifreli,

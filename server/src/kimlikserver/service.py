@@ -110,9 +110,11 @@ class QueryService:
                                "bir kez açın.") from None
         except AnahtarGerekli:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")
-            raise ServiceError("Veri şifreli ve anahtar açılamadı. Parola koruması varsa MCP "
-                               "sürecine KIMLIK_PAROLA ortam değişkenini verin; Windows hesabı "
-                               "farklıysa Kimlik Merkezi'nde kurtarma ifadesiyle yeniden bağlayın."
+            raise ServiceError("Veri şifreli ve anahtar açılamadı. Parolalı klasörü MCP kendiliğinden "
+                               "açamaz (bilinçli güvenlik kararı); Claude erişimi için Kimlik Merkezi > "
+                               "Güvenlik'ten parolayı kaldırın. İleri düzey: KIMLIK_PAROLA ortam değişkeni "
+                               "çalışır ama parolayı düz metin yapılandırmaya koymak korumayı azaltır. "
+                               "Windows hesabı farklıysa kurtarma ifadesiyle yeniden bağlayın."
                                ) from None
         except SifrelemeHatasi:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")

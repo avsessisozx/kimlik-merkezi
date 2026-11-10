@@ -1,6 +1,6 @@
 # Veri şifreleme (Kimlik Merkezi)
 
-Durum: ilk sürüm (dal `tur/i1-sifre`) + `oneri.db`/`erisim.db` açıklarının kapatılması (dal `tur/i1-oneri`, şema v4, bölüm 11). Bu belge neyin yapıldığını, neyin YAPILMADIĞINI ve neyin
+Durum: ilk sürüm (dal `tur/i1-sifre`) + `oneri.db`/`erisim.db` açıklarının kapatılması (dal `tur/i1-oneri`, şema v4, bölüm 11) + Windows arayüzünde Güvenlik sayfası, açılış parola kilidi ve MCP kararı (dal `tur/i5-guvenlik`, bölüm 12). Bu belge neyin yapıldığını, neyin YAPILMADIĞINI ve neyin
 doğrulanamadığını açıkça yazar. Kod: `core/src/kimlikcore/sifreleme.py` (anahtarlar, biçim, kurallar),
 `donusum.py` (şifrele / şifreyi kaldır), `hub.py` (şifreli açma), `cli.py` (komutlar).
 
@@ -136,9 +136,24 @@ Tüm okuyucular (`server` MCP süreci, harita, `windows` uygulaması) veriyi `Hu
 `KIMLIK_PAROLA` ortam değişkeninden alır. Tasarım:
 - **Parolasız (varsayılan):** MCP süreci Claude Desktop tarafından kullanıcının Windows hesabıyla başlar,
   DPAPI ile anahtarı kendisi açar. Ek sır, yapılandırma değişikliği yok.
-- **Parolalı:** MCP süreci kendiliğinden açamaz (DPAPI yuvası kaldırıldı). Seçenekler: (a) MCP girdisine
-  `KIMLIK_PAROLA` vermek — parola yapılandırma dosyasında düz metin olur ve parolanın değeri azalır;
-  (b) MCP kullanılacaksa parolasız katmanda kalmak. Bu bir ödünleşimdir, gizlenmemelidir.
+- **Parolalı: KARAR (dal `tur/i5-guvenlik`, bölüm 12): MCP parolalı klasörü kendiliğinden AÇAMAZ ve açması için
+  parola yapılandırmaya konmaz.** `KIMLIK_PAROLA` ortam değişkeni teknik olarak hâlâ çalışır (komut satırı/otomasyon
+  için), ama ürün bunu ÖNERMEZ ve "Claude'a ekle" ile yazmaz: Claude Desktop ayar dosyası aynı Windows hesabındaki
+  her programın okuyabildiği düz metindir; parola oraya yazılırsa parola katmanının koruduğu tehdit (aynı hesaptaki
+  başka program) tam olarak o dosyadan parolayı okur ve koruma kalmaz, üstelik parola başka yerlerde de
+  kullanılıyorsa sızar. Seçenekler ve neden elendikleri:
+
+  | Seçenek | Sonuç |
+  |---|---|
+  | `KIMLIK_PAROLA`'yı Claude ayar dosyasına yazmak | Elendi: parolayı düz metin yapar (yukarıda). |
+  | Windows uygulaması açıkken MCP'nin onun belleğindeki anahtarı kullanması (yerel kanal) | Elendi (bu turda): yeni bir kimlik doğrulamalı yerel kanal ve süreçler arası anahtar paylaşımı demek; ayrı bir güvenlik tasarımı ve inceleme ister. Gelecekte düşünülebilir. |
+  | **Parolalı klasörde MCP otomatik açılmaz (seçildi)** | Basit, dürüst, sır sızdırmaz. Claude erişimi isteyen kullanıcı parolasız (DPAPI'ye bağlı) şifreli klasörde kalır. |
+
+  Uygulamada karşılığı: (1) "Parola ekle" akışı, onaydan önce "parola eklerseniz Claude erişemez" uyarısını ve
+  Claude Desktop ayarında zaten bir `kimlik-merkezi` girişi varsa ayrıca kırmızı uyarı gösterir; onay kutusu bunu da
+  kapsar. (2) Parolalı klasörde `claude_ekle` reddedilir (`parola_mcp`), Erişim sayfasındaki düğme kapalıdır ve nedeni
+  yazar; ayar dosyasına dokunulmaz. (3) Elle üretilen anahtarın bağlantı metni `KIMLIK_PAROLA` önermez ve uyarı
+  taşır. (4) MCP, parolalı klasörde "Veri şifreli ve anahtar açılamadı... Güvenlik'ten parolayı kaldırın" der.
 - Anahtar açılamazsa MCP, sır sızdırmadan şu hatayı döner: "Veri şifreli ve anahtar açılamadı…" (erişim
   kaydına `hata` yazılır). Windows uygulaması açıkken (yazan) MCP salt okur; kapsayıcı atomik değiştiği
   için tutarlı sürüm görür.
@@ -148,7 +163,7 @@ Tüm okuyucular (`server` MCP süreci, harita, `windows` uygulaması) veriyi `Hu
 ## 7. Testler
 
 `core/tests/test_gelen.py` (gelen kutusu: çok süreçli yazım, şifreli dosyalarda düz metin yok, eski oneri.db/erisim.db göçü ve doğrulama, bozuk dosya, dönüşümde gelen dosyaları), `core/tests/test_sifreleme.py` (biçim, kurallar, yaşam döngüsü, Hub, dönüşüm), `test_sifreleme_cli.py`
-(komutlar, alt süreç), `server/tests/test_sifreli.py` (QueryService, MCP stdio), `windows/tests/test_mantik.py`.
+(komutlar, alt süreç), `server/tests/test_sifreli.py` (QueryService, MCP stdio), `windows/tests/test_mantik.py`, `windows/tests/test_guvenlik.py` (Güvenlik web uçları, akışlar, kilit, yavaşlatma, sızıntı), `windows/tests/test_tarayici_guvenlik.py` (gerçek tarayıcı).
 Kapsananlar: yanlış parola reddi; kurtarma akışları; ifade/parola kuralları; parola-önce-ifade zorunluluğu;
 anahtarın diskte düz metin olmaması; veritabanı ve ham arşiv dosyalarında bilinen metin aranınca (Türkçe
 karakterli, düz ve katlanmış hâliyle) bulunmaması; şifreliyken Türkçe katlamalı FTS5 (ISIK/ışık/İstanbul,
@@ -161,13 +176,10 @@ hata durumunda geri alma; bozuk/kırpılmış dosya; eski şemadan göç; başka
   `gelen/` dosyaları birikir; eski sürüm programlar yeni klasörü açamaz.
 - `cikti/` klasörü ve `disa-aktar` çıktısı düz kalır (kullanıcı istedi / kullanıcı verisi).
 - Anahtar döndürme (yeni DEK ile yeniden şifreleme) yok. `sifreyi-kaldir` + `sifrele` bunu dolaylı yapar.
-- **Windows uygulamasında parola sorma ekranı, kurtarma ifadesi sihirbazı ve şifreleme ayar sayfası YOK.**
-  Parola, kurtarma ifadesi ve şifrele/şifreyi kaldır YALNIZ komut satırından (`kimlikmerkezi` komutu, §5) yönetilir.
-  Uygulamada yeni klasör varsayılan şifreli (DPAPI) oluşur; PAROLALI bir klasör uygulamadan AÇILAMAZ (parola
-  sorulmaz; `KIMLIK_PAROLA` ortam değişkeni gerekir). Ayrıca Windows kurulum paketinin (PyInstaller exe'leri)
-  `kimlikmerkezi` komut satırı aracını (sifrele, parola-ekle, kurtarma-kur...) İÇERDİĞİ doğrulanmadı: paketin giriş
-  noktaları yalnız uygulama, `mcp`, `saglik`, `surum`; bu komutlar şimdilik Python paketi kurulu bir ortamda
-  (`pip install` ile gelen `kimlikmerkezi`) çalışır. Bu bir eksiktir, giderilmedi.
+- ~~Windows uygulamasında parola sorma ekranı, kurtarma ifadesi sihirbazı ve şifreleme ayar sayfası yok~~ —
+  KAPATILDI (bölüm 12). Kalan: hazır kurulum paketinin `kimlikmerkezi` komut satırı aracını içerdiği hâlâ
+  doğrulanmadı, ama artık gerekmez (hepsi Güvenlik sayfasında). Güvenlik sayfası gerçek Windows'ta (DPAPI, Inno
+  Setup kurulumu, PyInstaller paketi) DENENMEDİ.
 - **Gerçek Windows DPAPI burada denenemedi** (Linux). `DpapiSaglayici` ctypes kodu yazıldı ve Windows'ta
   koşacak bir test eklendi (`test_dpapi_gercek_gidis_donus`, Linux'ta atlanır) ama hiç çalıştırılmadı.
   Windows CI'da ve elle doğrulanmalı. `windows/paket` PyInstaller derlemesi de Windows'ta denenmedi.
@@ -249,3 +261,51 @@ kapatın.
   dosyası hâlâ ayrı bir şifreli dosyadır; boyutları kayıt uzunluğunu az çok belli eder (öneri cümlesinin uzunluğu gibi).
 - `sifrele`/`sifreyi-kaldir` sırasında çalışan bir MCP süreci, o an kendi kipinde yazabilir; dönüşümden önce
   MCP istemcilerini kapatın.
+
+## 12. Windows arayüzü: Güvenlik sayfası, açılış kilidi (dal `tur/i5-guvenlik`)
+
+**Ne eklendi.** `windows/src/kimlikwin/guvenlik.py` (iş mantığı), `statik/guvenlik.js` (sayfa, kilit ekranı, parola
+penceresi). İş mantığı yeniden yazılmadı: `sifreleme.py` (kurallar, yuvalar), `donusum.py` (şifrele/kaldır) ve `Hub`
+çağrılır. Çekirdeğe dokunulmadı; iki ince düzeltme: `OneriYonetici` artık açık Hub'ın kendi gelen kutusunu kullanır
+(aksi halde parolayla açılmış klasörde öneri/erişim ekranları `AnahtarGerekli` verirdi, çünkü gelen kutusu
+anahtarı yalnız DPAPI/ortam değişkeninden alıyordu), ve MCP hata iletisi yeni karara uydu.
+
+**Uçlar** (hepsi `POST /api/<ad>` + oturum jetonu + Host/Origin denetimi; GET ile erişilemez): `guvenlik_durum`,
+`guvenlik_ifade_degerlendir`, `guvenlik_parola_degerlendir`, `guvenlik_kurtarma_kur`, `guvenlik_parola_ekle`,
+`guvenlik_parola_kaldir`, `guvenlik_kurtar`, `guvenlik_donustur_baslat`, `guvenlik_donusum_durum`, `parola_ac`,
+`kilit_kurtar`. Kurallar sunucuda da uygulanır (arayüz atlansa bile): kurtarılamaz onayı `anladim is True` olmadan
+kurtarma ifadesi kurulmaz ve parola eklenmez; parola önce kurtarma ifadesi şartı çekirdekten gelir; şifrelemeyi
+kapatmak için `KALDIR` yazılmalı. Parola varsa tehlikeli işlemler (kurtarma ifadesini değiştirme, parolayı kaldırma,
+şifrelemeyi kapatma) mevcut parolayı yeniden ister.
+
+**Açılışta parola.** `Yonetici.baslat()` parolalı klasörde `AnahtarGerekli` alırsa uygulamayı AÇMAZ, `kilit` durumuna
+geçer; `acilis` yanıtı `kilit` taşır, arayüz tam ekran kilit ekranı gösterir ve kilitliyken parola/kurtarma ve kural
+değerlendiricileri dışında HİÇBİR işlem çalışmaz (HTTP 423, `kilitli_parola`). Windows hesabı değiştiği için DPAPI
+yuvası açılamıyorsa ve kurtarma ifadesi kuruluysa kilit ekranı yalnız kurtarma ifadesi sorar. Kişi değiştirme, kişi
+ekleme ve sihirbazda mevcut parolalı klasör seçme de parola ister (`parola_gerekli`).
+
+**Parola nerede tutulur.** Yalnız `Guvenlik._parolalar` sözlüğünde (süreç belleği, klasör başına); diske, ayar
+dosyasına, ortam değişkenine, günlüğe yazılmaz. Gerekçe: kişi değişiminde ve dönüşüm sonrası klasörü yeniden
+açmak için. Bellek temizleme garantisi YOK (Python dizgeleri değiştirilemez; takas dosyası/bellek dökümü kapsam
+dışı, bölüm 1).
+
+**Yanlış deneme yavaşlatması.** Süreç içi `DenemeSiniri`: ilk 2 hata bedava, sonra 5, 10, 20... sn, üst sınır 300 sn.
+Bekleme sürerken doğru parola bile DENENMEZ (HTTP 429, `cok_deneme`). Parola, kurtarma ifadesi ve yeniden doğrulama
+aynı sayacı paylaşır. Sınır: sayaç bellektedir; uygulama yeniden başlatılırsa sıfırlanır ve scrypt (n=2^15) zaten
+çevrimdışı saldırıyı (anahtar.json kopyalanırsa) engellemez, yalnız yerel arayüz üzerinden denemeyi yavaşlatır.
+
+**Şifrelemeyi aç/kapat.** Veritabanı kapatılır, `donusum.sifrele`/`sifreyi_kaldir` arka plan iş parçacığında çalışır
+(çekirdeğin geri alma ve doğrulama davranışı aynen), bitince klasör yeniden açılır; sürerken diğer tüm uçlar
+`mesgul` (409) döner, durum `guvenlik_donusum_durum` ile sorgulanır ve sayfa yeniden yüklense de ilerleme ekranı
+döner. Arayüz uyarır: uzun sürebilir, uygulamayı kapatmayın, Claude Desktop'u kapatın, önce klasör yedeği (anahtar.json
+dahil) alın. SINIR: işlem sürerken tepsiden "Çık" yine çıkar (engellenmedi); yarım kalan dönüşüm çekirdekte yeniden
+çalıştırılabilir (bölüm 5), arayüzde bu durumu ayrıca algılayan bir "yarım dönüşüm" ekranı yok (Güvenlik sayfasındaki
+uyarılar ham dosya/kalıntı sayısını gösterir).
+
+**Sızıntı önlemleri.** Parola ve ifade yalnız istek gövdesindedir (URL'de değil). Web işleyicisi erişim satırı
+yazmaz; hata iletileri sabit metindir; ayrıca gövdedeki `parola*`/`*ifade*` alanlarının değerleri (4+ karakter) tüm
+hata yanıtlarından `***` ile süpürülür (son güvenlik ağı). `test_guvenlik.py::test_parola_ve_ifade_hicbir_yere_sizmaz`
+günlük dosyası, tüm günlük kayıtları (argümanlar ve istisna dahil), HTTP yanıtları, hata raporu, stdout/stderr,
+erişim kaydı ve ayar/veri klasöründeki tüm dosyalarda sır arar (bilerek bir günlük satırı eklenince kırıldığı
+doğrulandı). Doğrulanmayan: Chromium'un form otomatik doldurması/parola yöneticisi (alanlar `autocomplete=off`
+`type=password`, ama tarayıcı yine de önerebilir), ekran/pano.

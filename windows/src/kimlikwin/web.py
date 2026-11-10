@@ -25,6 +25,24 @@ _AD_RE = re.compile(r"[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*")
 _STATIK_TUR = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8", "txt": "text/plain; charset=utf-8", "svg": "image/svg+xml"}
 ADRES = "127.0.0.1"
 MAKS_GOVDE = 1_000_000
+HATA_KODLARI = {"sihirbaz_gerekli": 409, "mesgul": 409, "kilitli_parola": 423, "cok_deneme": 429}
+_SIR_ALAN = re.compile(r"(parola|ifade|onay_sifre)", re.I)
+
+
+def _sirlar(girdi: dict) -> list[str]:
+    """İstek gövdesindeki gizli değerler (parola*, *ifade*). Hata iletilerinden süpürülür."""
+    return [v for k, v in girdi.items() if isinstance(v, str) and len(v) >= 4 and _SIR_ALAN.search(k)]
+
+
+def _supur(nesne: dict, sirlar: list[str]) -> dict:
+    if not sirlar:
+        return nesne
+    def temizle(v):
+        if isinstance(v, str):
+            for s in sirlar:
+                v = v.replace(s, "***")
+        return v
+    return {k: temizle(v) for k, v in nesne.items()}
 
 
 def _statik(ad: str) -> bytes:
@@ -136,19 +154,23 @@ class _Isleyici(BaseHTTPRequestHandler):
         except ValueError:
             return self._json(400, {"hata": "Geçersiz JSON."})
         ad = self.path[5:]
+        sirlar = _sirlar(girdi)
+
+        def hata(kod: int, nesne: dict) -> None:   # hata iletisine parola/ifade sızmasın (son güvenlik ağı)
+            self._json(kod, _supur(nesne, sirlar))
+
         try:
             self._json(200, self.sunucu.yonetici.api(ad, girdi))
         except IslemHatasi as e:
-            self._json(409 if e.kod in ("sihirbaz_gerekli", "mesgul") else 400,
-                       {"hata": str(e), "kod": e.kod, "ek": e.ek})
+            hata(HATA_KODLARI.get(e.kod, 400), {"hata": str(e), "kod": e.kod, "ek": e.ek})
         except HubLockedError as e:
-            self._json(409, {"hata": str(e), "kod": "kilitli"})
+            hata(409, {"hata": str(e), "kod": "kilitli"})
         except (KimlikError, FormatError, ValueError, TypeError) as e:
-            self._json(400, {"hata": f"{e}" if isinstance(e, (KimlikError, ValueError)) else "Geçersiz istek.",
-                             "kod": type(e).__name__})
+            hata(400, {"hata": f"{e}" if isinstance(e, (KimlikError, ValueError)) else "Geçersiz istek.",
+                       "kod": type(e).__name__})
         except Exception as e:
             gunluk.log().error("api/%s beklenmeyen hata: %s", ad, type(e).__name__)
-            self._json(500, {"hata": f"Beklenmeyen hata: {type(e).__name__}", "kod": "beklenmeyen"})
+            hata(500, {"hata": f"Beklenmeyen hata: {type(e).__name__}", "kod": "beklenmeyen"})
 
 
 def port_bos_mu(port: int) -> bool:
