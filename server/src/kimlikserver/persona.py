@@ -92,6 +92,12 @@ def _clean_statement(s: str) -> str:
     return s
 
 
+def son_dogrulama(f: "Fact") -> str | None:
+    """Bilginin son doğrulandığı gün (YYYY-MM-DD): valid_from, yoksa eklenme tarihi."""
+    d = f.valid_from or f.date
+    return d[:10] if d else None
+
+
 def _line(s: str) -> str:
     """Kartta tek satır: satır sonlarını boşluğa çevirir."""
     return re.sub(r"\s*[\r\n]+\s*", " ", s).strip()
@@ -170,21 +176,27 @@ class PersonaReader:
         for f in facts:
             by_cat.setdefault(f.category, []).append(f)
         labels: dict[str, str | None] = {}
-        out = ["# Kimlik Kartı", "", f"Oluşturulma: {self._now()}", ""]
+        out = ["# Kimlik Kartı", "", "## Bu kişi hakkında bilinenler", "",
+               "Kişinin kendi beyanı ya da bir kaynağa bağlı bilgiler; tahmin içermez. "
+               f"Oluşturulma: {self._now()}", ""]
+        bos = len(out)
         for cat in FACT_CATEGORIES:
             items = by_cat.get(cat)
             if not items:
                 continue
-            out += [f"## {CATEGORY_TITLES[cat]}", ""]
+            out += [f"### {CATEGORY_TITLES[cat]}", ""]
             for f in items:
-                line = f"- {_line(f.statement)}"
+                notlar = []
                 if f.status == "dosyadan_alinan":
                     if f.source_id not in labels:
                         labels[f.source_id] = self.source_label(f.source_id)
-                    line += f" (kaynak: {_line(labels[f.source_id] or 'bilinmeyen')})"
-                out.append(line)
+                    notlar.append(f"kaynak: {_line(labels[f.source_id] or 'bilinmeyen')}")
+                dogr = son_dogrulama(f)
+                if dogr:
+                    notlar.append(f"son doğrulama: {dogr}")
+                out.append(f"- {_line(f.statement)}" + (f" ({', '.join(notlar)})" if notlar else ""))
             out.append("")
-        if len(out) == 4:
+        if len(out) == bos:
             out += ["Seçilen kategorilerde bilgi yok.", ""]
         return "\n".join(out)
 
