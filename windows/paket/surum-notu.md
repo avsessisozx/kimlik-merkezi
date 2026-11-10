@@ -5,3 +5,4 @@ Kimlik Merkezi {SURUM} (ön sürüm), Windows
 - Ön sürüm: gerçek Takeout/Reddit arşivi doğrulanmadı.
 - İmzasız EXE: Windows SmartScreen uyarısı çıkabilir; indirdiğiniz dosyayı SHA256SUMS.txt ile doğrulayın.
 - Android uygulaması bu sürümde yok.
+- Yazılım malzeme listesi (SBOM, CycloneDX JSON) ve SHA256SUMS.txt yayında yer alır; paketteki bileşenleri ve lisansları listeler.
