@@ -15,6 +15,7 @@ from kimlikcore import AnahtarGerekli, KimlikError
 
 from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_raporu, saglik, veri_klasoru
 from .ayarlar import Ayarlar
+from .guncelleme import Guncelleme, GuncellemeHatasi
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
 from .tanila_is import TanilaIsi
@@ -54,8 +55,11 @@ def sec_dialog(tur: str) -> str | None:
 class Yonetici:
     def __init__(self, ayarlar: Ayarlar | None = None, otomatik: Otomatik | None = None,
                  secici: Callable[[str], str | None] = sec_dialog,
-                 claude_yolu: Callable[[], Path | None] = claude_ayar.bul):
+                 claude_yolu: Callable[[], Path | None] = claude_ayar.bul,
+                 guncelleme: Guncelleme | None = None):
         self.ayarlar = ayarlar or Ayarlar()
+        # Ağ politikası ASLA buradan verilmez (varsayılan: yalnız https + GitHub). Testler hazır nesne enjekte eder.
+        self.guncelleme = guncelleme or Guncelleme(self.ayarlar.dizin / "guncelleme")
         self.otomatik = otomatik or Otomatik()
         self.secici = secici
         self.claude_yolu = claude_yolu
@@ -240,6 +244,9 @@ class Yonetici:
                 "tema": self.ayarlar["tema"], "surum": __version__,
                 "ad": APP_AD, "varsayilan_klasor": veri_klasoru.varsayilan_oner(),
                 "otomatik_baslat": self.ayarlar["otomatik_baslat"],
+                "guncelleme_otomatik": self.ayarlar["guncelleme_otomatik"],
+                # Eski sürümden gelen kurulumda denetim bilgisi henüz gösterilmedi: arayüz bir kez açıkça söyler
+                "guncelleme_bilgi_gerekli": bool(self.ayarlar["ilk_acilis_tamam"] and not self.ayarlar["guncelleme_bilgi_goruldu"]),
                 "yarim_is": self.uygulama.yarim_kalan_is() if self.uygulama else None,
                 "eskiyen": self.uygulama.eskiyen if self.uygulama else 0,
                 "baslangic_hatasi": self.baslangic_hatasi}
@@ -276,13 +283,14 @@ class Yonetici:
         return veri_klasoru.denetle(yol).to_dict()
 
     def api_sihirbaz_tamamla(self, yol: str, otomatik_baslat: bool = True, ad: str = "Ben",
-                             parola: str | None = None) -> dict:
+                             parola: str | None = None, guncelleme_otomatik: bool = True) -> dict:
         if self.uygulama is not None or self.kilit is not None:
             raise IslemHatasi("Kurulum zaten tamamlanmış.")
         bilgi = self.guvenlik.parolali(yol, parola, lambda: veri_klasoru.olustur(yol, parola))
         kisi = {"id": uuid.uuid4().hex[:8], "ad": (ad or "Ben").strip()[:60] or "Ben", "klasor": bilgi["yol"]}
         self.ayarlar.guncelle(veri_klasoru=bilgi["yol"], ilk_acilis_tamam=True, otomatik_baslat=bool(otomatik_baslat),
-                              kisiler=[kisi], secili_kisi=kisi["id"])
+                              kisiler=[kisi], secili_kisi=kisi["id"],
+                              guncelleme_otomatik=bool(guncelleme_otomatik), guncelleme_bilgi_goruldu=True)
         self._otomatik_uygula(bool(otomatik_baslat))
         veri_yolunu_kaydet(bilgi["yol"])
         self.guvenlik.hatirla(bilgi["yol"], parola)
@@ -302,10 +310,16 @@ class Yonetici:
     def api_ayarlar(self) -> dict:
         return {"tema": self.ayarlar["tema"], "otomatik_baslat": self.otomatik.etkin_mi(),
                 "otomatik_destek": self.otomatik.desteklenir, "veri_klasoru": self.ayarlar["veri_klasoru"],
-                "port": self.ayarlar["port"]}
+                "port": self.ayarlar["port"], "guncelleme_otomatik": self.ayarlar["guncelleme_otomatik"],
+                "guncelleme_onsurum": self.ayarlar["guncelleme_onsurum"], "surum": __version__}
 
-    def api_ayar_yaz(self, tema: str | None = None, otomatik_baslat: bool | None = None) -> dict:
+    def api_ayar_yaz(self, tema: str | None = None, otomatik_baslat: bool | None = None,
+                     guncelleme_otomatik: bool | None = None, guncelleme_onsurum: bool | None = None) -> dict:
         uyari = None
+        if guncelleme_otomatik is not None:   # kullanıcı Ayarlar'da seçimi gördü: ayrıca bilgilendirme gerekmez
+            self.ayarlar.guncelle(guncelleme_otomatik=bool(guncelleme_otomatik), guncelleme_bilgi_goruldu=True)
+        if guncelleme_onsurum is not None:
+            self.ayarlar.guncelle(guncelleme_onsurum=bool(guncelleme_onsurum))
         if tema is not None:
             try:
                 self.ayarlar.guncelle(tema=tema)
@@ -316,6 +330,63 @@ class Yonetici:
             if uyari is None:
                 self.ayarlar.guncelle(otomatik_baslat=bool(otomatik_baslat))
         return {**self.api_ayarlar(), "uyari": uyari}
+
+    # ------------------------------------------------------------------ güncelleme (ağ kodu: guncelleme.py)
+    def acilista_guncelleme(self) -> None:
+        """Uygulama açılırken: eski indirme artıklarını sil; ayar açıksa (ve kullanıcı denetim bilgisini
+        görmüşse) yeni sürümü sor. Arka planda; indirme/kurulum ASLA kendiliğinden başlamaz."""
+        self.guncelleme.temizle()
+        a = self.ayarlar
+        if a["ilk_acilis_tamam"] and a["guncelleme_otomatik"] and a["guncelleme_bilgi_goruldu"]:
+            self.guncelleme.denetle(onsurum=bool(a["guncelleme_onsurum"]))
+
+    def cikista_kurulum(self) -> bool:
+        """Uygulama TAMAMEN kapandıktan sonra (veri klasörü bırakıldı) onaylanmış kurulumu başlatır."""
+        return self.guncelleme.kurulumu_baslat()
+
+    def _gunc_durum(self) -> dict:
+        return {**self.guncelleme.durum(), "otomatik": self.ayarlar["guncelleme_otomatik"],
+                "onsurum_dahil": self.ayarlar["guncelleme_onsurum"]}
+
+    def _gunc(self, islem: Callable[[], Any]) -> dict:
+        try:
+            islem()
+        except GuncellemeHatasi as e:
+            raise IslemHatasi(e.mesaj, "guncelleme") from None
+        return self._gunc_durum()
+
+    def api_guncelleme_durum(self) -> dict:
+        return self._gunc_durum()
+
+    def api_guncelleme_denetle(self) -> dict:
+        """'Güncellemeleri denetle' düğmesi: kullanıcı eylemi (otomatik denetim ayarı kapalı olsa da çalışır)."""
+        return self._gunc(lambda: self.guncelleme.denetle(onsurum=bool(self.ayarlar["guncelleme_onsurum"])))
+
+    def api_guncelleme_indir(self, onay: bool = False) -> dict:
+        return self._gunc(lambda: self.guncelleme.indir(onay=onay is True))
+
+    def api_guncelleme_duraklat(self) -> dict:
+        return self._gunc(self.guncelleme.duraklat)
+
+    def api_guncelleme_surdur(self) -> dict:
+        return self._gunc(self.guncelleme.surdur)
+
+    def api_guncelleme_iptal(self) -> dict:
+        return self._gunc(self.guncelleme.iptal)
+
+    def api_guncelleme_kur(self, onay: bool = False) -> dict:
+        """İkinci onay. Kurulum hazırlanır ve uygulama kapanmaya başlar; kurulum programı kapanış SONRASI başlar."""
+        d = self._gunc(lambda: self.guncelleme.kur(onay=onay is True, otomatik_baslat=bool(self.otomatik.etkin_mi())))
+        self.cikis_istegi = True
+        gunluk.log().info("güncelleme kurulumu onaylandı; uygulama kapanıyor")
+        return d
+
+    def api_guncelleme_bilgi(self, otomatik: bool = True) -> dict:
+        """Eski kurulumdan gelen kullanıcı için tek seferlik bilgilendirmeye verilen yanıt."""
+        self.ayarlar.guncelle(guncelleme_otomatik=bool(otomatik), guncelleme_bilgi_goruldu=True)
+        if otomatik:
+            self.acilista_guncelleme()
+        return self._gunc_durum()
 
     def api_saglik(self) -> dict:
         veri = self.ayarlar["veri_klasoru"]

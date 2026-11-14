@@ -45,3 +45,13 @@ CycloneDX JSON) bulunur. Paket **henüz kod imzalı değildir** ([docs/IMZA.md](
 indirdiğiniz dosyanın toplamını `SHA256SUMS.txt` ile karşılaştırmanız önemlidir. `SHA256SUMS.txt`
 paketle aynı yerden geldiği için, indirme sayfasının kendisi ele geçirilmişse tek başına kanıt değildir;
 bu sınır imzalama yapılana kadar sürer.
+
+**Uygulama içi güncelleme aynı sınırı taşır.** Uygulama yeni sürümü GitHub'daki herkese açık yayın listesinden
+öğrenir, kurulum paketini ve `SHA256SUMS.txt` dosyasını aynı sürüm sayfasından indirir ve yalnız bu toplamla doğrular.
+Paket imzalı olmadığı için bu doğrulama, indirme sırasında bozulmaya ya da yanlış dosyaya karşı korur; GitHub
+hesabının/yayının ele geçirilmesine karşı korumaz (saldırgan paketi ve toplamı birlikte değiştirebilir). Önlemler:
+yalnız https; yönlendirmelerde ana makine beyaz listesi (`api.github.com`, `github.com`, GitHub dosya
+depolaması); dosya adı katı kalıba uymalı (yol geçişi yok); dosya yalnız uygulamanın kendi klasörüne yazılır;
+indirme ve kurulum her biri ayrı kullanıcı onayı ister; kurulum öncesi dosya yeniden doğrulanır. Denetimi
+Ayarlar'dan kapatabilirsiniz; kapalıyken uygulama internete bağlanmaz. Bkz. [docs/AG-GARANTISI.md](docs/AG-GARANTISI.md)
+ve [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md) 2.6.

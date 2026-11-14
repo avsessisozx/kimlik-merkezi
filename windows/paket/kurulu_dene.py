@@ -87,7 +87,8 @@ kontrol(any(p.stem == "_base" for p in pys) and any(p.stem == "_win32" for p in 
         "pystray modülleri ayrı dosya (.pyc) olarak kurulu pakette (kullanıcı değiştirebilir)")
 
 # ---- uygulamayı başlat
-env = dict(os.environ, KIMLIK_AYAR_DIZINI=str(ayar), APPDATA=str(appdata), PYTHONIOENCODING="utf-8")
+# KIMLIK_GUNCELLEME=kapali: CI'da GitHub sürüm denetimi KAPALI (ağ izleyici hiçbir istisna tanımaz; ci_paket.ps1 de ayarlar)
+env = dict(os.environ, KIMLIK_AYAR_DIZINI=str(ayar), APPDATA=str(appdata), PYTHONIOENCODING="utf-8", KIMLIK_GUNCELLEME="kapali")
 env.pop("KIMLIK_VERI", None)
 surec = subprocess.Popen([str(APP), "--arka-plan"], env=env)
 calisan = ayar / "calisan.json"
@@ -134,6 +135,19 @@ try:
             "veritabanı ve klasörler oluştu: " + ", ".join(t["dosyalar"]))
     s = api("saglik")
     kontrol(s["ok"], "sağlık denetimi geçti\n" + s["metin"])
+
+    # güncelleme: ayar varsayılan AÇIK, ama ortam anahtarı kapalıyken HİÇ ağ erişimi olmaz (donmuş exe içinde de çalışıyor)
+    kontrol(api("ayarlar")["guncelleme_otomatik"] is True, "güncelleme denetimi ayarı varsayılan AÇIK (kullanıcı kapatabilir)")
+    gd = api("guncelleme_denetle")
+    kontrol(gd["durum"] == "kapali" and gd["kapali"] is True, "KIMLIK_GUNCELLEME=kapali: güncelleme denetimi ağa çıkmadı (durum: kapali)")
+    kontrol(api("guncelleme_durum")["durum"] == "kapali", "güncelleme durumu 'kapali' (indirme/kurulum da başlatılamaz)")
+    istek = urllib.request.Request(f"http://127.0.0.1:{port}/api/guncelleme_indir", json.dumps({"onay": False}).encode(),
+                                   {"Content-Type": "application/json", "X-Kimlik-Jeton": jeton})
+    try:
+        urllib.request.urlopen(istek, timeout=20)
+        kontrol(False, "onaysız indirme reddedilmeliydi")
+    except urllib.error.HTTPError as e:
+        kontrol(e.code == 400, f"onaysız indirme reddedildi (HTTP {e.code})")
 
     # dosya denetimi (arayüz ucu): sentinel rapora sızmamalı, veritabanına hiçbir şey eklenmemeli
     once = api("durum")["ozet"]["counts"]["event"]

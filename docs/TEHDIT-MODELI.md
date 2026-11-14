@@ -101,7 +101,16 @@ Tarayıcınızda açık başka bir sitenin, `127.0.0.1` üzerindeki Kimlik Merke
 - **Kalan risk: yüksek**, kapsam dışı (bkz. 4).
 
 ### 2.6 Yayın zinciri: sahte ya da değiştirilmiş kurulum paketi
-- **Önlemler:** Her yayında `SHA256SUMS.txt` ve SBOM; yayın işi, derlemede hesaplanan özetle yayınlanan dosyayı
+- **Uygulama içi güncelleme (bu özellikle eklendi):** Uygulama GitHub'daki herkese açık yayın listesine bağlanır
+  (`windows/.../guncelleme.py`, uygulamanın ağa çıkan TEK yolu; varsayılan açık, Ayarlar'dan kapatılır). Önlemler:
+  yalnız https, ana makine beyaz listesi (yönlendirmeler dahil), dosya adı kalıbı ve yalnız bu deponun
+  `releases/download/<etiket>/<dosya>` yolu, yalnız uygulamaya ait klasöre yazma, indirme ve kurulum için ayrı
+  kullanıcı onayları, kurulumdan hemen önce yeniden doğrulama, kurulum programı yalnız uygulama kapandıktan sonra
+  başlar. **Kalan risk:** doğrulama yalnız aynı sürüm sayfasındaki `SHA256SUMS.txt` iledir; GitHub hesabı ya da
+  yayın hattı ele geçirilirse saldırgan paketi ve toplamı birlikte değiştirebilir ve kullanıcı onay verirse kurulur
+  (imza yok). Sürüm denetimi isteği GitHub'a IP adresinizi gösterir. Bu risk, kullanıcı denetimi kapatarak ve
+  güncellemeleri elle doğrulayarak kaçınabileceği bir risktir.
+- **Önlemler (elle indirme):** Her yayında `SHA256SUMS.txt` ve SBOM; yayın işi, derlemede hesaplanan özetle yayınlanan dosyayı
   karşılaştırır ve yayından sonra dosyaları yeniden indirip doğrular (CI'da; bu belge yazılırken CI burada
   çalıştırılamadı, bkz. aşağıdaki not).
 - **Kalan risk:** Paket **kod imzalı değildir**; toplamlar paketle aynı yerden geldiği için yayın sayfasını
@@ -120,7 +129,7 @@ Tarayıcınızda açık başka bir sitenin, `127.0.0.1` üzerindeki Kimlik Merke
 | Erişim günlüğü; yazılamazsa veri verilmez | `access.py`, `service.py` |
 | Veri etiketleme ve "talimat değildir" uyarısı | `service.py`, `mcp/server.py` |
 | Yalnız `127.0.0.1`, Host/Origin denetimi, oturum jetonu, güvenlik başlıkları | `windows/.../web.py` |
-| Ağa çıkış yok testleri ve CI izleme | [AG-GARANTISI.md](AG-GARANTISI.md) |
+| Ağa çıkış yok testleri ve CI izleme; tek istisna olan güncelleme modülü (`guncelleme.py`) ve kilit testleri | [AG-GARANTISI.md](AG-GARANTISI.md) |
 | Kayıt içeriğinin günlüğe yazılmaması | `gunluk.py`, `hata_raporu.py` (kullanıcı adı maskelenir) |
 | Arşivler diske açılmaz, belge boyut sınırları | `importers/` |
 

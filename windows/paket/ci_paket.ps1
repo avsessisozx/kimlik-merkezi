@@ -6,6 +6,9 @@ $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
 $k = $PSScriptRoot
 Set-Location $k
+# CI'da uygulamanin GitHub surum denetimi KAPALI: ag izleyici hicbir istisna taniyamaz (docs/AG-GARANTISI.md).
+# Bu degisken kurulu uygulamaya, kurulum programinin yeniden actigi kopyaya ve alt sureclere de gecer.
+$env:KIMLIK_GUNCELLEME = 'kapali'
 $ozet = [ordered]@{ surum = $Surum; python = (python --version) }
 function Adim($m) { Write-Host "`n=== $m" -ForegroundColor Cyan }
 function Dene($m, [scriptblock]$b) { if (-not (& $b)) { throw "BAŞARISIZ: $m" } else { Write-Host "[tamam] $m" } }
@@ -129,6 +132,33 @@ Copy-Item $agCikti "$k\cikti\ag_sonuc.json" -Force
 $o = & "$hedef\kimlikmerkezi-mcp.exe" saglik --veri "$calisma\veri" 2>&1 | Out-String
 Write-Host $o
 Dene 'konsol exe sağlık komutu geçti (çıkış 0)' { $LASTEXITCODE -eq 0 }
+
+Adim 'Üstüne kurulum (uygulama içi güncelleme akışı): veri klasörü ve ayarlar korunmalı'
+Dene 'çalışan uygulama kalmadı (kurulumdan önce)' { -not (Get-Process -Name KimlikMerkezi, kimlikmerkezi-mcp -ErrorAction SilentlyContinue) }
+python veri_parmak.py yaz "$calisma\parmak.json" "$calisma\veri" "$calisma\ayar\ayarlar.json"
+Dene 'veri/ayar parmak izi alındı' { $LASTEXITCODE -eq 0 }
+# Gerçek bir sürüm yükseltmesi: aynı kaynaktan bir üst yama numarasıyla ikinci paket (çıktı klasörü ayrı: yayın işi ilk paketi seçer)
+if ($Surum -match '^(\d+)\.(\d+)\.(\d+)') { $Surum2 = "$($Matches[1]).$($Matches[2]).$([int]$Matches[3] + 1)" } else { $Surum2 = '99.0.0' }
+$yukselt = Join-Path $k 'yukselt'
+Remove-Item $yukselt -Recurse -Force -ErrorAction SilentlyContinue
+& $iscc "/DSurum=$Surum2" "/DKaynak=$dist" "/O$yukselt" KimlikMerkezi.iss
+if ($LASTEXITCODE) { throw 'iscc (yükseltme paketi)' }
+$kur2 = Get-Item "$yukselt\KimlikMerkezi-$Surum2-kurulum.exe"
+# Uygulamanın güncelleme sırasında çalıştırdığı bayraklar (guncelleme.py kurulum_komutu; girişte başlatma AÇIK senaryosu)
+$p2 = Start-Process $kur2.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=otobaslat', '/GUNCELLEME=1', "/LOG=$k\cikti\kur2.log" -Wait -PassThru
+$ozet['yukseltme_kurulum_cikis'] = $p2.ExitCode
+Dene 'üstüne kurulum çıkış kodu 0' { $p2.ExitCode -eq 0 }
+Dene 'kurulum kaydındaki sürüm yükseldi (Inno)' { (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object { $_.DisplayName -eq 'Kimlik Merkezi' } | Select-Object -First 1).DisplayVersion -eq $Surum2 }
+Dene 'program dosyaları yerinde' { (Test-Path "$hedef\KimlikMerkezi.exe") -and (Test-Path "$hedef\kimlikmerkezi-mcp.exe") }
+python veri_parmak.py denetle "$calisma\parmak.json"
+Dene 'veri klasörü ve ayarlar üstüne kurulumda AYNEN korundu (dosya adları, boyutlar, SHA-256)' { $LASTEXITCODE -eq 0 }
+# /GUNCELLEME=1 ile kurulum bitince uygulama yeniden açılır (kurulum programı açar; tepside/arka planda çalışır)
+$acildi = $false
+for ($i = 0; $i -lt 60 -and -not $acildi; $i++) { $acildi = [bool](Get-Process -Name KimlikMerkezi -ErrorAction SilentlyContinue); if (-not $acildi) { Start-Sleep -Milliseconds 500 } }
+Dene 'güncelleme bayrağıyla kurulum sonrası uygulama yeniden açıldı' { $acildi }
+Get-Process -Name KimlikMerkezi, kimlikmerkezi-mcp -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep 2
+Remove-Item $yukselt -Recurse -Force -ErrorAction SilentlyContinue
 
 Adim 'Kaldırma: varsayılan (veri KALMALI)'
 Kaldir @()

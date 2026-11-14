@@ -40,8 +40,16 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\KimlikMerkezi.exe"; Description: "{#AppAd} uygulamasını şimdi aç"; Flags: nowait postinstall skipifsilent
+; Uygulama içi güncelleme (guncelleme.py) kurulumu sessiz başlatır ve /GUNCELLEME=1 verir: 'postinstall' girdisi sessizde
+; çalışmaz, bu yüzden uygulama burada yeniden açılır. Normal (elle) sessiz kurulumda /GUNCELLEME yoktur: açılmaz.
+Filename: "{app}\KimlikMerkezi.exe"; Flags: nowait skipifdoesntexist; Check: GuncellemedenGeldi
 
 [Code]
+function GuncellemedenGeldi(): Boolean;
+begin
+  Result := (ExpandConstant('{param:GUNCELLEME|0}') = '1');
+end;
+
 procedure UygulamayiKapat();
 var
   kod: Integer;

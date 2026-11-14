@@ -59,6 +59,10 @@ details.nedir>summary{cursor:pointer;font-weight:600}
 .eklenemedi{border-left:4px solid var(--tehlike);padding:10px 12px;background:var(--panel);margin:8px 0}
 .eklendi-kutu{border-left:4px solid var(--ok);padding:10px 12px;background:var(--panel);margin:8px 0}
 .tablo-kap{overflow-x:auto}
+#guncelleme-kutu:empty{display:none}
+.guncelleme{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--cizgi);border-left:4px solid var(--vurgu)}
+.guncelleme.hata-kutu{border-left-color:var(--tehlike)}
+.guncelleme progress{margin:6px 0 2px}
 @media(max-width:700px){
  table.duyarli,table.duyarli tbody{display:block;width:100%}table.duyarli tr:first-child{display:none}
  table.duyarli tr{display:block;border:1px solid var(--cizgi);border-radius:8px;margin:0 0 8px;padding:4px 8px}
@@ -72,6 +76,7 @@ details.nedir>summary{cursor:pointer;font-weight:600}
 </head>
 <body>
 <header><h1>Kimlik Merkezi</h1><div class="kisi" id="kisi-kutu"></div><button class="i" id="rapor-dugme">Hata raporunu kopyala</button></header>
+<div id="guncelleme-kutu"></div>
 <div class="duzen"><nav id="nav"></nav><main id="ana"></main></div>
 <div id="kok-pencere"></div><div id="bildirim"></div>
 <script src="/statik/ortak.js"></script>
@@ -79,6 +84,7 @@ details.nedir>summary{cursor:pointer;font-weight:600}
 <script src="/statik/figur.js"></script>
 <script src="/statik/harita.js"></script>
 <script src="/statik/guvenlik.js"></script>
+<script src="/statik/guncelleme.js"></script>
 <script>
 "use strict";
 const JETON=document.querySelector('meta[name=kimlik-jeton]').content;
@@ -436,18 +442,19 @@ SF.ayar=async a=>{
   a.append(h('h2',{},'Ayarlar'),h('div',{class:'kart'},h('div',{class:'satir'},'Tema: ',tema),
     h('div',{class:'satir'},h('label',{},oto,' Windows açılışında otomatik başlat (tepside)')),
     h('div',{},'Veri klasörü: ',s.veri_klasoru),h('div',{class:'soluk'},'Veri klasörünü değiştirmek için uygulamayı kapatıp ayar dosyasını silin ya da destek rehberine bakın; veriler taşınmaz.')),
+    guncAyarKarti(s),
     h('div',{class:'kart'},h('button',{class:'t',onclick:async()=>{if(!confirm('Uygulama kapatılsın mı? Tepsi simgesi de kalkar.'))return;await api('cikis');document.body.textContent='Kimlik Merkezi kapatıldı. Bu sekmeyi kapatabilirsiniz.';}},'Uygulamadan çık')));
 };
 SF.hakkinda=async a=>{
   const r=await api('hakkinda');
   a.append(h('h2',{},'Hakkında'),h('div',{class:'kart'},h('div',{},`${r.ad} ${r.surum} (çekirdek ${r.cekirdek}, Python ${r.python})`),h('div',{},'Veri klasörü: '+r.veri_klasoru)),
-    h('div',{class:'kart'},h('h3',{},'Güvenlik ve gizlilik'),h('p',{},'Arayüz yalnızca bu bilgisayarda (127.0.0.1) çalışır; hiçbir şey internete açılmaz.'),h('p',{},r.sifreleme_notu),h('p',{class:'uyari'},r.smartscreen_notu)),
+    h('div',{class:'kart'},h('h3',{},'Güvenlik ve gizlilik'),h('p',{},'Arayüz yalnızca bu bilgisayarda (127.0.0.1) çalışır. Kimlik Merkezi\'nin internete çıkan tek yolu, Ayarlar\'dan kapatabileceğiniz GitHub sürüm denetimidir (indirme ve kurulum yalnız onayınızla); verileriniz hiçbir yere gönderilmez.'),h('p',{},r.sifreleme_notu),h('p',{class:'uyari'},r.smartscreen_notu)),
     h('div',{class:'kart'},h('h3',{},'Terimler sözlüğü'),h('dl',{class:'sozluk'},Object.values(SOZLUK).map(([ad,m])=>[h('dt',{},ad),h('dd',{},m)]).flat())),
     h('div',{class:'kart'},h('h3',{},'Lisanslar'),h('ul',{},r.lisanslar.map(x=>h('li',{},x)))));
 };
 // ------------------------------------------------------------------ ilk açılış sihirbazı
 async function sihirbaz(ac){
-  let adim=1,yol=ac.varsayilan_klasor,oto=true,son=null,kisiAd='Ben';
+  let adim=1,yol=ac.varsayilan_klasor,oto=true,guncOto=true,son=null,kisiAd='Ben';
   const ciz=()=>{
     const k=$('#kok-pencere');k.textContent='';let icerik;
     if(adim===1){const g=h('input',{type:'text',value:yol,oninput:e=>{yol=e.target.value;den();}});const sonuc=h('div',{});
@@ -461,10 +468,12 @@ async function sihirbaz(ac){
       setTimeout(den,0);}
     else if(adim===2){
       icerik=[h('p',{},'Seçtiğiniz klasör: '+yol),h('label',{},h('input',{type:'checkbox',checked:oto,onchange:e=>{oto=e.target.checked;}}),' Windows açılışında otomatik başlat (tepsi simgesiyle; sonra Ayarlar\'dan kapatılabilir)'),
+        h('div',{},h('label',{},h('input',{type:'checkbox',id:'sihirbaz-gunc',checked:guncOto,onchange:e=>{guncOto=e.target.checked;}}),' Açılışta yeni sürüm olup olmadığını denetle (varsayılan: açık)'),
+          h('div',{class:'soluk'},'Açıkken Kimlik Merkezi, açılışta GitHub\'ın herkese açık sürüm listesine bağlanıp "yeni sürüm var mı" diye sorar (IP adresiniz GitHub tarafından görülür; sürümünüz, adınız ve verileriniz gönderilmez). Bu, uygulamanın internete çıkan tek yoludur. Yeni sürüm bulunursa indirme ve kurulum yalnız sizin onayınızla yapılır. Kapatırsanız uygulama internete hiç bağlanmaz; Ayarlar\'dan istediğiniz zaman değiştirebilirsiniz.')),
         h('div',{class:'satir'},h('button',{class:'i',onclick:()=>{adim=1;ciz();}},'Geri'),h('button',{class:'d',onclick:async e=>{e.target.disabled=true;
-          son=await gParolaIleDene(p=>api('sihirbaz_tamamla',{yol,otomatik_baslat:oto,ad:kisiAd,parola:p}),'Seçtiğiniz klasörde parolayla korunan bir Kimlik Merkezi verisi var.').catch(x=>{if(!(x&&x.iptal))hataGoster(x);return null;});if(son){adim=3;ciz();}else ciz();}},'Kur')) ];}
+          son=await gParolaIleDene(p=>api('sihirbaz_tamamla',{yol,otomatik_baslat:oto,ad:kisiAd,parola:p,guncelleme_otomatik:guncOto}),'Seçtiğiniz klasörde parolayla korunan bir Kimlik Merkezi verisi var.').catch(x=>{if(!(x&&x.iptal))hataGoster(x);return null;});if(son){adim=3;ciz();}else ciz();}},'Kur')) ];}
     else{icerik=[h('p',{class:'tamam'},'Hazır. Kurulum tamamlandı.'),
-        h('ul',{class:'ozet-liste'},h('li',{},'Adınız: '+(kisiAd.trim()||'Ben')),h('li',{},'Veri klasörü: '+yol),h('li',{},'Windows açılışında otomatik başlama: '+(oto?'açık':'kapalı')+' (Ayarlar\'dan değiştirilebilir)'),
+        h('ul',{class:'ozet-liste'},h('li',{},'Adınız: '+(kisiAd.trim()||'Ben')),h('li',{},'Veri klasörü: '+yol),h('li',{},'Windows açılışında otomatik başlama: '+(oto?'açık':'kapalı')+' (Ayarlar\'dan değiştirilebilir)'),h('li',{id:'sihirbaz-gunc-ozet'},'Açılışta güncelleme denetimi: '+(guncOto?'açık (GitHub\'a yalnız sürüm sorusu gider; indirme/kurulum onayınızla)':'kapalı (internete hiç bağlanılmaz)')+' (Ayarlar\'dan değiştirilebilir)'),
           h('li',{},'Veritabanı ve alt klasörler oluşturuldu'+(son.dosyalar&&son.dosyalar.length?` (${son.dosyalar.length} dosya/klasör)`:'')+'.'),
           son.sifreli?h('li',{id:'sihirbaz-sifreleme'},'Şifreleme AÇIK (varsayılan): verileriniz diskte şifreli, anahtar Windows hesabınıza bağlı. Güvenlik sayfasından parola ekleyebilirsiniz.'):h('li',{id:'sihirbaz-sifreleme',class:'kotu'},'Şifreleme KAPALI: bu sistemde anahtar koruması (Windows DPAPI) yok; veriler diskte düz metin. Ayrıntı: Güvenlik sayfası.')),
         h('h3',{},'Sıradaki adımlar'),
@@ -482,7 +491,8 @@ async function start(){
   if(ac.mesgul){menu();$('#ana').textContent='';return gDonusumIzle();}
   if(ac.sihirbaz){menu();$('#ana').textContent='';return sihirbaz(ac);}
   await kisileriYukle();
-  git('harita');}
+  git('harita');
+  guncBaslat(ac);}
 menu();start().catch(hataGoster);
 </script>
 </body>

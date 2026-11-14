@@ -103,6 +103,7 @@ def calistir(arka_plan: bool) -> int:
         yonetici.baslangic_hatasi = f"{type(e).__name__}: {e}"
     sunucu = Sunucu(yonetici, int(yonetici.ayarlar["port"]))
     sunucu.baslat()
+    yonetici.acilista_guncelleme()   # ayar açıksa yalnız sürüm listesini sorar (güncelleme modülü); indirme/kurulum onay ister
     ayar_dizini().mkdir(parents=True, exist_ok=True)
     _calisan_dosyasi().write_text(json.dumps({"port": sunucu.port}), encoding="utf-8")
     gunluk.log().info("web arayüzü %s", sunucu.url)
@@ -142,6 +143,7 @@ def calistir(arka_plan: bool) -> int:
         except OSError:
             pass
         gunluk.log().info("kapandı")
+    yonetici.cikista_kurulum()   # onaylandıysa kurulum programı, uygulama tamamen kapandıktan SONRA başlar
     return 0
 
 

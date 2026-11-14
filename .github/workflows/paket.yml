@@ -90,6 +90,7 @@ jobs:
             windows/paket/cikti/ozet.json
             windows/paket/cikti/ag_sonuc.json
             windows/paket/cikti/kur.log
+            windows/paket/cikti/kur2.log
 
   yayin:
     # Paket yeşilse Release'i bu iş açar. Etiket zaten varsa (ya da etiket tetiğinde Release varsa) hata vermeden durur.

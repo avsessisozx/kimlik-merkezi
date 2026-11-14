@@ -4,6 +4,8 @@ A) Koruma düzeneğinin kendisi çalışıyor mu (yerel serbest, dış hedef eng
 B) Statik denetim: kaynak kodda harici bağlantı kütüphanesi / URL / CDN / telemetri yok;
    izinli istisnalar AÇIKÇA listelenmiştir. Yeni bir istisna eklemek bilinçli bir karar olmalıdır.
 C) Yerel web arayüzü dosyalarında (windows/.../statik) harici URL yok.
+D) Güncelleme istisnası (windows/src/kimlikwin/guncelleme.py) DAR ve kilitli: tek modül, tek ağ çağrısı, sabit ana makine
+   listesi, yalnız https; başka bir modül ağ açarsa test kırmızı olur.
 """
 from __future__ import annotations
 
@@ -37,7 +39,8 @@ def test_yerel_hedefler_serbest(host):
     assert ag_koruma.yerel_mi(host)
 
 
-@pytest.mark.parametrize("host", ["example.com", "8.8.8.8", "192.0.2.1", "0.0.0.0", "::ffff:8.8.8.8"])
+@pytest.mark.parametrize("host", ["example.com", "8.8.8.8", "192.0.2.1", "0.0.0.0", "::ffff:8.8.8.8",
+                                  "api.github.com", "github.com", "objects.githubusercontent.com"])
 def test_yerel_olmayan_hedefler_yerel_sayilmaz(host):
     assert not ag_koruma.yerel_mi(host)
 
@@ -139,6 +142,9 @@ IZINLI_ISTISNALAR = {
         "yalnız 127.0.0.1'e bind ederek boş port bulma; dış bağlantı yok",
     ("windows/src/kimlikwin/uygulama.py", "urllib.request"):
         "yalnız http://127.0.0.1:<port>/saglik (kendi yerel sunucusunu yoklar)",
+    ("windows/src/kimlikwin/guncelleme.py", "urllib.request"):
+        "UYGULAMANIN TEK DIŞ AĞ YOLU: GitHub sürüm denetimi/indirme (api.github.com + release dosyaları); "
+        "kullanıcı kapatabilir, indirme/kurulum yalnız onayla. Sınırları test_guncelleme_istisnasi_dar kilitler",
     ("windows/src/kimlikwin/uygulama.py", "webbrowser"):
         "yalnız kendi yerel adresini (sunucu.url = http://127.0.0.1:<port>/) kullanıcının tarayıcısında açar",
 }
@@ -176,17 +182,23 @@ def _yasak_mi(modul: str) -> str | None:
     return None
 
 
-def test_kaynakta_yasak_ag_modulu_yok():
+def _modul_ihlalleri(dosyalar):
+    """dosyalar: [(Path, kök'e göre ad)] -> (ihlal iletileri, kullanılan istisna anahtarları)."""
     ihlaller, kullanilan = [], set()
-    for yol in _py_dosyalari():
+    for yol, ad in dosyalar:
         for m in set(_ice_aktarilanlar(yol)):
             y = _yasak_mi(m)
             if y is None:
                 continue
-            anahtar = (_goreli(yol), y)
+            anahtar = (ad, y)
             kullanilan.add(anahtar)
             if anahtar not in IZINLI_ISTISNALAR:
                 ihlaller.append(f"{anahtar[0]}: '{m}' içe aktarıyor")
+    return ihlaller, kullanilan
+
+
+def test_kaynakta_yasak_ag_modulu_yok():
+    ihlaller, kullanilan = _modul_ihlalleri([(y, _goreli(y)) for y in _py_dosyalari()])
     assert not ihlaller, "izinsiz ağ modülü (gerekçeyle IZINLI_ISTISNALAR'a eklenmeli):\n" + "\n".join(ihlaller)
     eskimis = set(IZINLI_ISTISNALAR) - kullanilan
     assert not eskimis, f"artık gerekmeyen istisnalar listeden silinmeli: {sorted(eskimis)}"
@@ -223,6 +235,8 @@ IZINLI_URL_SUNUCU = {"127.0.0.1", "localhost", "[::1]"}
 # Python kaynağında başka URL de yasak; belgeleme amaçlı bir tane gerekirse buraya (dosya, sunucu) yazın.
 IZINLI_PY_URL: dict[tuple[str, str], str] = {
     ("windows/src/kimlikwin/web.py", "{adres"): "f-dizgesi http://{ADRES}:port ; ADRES = '127.0.0.1' (ayrı testle doğrulanır)",
+    ("windows/src/kimlikwin/guncelleme.py", "api.github.com"): "sürüm listesi (AgPolitikasi.api_taban varsayılanı)",
+    ("windows/src/kimlikwin/guncelleme.py", "github.com"): "release dosyası adresi (AgPolitikasi.site_taban varsayılanı)",
 }
 YASAK_ALAN_ADLARI = ("cdn.", "googleapis", "gstatic", "jsdelivr", "unpkg", "cloudflare", "cdnjs",
                      "googletagmanager", "google-analytics", "doubleclick", "sentry", "segment.",
@@ -234,15 +248,20 @@ def _sunucu(url: str) -> str:
         if not url.split("://", 1)[1].startswith("[") else "[::1]"
 
 
-def test_kaynakta_harici_url_veya_cdn_yok():
+def _url_ihlalleri(dosyalar):
     ihlaller = []
-    for yol in _py_dosyalari():
+    for yol, ad in dosyalar:
         for m in URL_RE.finditer(yol.read_text(encoding="utf-8")):
             url = m.group(0)
             host = _sunucu(url).lower()
-            if host in IZINLI_URL_SUNUCU or (_goreli(yol), host) in IZINLI_PY_URL:
+            if host in IZINLI_URL_SUNUCU or (ad, host) in IZINLI_PY_URL:
                 continue
-            ihlaller.append(f"{_goreli(yol)}: {url}")
+            ihlaller.append(f"{ad}: {url}")
+    return ihlaller
+
+
+def test_kaynakta_harici_url_veya_cdn_yok():
+    ihlaller = _url_ihlalleri([(y, _goreli(y)) for y in _py_dosyalari()])
     assert not ihlaller, "Python kaynağında harici URL:\n" + "\n".join(ihlaller)
     # CDN / telemetri adları URL biçiminde olmasa bile (yalnız ad) geçmesin
     for yol in _py_dosyalari():
@@ -259,7 +278,7 @@ IZINLI_STATIK_URL = {
     "www.apache.org",      # lisans metni
     "github.com",          # ECHARTS-LICENSE / zrender LICENSE yorumları (yalnız metin)
 }
-ARAYUZ_DOSYALARI = ("index.html", "harita.js", "figur.js", "harita.css")
+ARAYUZ_DOSYALARI = ("index.html", "harita.js", "figur.js", "harita.css", "guncelleme.js")
 
 
 def _statik_dosyalar():
@@ -331,3 +350,101 @@ def test_paket_ci_ag_izleme_adimi_bagli():
     assert "ci_paket.ps1" in yml and "ag_sonuc.json" in yml
     yaml = pytest.importorskip("yaml")
     assert "jobs" in yaml.safe_load(yml)
+
+
+# ---------------------------------------------------------------- E) güncelleme istisnası dar ve kilitli
+
+GUNCELLEME = "windows/src/kimlikwin/guncelleme.py"
+BEKLENEN_ANA_MAKINELER = ("api.github.com", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com")
+
+
+def test_baska_modul_ag_acarsa_test_kirmizi(tmp_path):
+    """Denetim gerçekten ısırıyor mu: izinli listede olmayan her modül (adı ne olursa olsun) ağ açınca ihlal sayılır."""
+    ornekler = {
+        "windows/src/kimlikwin/kotu1.py": "import urllib.request\nurllib.request.urlopen('https://example.com')\n",
+        "windows/src/kimlikwin/kotu2.py": "from urllib import request\n",
+        "server/src/kimlikserver/kotu3.py": "import requests\n",
+        "core/src/kimlikcore/kotu4.py": "__import__('http.client')\n",
+        "windows/src/kimlikwin/kotu5.py": "import importlib\nimportlib.import_module('socket')\n",
+        "importers/src/kimlikimport/guncelleme.py": "import urllib.request\n",          # aynı AD, başka klasör: izin yok
+        GUNCELLEME.replace("guncelleme.py", "guncelleme_kopya.py"): "import urllib.request\n",
+        "windows/src/kimlikwin/kotu6.py": "import ssl\n",
+    }
+    dosyalar = []
+    for ad, kod in ornekler.items():
+        yol = tmp_path / ad.replace("/", "_")
+        yol.write_text(kod, encoding="utf-8")
+        dosyalar.append((yol, ad))
+    ihlaller, _ = _modul_ihlalleri(dosyalar)
+    assert len(ihlaller) == len(ornekler), ihlaller
+    # istisna YALNIZ guncelleme.py + urllib.request için geçerli: aynı dosya adıyla socket/ssl ya da http.client yine ihlal
+    yol = tmp_path / "g.py"
+    yol.write_text("import urllib.request\nimport socket\nimport ssl\nimport http.client\n", encoding="utf-8")
+    ihlaller, kullanilan = _modul_ihlalleri([(yol, GUNCELLEME)])
+    assert len(ihlaller) == 3 and (GUNCELLEME, "urllib.request") in kullanilan
+    # harici URL de başka modülde yasak, guncelleme.py'de yalnız iki sabit ana makine serbest
+    yol.write_text("A = 'https://api.github.com'\nB = 'https://evil.example/x'\nC = 'https://github.com'\n", encoding="utf-8")
+    assert len(_url_ihlalleri([(yol, GUNCELLEME)])) == 1
+    assert len(_url_ihlalleri([(yol, "windows/src/kimlikwin/baska.py")])) == 3
+
+
+def test_guncelleme_istisnasi_dar():
+    from kimlikwin import guncelleme as G
+    kaynak = (KOK / GUNCELLEME).read_text(encoding="utf-8")
+    agac = ast.parse(kaynak)
+    # 1) ana makine listesi sabit (genişletmek bilinçli karar: bu testi de değiştirmeyi gerektirir) ve yalnız https
+    assert G.IZINLI_ANA_MAKINELER == BEKLENEN_ANA_MAKINELER
+    assert G.URETIM.izinli == BEKLENEN_ANA_MAKINELER and G.URETIM.https_zorunlu is True
+    assert G.URETIM.api_taban == "https://api.github.com" and G.URETIM.site_taban == "https://github.com"
+    assert G.DEPO == "avsessisozx/kimlik-merkezi" and G.KULLANICI_AJANI == "KimlikMerkezi-guncelleme"
+    # 2) tek modülde yalnız urllib.request (socket/ssl/http.client/requests yok)
+    yasaklar = {y for m in _ice_aktarilanlar(KOK / GUNCELLEME) if (y := _yasak_mi(m))}
+    assert yasaklar == {"urllib.request"}, yasaklar
+    # 3) TEK ağ çağrısı: opener.open(...) bir yerde; urlopen / başka açma çağrısı yok
+    acmalar = [n for n in ast.walk(agac) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr in ("open", "urlopen", "request", "getresponse")]
+    assert len(acmalar) == 1 and isinstance(acmalar[0].func.value, ast.Attribute) and acmalar[0].func.value.attr == "_opener", \
+        [ast.unparse(n) for n in acmalar]
+    assert "urlopen" not in kaynak
+    # 4) ağ kapatma anahtarı ve adres denetimi o tek çağrıdan önce
+    govde = kaynak[kaynak.index("def _ac("):kaynak.index("def _oku_sinirli(")]
+    assert govde.index("kapali_mi()") < govde.index("adres_denetle(") < govde.index("self._opener.open(")
+    assert "User-Agent" in govde and "Cookie" not in kaynak and "Authorization" not in kaynak and "Referer" not in kaynak
+    # 5) test politikası (https_zorunlu=False, başka ana makine) yalnız testlerde: uygulama kaynağında hiçbir yerde yok
+    for yol in _py_dosyalari():
+        if _goreli(yol) == GUNCELLEME:
+            continue
+        k = yol.read_text(encoding="utf-8")
+        assert "AgPolitikasi" not in k and "https_zorunlu" not in k and "politika=" not in k, _goreli(yol)
+    assert "https_zorunlu=False" not in kaynak.replace("https_zorunlu: bool = True", "")
+    # 6) guncelleme.py'yi yalnız Yonetici kullanır; ağ işlevlerini (denetle/indir/surdur) başka modül çağırmaz
+    for yol in _py_dosyalari():
+        ad = _goreli(yol)
+        k = yol.read_text(encoding="utf-8")
+        if ad not in (GUNCELLEME, "windows/src/kimlikwin/yonetici.py"):
+            assert not re.search(r"\bguncelleme\b", k.replace("guncelleme_", "")) or ad.startswith("windows/src/kimlikwin/statik"), ad
+    yon = (KOK / "windows/src/kimlikwin/yonetici.py").read_text(encoding="utf-8")
+    assert re.findall(r"guncelleme\.(denetle|indir|surdur)\(", yon) and "onay=onay is True" in yon
+
+
+def test_arayuz_guncelleme_ana_makinesi_icermez():
+    """Arayüz GitHub'a doğrudan bağlanamaz: ana makine adı yalnız guncelleme.py'de; arayüz yalnız yerel /api/ uçlarını kullanır."""
+    for yol in _statik_dosyalar():
+        if yol.suffix in (".js", ".html", ".css"):
+            metin = yol.read_text(encoding="utf-8", errors="replace")
+            if yol.name == "echarts.min.js":
+                continue
+            assert "api.github.com" not in metin and "githubusercontent" not in metin, yol.name
+    js = (STATIK / "guncelleme.js").read_text(encoding="utf-8")
+    assert "fetch(" not in js and "XMLHttpRequest" not in js and not re.search(r"https?://", js)
+
+
+def test_ci_guncelleme_denetimi_kapali_ve_izleyici_siki():
+    """CI: kurulu uygulama KIMLIK_GUNCELLEME=kapali ile çalışır; ağ izleyici istisna TANIMAZ (dış bağlantı = hata)."""
+    ps = (KOK / "windows/paket/ci_paket.ps1").read_text(encoding="utf-8")
+    izle = (KOK / "windows/paket/ag_izle.ps1").read_text(encoding="utf-8")
+    dene = (KOK / "windows/paket/kurulu_dene.py").read_text(encoding="utf-8")
+    assert "KIMLIK_GUNCELLEME" in ps and "KIMLIK_GUNCELLEME" in dene
+    kod = "\n".join(s for s in izle.splitlines() if not s.lstrip().startswith("#")).lower()   # yorumlar hariç
+    assert "github" not in kod and "githubusercontent" not in kod, "ağ izleyiciye GitHub istisnası eklenmemeli"
+    assert "/GUNCELLEME=1" in ps and "veri_parmak.py" in ps          # üstüne kurulumda veri klasörü korunuyor mu adımı

@@ -15,6 +15,9 @@ VARSAYILAN: dict[str, Any] = {
     "otomatik_baslat": True,     # kurulumda açık; Ayarlar'dan kapatılır
     "kisiler": [],               # [{"id","ad","klasor"}]: her kişi ayrı veri klasörü
     "secili_kisi": None,
+    "guncelleme_otomatik": True,        # açılışta GitHub'da yeni sürüm denetle (VARSAYILAN AÇIK; kapatılabilir)
+    "guncelleme_onsurum": True,         # ön sürümleri de dikkate al (proje ön sürüm aşamasında)
+    "guncelleme_bilgi_goruldu": False,  # kullanıcı denetim bilgisini gördü mü (görmeden otomatik denetim yapılmaz)
     "port": 47821,               # tercih edilen yerel port; doluysa boş bir port seçilir
 }
 TEMALAR = ("sistem", "acik", "koyu")

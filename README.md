@@ -24,8 +24,9 @@ Windows uygulaması.
 
 ## Ne OLMADIĞI
 
-- Bir bulut hizmeti, hesap ya da senkronizasyon aracı **değildir**. Sunucumuz yok; telemetri, güncelleme
-  yoklaması ve hata raporu gönderimi yok.
+- Bir bulut hizmeti, hesap ya da senkronizasyon aracı **değildir**. Sunucumuz yok; telemetri ve hata raporu
+  gönderimi yok. Tek istisna, GitHub'daki herkese açık yayın listesine bakan **güncelleme denetimidir** (aşağıda
+  "Gizlilik ve yerel çalışma sözü"); kapatabilirsiniz, indirme/kurulum yalnız onayınızla yapılır.
 - Her şeyi şifrelemez ve kötü amaçlı yazılıma karşı koruma değildir: aşağıdaki "Şifreleme" bölümü neyin
   şifrelendiğini ve neyin ŞİFRELENMEDİĞİNİ açıkça yazar. Ek önlem olarak veri klasörünü BitLocker/VeraCrypt gibi
   şifreli bir birimde tutmanız önerilir. Ayrıntı: [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md).
@@ -74,10 +75,20 @@ Teknik ayrıntı ve sınırlar: [docs/SIFRELEME.md](docs/SIFRELEME.md).
 
 ## Gizlilik ve yerel çalışma sözü
 
-Kimlik Merkezi'nin kendi kodu internete bağlanmaz. Tek ağ kullanımı yalnızca `127.0.0.1` üzerinde dinleyen
+Kimlik Merkezi'nin kendi kodu, **tek bir istisna dışında**, internete bağlanmaz: Windows uygulaması
+**güncelleme denetimi** için GitHub'a (`api.github.com`; indirme olursa `github.com` ve GitHub'ın dosya depolama
+adresleri) bağlanabilir. Bu denetim **varsayılan olarak AÇIKTIR** (uygulama açılırken "yeni sürüm var mı?" diye
+sorar; ilk açılış sihirbazında ve Ayarlar'da açıkça yazılıdır) ve Ayarlar'dan **kapatılabilir**; kapalıyken ve
+"Güncellemeleri denetle" düğmesine basmadıkça uygulama internete hiç bağlanmaz. Gönderilen tek şey sürüm listesi
+isteğidir: genel bir kullanıcı ajanı (`KimlikMerkezi-guncelleme`), sürümünüz, adınız ya da verileriniz yok (IP
+adresiniz GitHub tarafından görülür). Yeni sürüm bulunursa **önce sorulur**; indirme yalnız onaylarsanız
+başlar (ilerleme çubuğu, duraklat/devam, iptal; SHA-256 ile doğrulanır) ve kurulum için **ikinci bir onay**
+istenir. Paket imzasız olduğundan doğrulama yalnız aynı sürüm sayfasındaki `SHA256SUMS.txt` ile yapılır
+(ayrıntı ve sınırı: [SECURITY.md](SECURITY.md)). Bunun dışında tek ağ kullanımı `127.0.0.1` üzerinde dinleyen
 yerel web arayüzüdür; MCP sunucusu ağ yerine standart girdi/çıktı kullanır. Bu söz otomatik testlerle, kaynak
-denetimiyle ve Windows paket CI'sındaki bağlantı izlemesiyle sınanır; sınırları (neleri garanti ETMEDİĞİMİZ
-dahil) açıkça yazılıdır: [docs/AG-GARANTISI.md](docs/AG-GARANTISI.md).
+denetimiyle (istisna tek dosyaya ve sabit ana makine listesine kilitlidir) ve Windows paket CI'sındaki
+bağlantı izlemesiyle sınanır; sınırları (neleri garanti ETMEDİĞİMİZ dahil) açıkça yazılıdır:
+[docs/AG-GARANTISI.md](docs/AG-GARANTISI.md).
 Güvenlik varsayımları ve kalan riskler: [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md).
 Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md).
 
@@ -88,12 +99,19 @@ Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md).
 1. GitHub'daki "Releases" bölümünden `KimlikMerkezi-Kurulum-v….exe` ve `SHA256SUMS.txt` dosyalarını indirin.
 2. Bütünlüğü doğrulayın (PowerShell). Çıkan değer `SHA256SUMS.txt` içindeki satırla aynı olmalıdır:
    `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.1.exe -Algorithm SHA256`
-3. Çalıştırın. Paket **imzasız** olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı
+3. Çalıştırın. (Uygulama içinden güncelliyorsanız bu adımlar kendiliğinden yapılır: aşağıdaki "Uygulama içi güncelleme".) Paket **imzasız** olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı
    gösterebilir; yalnızca özeti doğruladıysanız "Ek bilgi > Yine de çalıştır" deyin.
 4. Yayınlarda ayrıca yazılım malzeme listesi (SBOM, CycloneDX JSON) bulunur; hangi bileşenlerin ve
    lisansların pakete girdiğini gösterir.
 
 Kaldırırken kişisel verileriniz varsayılan olarak **silinmez**; silmek isteyip istemediğiniz sorulur.
+
+**Uygulama içi güncelleme** (Windows): yeni sürüm bulunursa "Yeni sürüm X var, indirmek ister misin?" diye sorulur.
+Onaylarsanız kurulum dosyası indirilir (ilerleme, kalan süre, duraklat/devam, iptal), `SHA256SUMS.txt` ile
+doğrulanır (uyuşmazsa dosya silinir ve hata gösterilir) ve **"Şimdi kurmak ister misin?"** diye ikinci kez sorulur.
+Onaylarsanız uygulama kapanır, kurulum sessizce yapılır ve Kimlik Merkezi yeniden açılır; veri klasörünüze ve
+ayarlarınıza dokunulmaz. Denetimi Ayarlar > Güncellemeler bölümünden kapatabilir ya da elle başlatabilirsiniz.
+Gerçek Windows üzerinde uçtan uca denenmedi; neyin doğrulandığı için bkz. `windows/paket/surum-notu.md`.
 
 **Kaynaktan** (Python 3.12 veya üstü):
 

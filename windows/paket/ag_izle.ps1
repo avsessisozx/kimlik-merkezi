@@ -2,6 +2,8 @@
 # Kimlik Merkezi sureclerinin TCP baglantilarini yoklar; 127.0.0.1 / ::1 disinda uzak adres gorurse kaydeder.
 # SINIRLAR (docs/AG-GARANTISI.md): yoklama (ornekleme) yapar; yoklama araligindan kisa omurlu baglanti kacabilir.
 # UDP ve DNS sorgulari surecle eslenemez. Tek basina "hic baglanmadi" kaniti degildir.
+# GUNCELLEME ISTISNASI YOK: uygulamanin GitHub surum denetimi CI'da KIMLIK_GUNCELLEME=kapali ile kapatilir
+# (ci_paket.ps1); bu yuzden 127.0.0.1 disindaki HER baglanti, GitHub'a olsa bile, ihlal sayilir.
 # Her durumda (hata dahil) -Cikti dosyasina JSON yazar. -Hazir dosyasi ilk yoklamadan hemen once yazilir.
 # Her iki dosya ATOMIK yazilir (once gecici dosya, sonra yeniden adlandirma): okuyan taraf yari/bos dosya gormez.
 param(
