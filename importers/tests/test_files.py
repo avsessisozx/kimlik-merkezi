@@ -81,15 +81,16 @@ def tree(tmp_path):
             os.utime(p, (1709287200, 1709287200))
     return r
 
-# belge: not, csv, bin(diğer), rapor, taranmış, bozuk, mektup = 7 dosya.kayit; foto 2 + video 2 = 4 medya; konum 2
-EXPECT = 7 + 4 + 2
+# belge: not, csv, bin(yalnız kayıt), rapor, taranmış(yalnız kayıt), mektup = 6 dosya.kayit (bozuk.pdf ATLANIR, kayıt yok);
+# foto 2 + video 2 = 4 medya; konum 2
+EXPECT = 6 + 4 + 2
 
 
 def test_kayit_sayisi_ve_kategoriler(hub, tree):
     r = run(hub, tree, "computer_files")
     assert (r.parsed, r.added, r.duplicate) == (EXPECT, EXPECT, 0)
     ev = hub.timeline(limit=100)
-    assert Counter(e.category for e in ev) == {"dosyalar": 7, "medya_meta": 4, "konum": 2}
+    assert Counter(e.category for e in ev) == {"dosyalar": 6, "medya_meta": 4, "konum": 2}
     assert Counter(e.kind for e in ev)["dosya.konum"] == 2
     assert r.raw_files == []  # dosyalar yerinde kalır, ham arşive kopyalanmaz
 
@@ -101,7 +102,8 @@ def test_metin_cikarma_ve_arama(hub, tree):
     assert hub.search("ISIK istanbul", categories=["dosyalar"])
     st = {e.payload["ad"]: e.payload["metin_durumu"] for e in hub.timeline(categories=["dosyalar"], limit=50)}
     assert st["rapor.pdf"] == st["mektup.docx"] == st["not.txt"] == "var"
-    assert st["taranmis.pdf"] == "yok" and st["bozuk.pdf"] == "hata" and st["ikili.bin"] == "uygulanmaz"
+    assert st["taranmis.pdf"] == "yok" and st["ikili.bin"] == "uygulanmaz"
+    assert "bozuk.pdf" not in st  # bozuk dosya atlanır; nedeni raporda (test_ozet_*)
     assert not hub.search("gizli klasor icerigi") and not hub.search("atlanmali")
 
 

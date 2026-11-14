@@ -64,8 +64,12 @@ def _fact(f) -> dict[str, Any]:
 class IceAktarmaIsi:
     """Arka planda çalışan tek içe aktarma. Durum ilerleme çubuğu için sorgulanır."""
 
-    def __init__(self, yol: str, tur: str | None, yine_de: bool):
+    def __init__(self, yol: str, tur: str | None, yine_de: bool, yollar: list[str] | None = None):
         self.yol, self.tur, self.yine_de = yol, tur, yine_de
+        self.yollar = yollar                # birden çok dosya/klasör seçimi (yalnız computer_files)
+        self.dosya_islenen = 0              # dosya taraması yapan içe aktarıcılar için ilerleme
+        self.dosya_toplam = 0
+        self.dosya_ozeti: dict | None = None
         self.durum = "calisiyor"         # calisiyor | bitti | hata
         self.asama = "dogrula"
         self.sayi = 0
@@ -79,11 +83,17 @@ class IceAktarmaIsi:
         with self._kilit:
             return {"durum": self.durum, "asama": self.asama, "sayi": self.sayi, "yol": self.yol,
                     "sonuc": self.sonuc, "hata": self.hata, "hata_kodu": self.hata_kodu,
-                    "bicim_raporu": self.biçim_raporu}
+                    "bicim_raporu": self.biçim_raporu, "yollar": self.yollar,
+                    "dosya_islenen": self.dosya_islenen, "dosya_toplam": self.dosya_toplam,
+                    "dosya_ozeti": self.dosya_ozeti}
 
     def ilerleme(self, asama: str, sayi: int) -> None:
         with self._kilit:
             self.asama, self.sayi = asama, sayi
+
+    def dosya_ilerleme(self, islenen: int, toplam: int) -> None:
+        with self._kilit:
+            self.dosya_islenen, self.dosya_toplam = islenen, toplam
 
 
 class Uygulama:
@@ -198,42 +208,53 @@ class Uygulama:
     def turler(self) -> dict:
         return {"turler": registry.names()}
 
-    def ice_aktar_baslat(self, yol: str, tur: str | None = None, yine_de: bool = False) -> dict:
+    def ice_aktar_baslat(self, yol: str = "", tur: str | None = None, yine_de: bool = False,
+                         yollar: list[str] | None = None) -> dict:
         yol = (yol or "").strip().strip('"')
+        if yollar:
+            yollar = [str(y).strip().strip('"') for y in yollar if str(y).strip()]
+            if len(yollar) > 1 and tur not in ("computer_files", "dosyalar"):
+                raise IslemHatasi("Birden çok dosya/klasör yalnız \"Bilgisayarımdaki dosyalar\" ile eklenebilir.")
+            yol = yol or (yollar[0] if len(yollar) == 1 else f"{len(yollar)} öğe")
+            if len(yollar) == 1:
+                yollar = None
+        else:
+            yollar = None
         if not yol:
             raise IslemHatasi("Bir dosya ya da klasör yolu yazın ya da seçin.")
         with self._is_kilit:
             if self.is_ and self.is_.durum == "calisiyor":
                 raise IslemHatasi("Başka bir içe aktarma sürüyor.", "mesgul")
-            is_ = IceAktarmaIsi(yol, tur or None, bool(yine_de))
+            is_ = IceAktarmaIsi(yol, tur or None, bool(yine_de), yollar)
             self.is_ = is_
-        self._is_dosyasi({"yol": yol, "tur": tur, "durum": "calisiyor"})
+        self._is_dosyasi({"yol": yol, "yollar": yollar, "tur": tur, "durum": "calisiyor"})
         threading.Thread(target=self._ice_aktar_is, args=(is_,), daemon=True, name="ice-aktar").start()
         return is_.to_dict()
 
     def _ice_aktar_is(self, is_: IceAktarmaIsi) -> None:
         try:
-            r = ice_aktar_calistir(self.hub, is_.yol, is_.tur, yine_de=is_.yine_de, progress=is_.ilerleme)
+            r = ice_aktar_calistir(self.hub, is_.yollar or is_.yol, is_.tur, yine_de=is_.yine_de,
+                                   progress=is_.ilerleme, file_progress=is_.dosya_ilerleme)
             with is_._kilit:
-                is_.sonuc, is_.durum = str(r), "bitti"
-            self._is_dosyasi({"yol": is_.yol, "tur": is_.tur, "durum": "bitti"})
+                is_.sonuc, is_.durum, is_.dosya_ozeti = str(r), "bitti", r.files
+            self._is_dosyasi({"yol": is_.yol, "yollar": is_.yollar, "tur": is_.tur, "durum": "bitti"})
             gunluk.log().info("içe aktarma bitti: %s eklenen=%d tekrar=%d", r.importer, r.added, r.duplicate)
         except ImportFormatError as e:
             with is_._kilit:
                 is_.durum, is_.hata_kodu = "hata", "bicim"
                 is_.hata, is_.biçim_raporu = "Bu dosya beklenen biçimde değil.", e.report.to_text()
-            self._is_dosyasi({"yol": is_.yol, "tur": is_.tur, "durum": "hata"})
+            self._is_dosyasi({"yol": is_.yol, "yollar": is_.yollar, "tur": is_.tur, "durum": "hata"})
             gunluk.log().warning("içe aktarma: biçim uygun değil (%s)", e.report.importer)
         except FormatError as e:
             kod = "daha_once_silinmis" if "kalıcı sildiniz" in str(e) else "hata"
             with is_._kilit:
                 is_.durum, is_.hata, is_.hata_kodu = "hata", str(e), kod
-            self._is_dosyasi({"yol": is_.yol, "tur": is_.tur, "durum": "hata"})
+            self._is_dosyasi({"yol": is_.yol, "yollar": is_.yollar, "tur": is_.tur, "durum": "hata"})
             gunluk.log().warning("içe aktarma hatası: %s", type(e).__name__)
         except Exception as e:  # beklenmeyen; ayrıntı günlükte (içerik yok)
             with is_._kilit:
                 is_.durum, is_.hata, is_.hata_kodu = "hata", f"Beklenmeyen hata: {type(e).__name__}: {e}", "beklenmeyen"
-            self._is_dosyasi({"yol": is_.yol, "tur": is_.tur, "durum": "hata"})
+            self._is_dosyasi({"yol": is_.yol, "yollar": is_.yollar, "tur": is_.tur, "durum": "hata"})
             gunluk.log().error("içe aktarma beklenmeyen hata: %s", type(e).__name__)
 
     def ice_aktar_durum(self) -> dict:

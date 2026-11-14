@@ -174,13 +174,14 @@ class Yonetici:
     def _ice_aktar_suruyor(self) -> bool:
         return bool(self.uygulama and self.uygulama.is_ and self.uygulama.is_.durum == "calisiyor")
 
-    def api_ice_aktar_baslat(self, yol: str, tur: str | None = None, yine_de: bool = False) -> dict:
+    def api_ice_aktar_baslat(self, yol: str = "", tur: str | None = None, yine_de: bool = False,
+                             yollar: list[str] | None = None) -> dict:
         """Uygulama.ice_aktar_baslat'a gider; yalnız tanila ile aynı anda çalışmasın (paylaşılan arşiv önbelleği)."""
         if self.uygulama is None:
             raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
         if self.tanila is not None and self.tanila.canli:
             raise IslemHatasi("Bir dosya denetimi sürüyor; bitmesini bekleyin.", "mesgul")
-        return self.uygulama.ice_aktar_baslat(yol, tur, yine_de)
+        return self.uygulama.ice_aktar_baslat(yol, tur, yine_de, yollar)
 
     def api_tanila_baslat(self, yol: str, adlari_goster: bool = False, ayrinti: bool = False) -> dict:
         """Dosyanın içeriksiz yapı raporunu arka planda üretir. Veritabanına yazmaz, kilit gerektirmez."""
@@ -275,9 +276,11 @@ class Yonetici:
             raise IslemHatasi(f"{kisi['ad']} okunamadı: {e}", "kisi_acilamadi") from None
 
     def api_sec(self, tur: str) -> dict:
-        if tur not in ("dosya", "klasor"):
+        if tur not in ("dosya", "klasor", "dosyalar"):
             raise IslemHatasi("Geçersiz seçim türü.")
-        return {"yol": self.secici(tur)}
+        secim = self.secici(tur)
+        yollar = [y for y in (secim or "").split("\n") if y.strip()] if tur == "dosyalar" else []
+        return {"yol": yollar[0] if yollar else secim, "yollar": yollar}
 
     def api_sihirbaz_denetle(self, yol: str) -> dict:
         return veri_klasoru.denetle(yol).to_dict()

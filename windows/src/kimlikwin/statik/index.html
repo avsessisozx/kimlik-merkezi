@@ -186,6 +186,7 @@ async function kisiEkle(){
   oner();}
 SF.harita=async a=>HARITA.ekran(a);
 // ------------------------------------------------------------------ ana sayfa
+var ICE_DEVAM=null;
 SF.ana=async a=>{
   const d=await api('durum');DURUM=d;KATEGORILER=d.kategoriler;
   a.append(h('h2',{},'Ana sayfa'));
@@ -193,7 +194,7 @@ SF.ana=async a=>{
   if(d.acik_celiski>0)a.append(h('div',{class:'uyari'},`${d.acik_celiski} çelişen bilgi seçiminizi bekliyor (Persona).`));
   const ac=await api('acilis');
   if(ac.yarim_is)a.append(h('div',{class:'uyari'},'Yarım kalmış bir içe aktarma var: '+ac.yarim_is.yol+' ',
-    h('button',{class:'i',onclick:()=>{git('ice');setTimeout(()=>{const g=$('#ice-yol');if(g)g.value=ac.yarim_is.yol;},50);}},'Kaldığı yerden devam et')));
+    h('button',{class:'i',onclick:()=>{ICE_DEVAM=ac.yarim_is;git('ice');}},'Kaldığı yerden devam et')));
   const g=h('div',{class:'izgara'});
   const say=(ad,n)=>h('div',{class:'kart'},h('div',{class:'sayi'},SAYI(n)),h('div',{class:'soluk'},ad));
   const c=d.ozet.counts||{};
@@ -214,22 +215,43 @@ SF.ice=async a=>{
   const yol=h('input',{type:'text',id:'ice-yol',placeholder:'Zip dosyası ya da klasör yolu'});
   const tur=h('select',{},h('option',{value:''},'Otomatik tanı'),turler.map(t=>h('option',{value:t},t)));
   const alan=h('div',{});
-  const sec=async k=>{const r=await api('sec',{tur:k});if(r.yol)yol.value=r.yol;};
-  async function baslat(yineDe){
+  const sec=async k=>{const r=await api('sec',{tur:k});if(r.yol){yol.value=r.yol;dYollar=[];dOzet.textContent=DSECIM_YOK;}};
+  // ---- bilgisayardaki dosyalar ve klasörler (PDF, Word, notlar, her tür dosya): computer_files AÇIKÇA seçilir
+  const DSECIM_YOK='Henüz bir şey seçilmedi.';
+  let dYollar=[];
+  const dOzet=h('div',{class:'soluk',id:'dosya-secim'},DSECIM_YOK);
+  const dSecimGoster=()=>{dOzet.textContent=!dYollar.length?DSECIM_YOK:dYollar.length===1?dYollar[0]:`${SAYI(dYollar.length)} öğe seçildi: ${dYollar.slice(0,3).join(', ')}${dYollar.length>3?'…':''}`;};
+  const dSec=async k=>{const r=await api('sec',{tur:k});const l=k==='dosyalar'?(r.yollar||[]):(r.yol?[r.yol]:[]);
+    if(l.length){dYollar=l;yol.value='';dSecimGoster();}};
+  async function baslat(yineDe,zorla){
     alan.textContent='';
-    await api('ice_aktar_baslat',{yol:yol.value,tur:tur.value||null,yine_de:!!yineDe});yokla();}
+    const d=zorla==='dosyalar';
+    await api('ice_aktar_baslat',{yol:d?(dYollar[0]||''):yol.value,yollar:d?dYollar:null,tur:d?'computer_files':(zorla||tur.value||null),yine_de:!!yineDe});yokla();}
+  function dosyaOzeti(o){if(!o)return null;
+    const k=h('div',{class:'kart',id:'dosya-ozeti'},h('h3',{},'Dosya özeti'),
+      h('p',{id:'dosya-ozet-metin'},`${SAYI(o.icerikli)} dosya içeriğiyle, ${SAYI(o.yalniz_kayit)} dosya yalnız kayıt olarak (içerik okunamadı), ${SAYI(o.bozuk)} dosya bozuk/okunamadığı için atlandı.`));
+    if(o.metinsiz_pdf)k.append(h('div',{class:'uyari',id:'dosya-metinsiz'},`${SAYI(o.metinsiz_pdf)} PDF'de okunabilir metin yok (taranmış olabilir).`));
+    const liste=(ad,l,nd)=>{if(!l||!l.length)return;const top=Object.values(nd).reduce((x,y)=>x+y,0);
+      k.append(h('details',{class:'ayrinti-kutu'},h('summary',{},`${ad} (${SAYI(top)})`),
+        h('pre',{},l.map(x=>x.yol+' — '+x.neden).join('\n')+(top>l.length?`\n… ve ${SAYI(top-l.length)} dosya daha`:''))));};
+    liste('Bozuk, atlanan dosyalar',o.bozuk_dosyalari,o.bozuk_nedenleri||{});
+    liste('Yalnız kayıt eklenen dosyalar',o.yalniz_kayit_dosyalari,o.yalniz_kayit_nedenleri||{});
+    return k;}
   function yokla(){if(yoklama)clearInterval(yoklama);
     yoklama=setInterval(async()=>{const s=await api('ice_aktar_durum').catch(()=>null);if(!s)return;ciz(s);
       if(s.durum!=='calisiyor'){clearInterval(yoklama);yoklama=null;seritYenile().catch(()=>{});}},700);}
   function ciz(s){alan.textContent='';
     if(s.durum==='calisiyor'){const ad={dogrula:'Dosya doğrulanıyor',kopyala:'Ham arşive kopyalanıyor',isle:'Kayıtlar işleniyor'}[s.asama]||s.asama;
-      alan.append(h('div',{class:'kart'},h('div',{},`${ad}… ${s.sayi?SAYI(s.sayi)+' kayıt':''}`,s.asama==='kopyala'?ipucu('harsiv'):null),h('progress',{}),h('div',{class:'soluk'},'Kapatırsanız aynı dosyayı yeniden verin: tekrar eden kayıtlar eklenmez, kalan devam eder.')));}
-    else if(s.durum==='bitti')alan.append(h('div',{class:'kart'},h('h3',{class:'tamam'},'Tamamlandı'),h('pre',{},s.sonuc)));
+      const dp=s.dosya_toplam>0;
+      alan.append(h('div',{class:'kart'},h('div',{id:'ice-ilerleme'},dp?`Dosyalar işleniyor… ${SAYI(s.dosya_islenen)} / ${SAYI(s.dosya_toplam)} dosya`:`${ad}… ${s.sayi?SAYI(s.sayi)+' kayıt':''}`,s.asama==='kopyala'?ipucu('harsiv'):null),dp?h('progress',{value:String(s.dosya_islenen),max:String(s.dosya_toplam)}):h('progress',{}),h('div',{class:'soluk'},'Kapatırsanız aynı dosyayı yeniden verin: tekrar eden kayıtlar eklenmez, kalan devam eder.')));}
+    else if(s.durum==='bitti')alan.append(h('div',{class:'kart'},h('h3',{class:'tamam'},'Tamamlandı'),h('pre',{},s.sonuc)),dosyaOzeti(s.dosya_ozeti));
     else if(s.durum==='hata'){
       const [ana,...teknik]=String(s.hata).split('\n\n');
       alan.append(h('div',{class:'hata'},ana,teknik.length?h('details',{class:'ayrinti-kutu'},h('summary',{},'Teknik ayrıntı'),h('pre',{},teknik.join('\n\n'))):null));
       if(s.bicim_raporu)alan.append(h('div',{class:'kart'},h('h3',{},terim('Biçim raporu','bicimraporu')),yapistirmaKutusu(s.bicim_raporu),
         h('button',{class:'d',onclick:()=>kopyala(s.bicim_raporu)},'Biçim raporunu kopyala')));
+      if(String(s.hata).startsWith('Bu dosyayı tanıyamadım'))alan.append(h('div',{class:'satir'},h('span',{},'Dışa aktarma değil de bilgisayarınızdaki bir dosya/klasörse:'),
+        h('button',{class:'d',id:'dosya-olarak-ekle',onclick:()=>{dYollar=s.yollar&&s.yollar.length?s.yollar:[s.yol];baslat(false,'dosyalar').catch(hataGoster);}},'Bilgisayar dosyası olarak ekle')));
       if(s.hata_kodu==='daha_once_silinmis')alan.append(h('div',{class:'satir'},h('span',{},'Daha önce kalıcı sildiğiniz bir girdi. Yine de alınsın mı?'),
         h('button',{class:'d',onclick:()=>baslat(true).catch(hataGoster)},'Evet, yine de al')));
       SON_HATA={adim:'içe aktar',mesaj:s.hata,ek:s.bicim_raporu||''};}}
@@ -255,7 +277,11 @@ SF.ice=async a=>{
     h('p',{},'Google Takeout zip dosyası, Reddit veri dışa aktarımı ya da açılmış bir klasör seçin.'),
     h('div',{class:'satir'},yol),
     h('div',{class:'satir'},h('button',{class:'i',onclick:()=>sec('dosya').catch(hataGoster)},'Dosya seç…'),h('button',{class:'i',onclick:()=>sec('klasor').catch(hataGoster)},'Klasör seç…'),tur,
-      h('button',{class:'d',onclick:()=>baslat(false).catch(hataGoster)},'İçe aktarmayı başlat'))),alan,
+      h('button',{class:'d',onclick:()=>baslat(false).catch(hataGoster)},'İçe aktarmayı başlat'))),
+    h('div',{class:'kart',id:'dosya-karti'},h('h3',{},'Bilgisayarımdaki dosyalar ve klasörler (PDF, Word, notlar…)'),
+      h('p',{},'Dışa aktarma dosyası değil, kendi belgeleriniz: bir klasör ya da birden çok dosya seçin. Okunabilen her şeyin (PDF, Word, Excel, metin, e-posta, fotoğraf…) içeriği eklenir; okunamayan sağlam dosyalar yalnız kayıt (ad, tür, boyut, tarih) olarak girer; bozuk dosya atlanır ve nedeniyle listelenir. Dosyalar yerinde kalır.'),
+      h('div',{class:'satir'},h('button',{class:'i',id:'dosya-klasor-sec',onclick:()=>dSec('klasor').catch(hataGoster)},'Klasör seç…'),h('button',{class:'i',id:'dosya-dosyalar-sec',onclick:()=>dSec('dosyalar').catch(hataGoster)},'Dosya(lar) seç…'),
+        h('button',{class:'d',id:'dosya-baslat',onclick:()=>baslat(false,'dosyalar').catch(hataGoster)},'Dosyaları içe aktar')),dOzet),alan,
     h('div',{class:'kart'},h('h3',{},'Dosya tanınmadı mı?'),
       h('p',{class:'soluk'},'Yukarıda seçtiğiniz dosyayı denetleyin: dosyanın yapısını (alan adları, türler, sayılar) gösteren bir rapor çıkar. Hiçbir şey içe aktarılmaz ya da kaydedilmez; rapor dosya içeriğini içermez. Tanınmayan bir dosya için raporu kopyalayıp gönderebilirsiniz.'),
       h('div',{class:'satir'},h('button',{class:'i',id:'tanila-dugme',onclick:()=>denetle().catch(hataGoster)},'Dosyayı denetle (içerik göstermez)')),
@@ -263,6 +289,8 @@ SF.ice=async a=>{
         h('label',{class:'satir'},tAdlar,' Dosya ve klasör adlarını gerçek haliyle yaz (kişi adı içerebilir; göndermeden önce raporu okuyun)'),
         h('label',{class:'satir'},tAyrinti,' Daha ayrıntılı (uzun) rapor'))),tAlan);
   const ts=await api('tanila_durum').catch(()=>({durum:'yok'}));if(ts.durum!=='yok'){tCiz(ts);if(ts.durum==='calisiyor')tYokla();}
+  if(ICE_DEVAM){const d=ICE_DEVAM;ICE_DEVAM=null;
+    if(d.yollar&&d.yollar.length){dYollar=d.yollar;dSecimGoster();}else{yol.value=d.yol||'';if(d.tur)tur.value=d.tur;}}
   const s=await api('ice_aktar_durum');if(s.durum!=='yok'){ciz(s);if(s.durum==='calisiyor')yokla();}
 };
 // ------------------------------------------------------------------ kayıt listesi

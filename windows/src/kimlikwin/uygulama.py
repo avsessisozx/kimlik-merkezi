@@ -6,7 +6,7 @@
   KimlikMerkezi.exe tanila <yol> [--adlari-goster] [--ayrinti]
                                   dışa aktarma dosyasının İÇERİKSİZ yapı raporu (konsolda: kimlikmerkezi-mcp.exe tanila ...)
   KimlikMerkezi.exe mcp           MCP (stdio); pencere/tepsi açmaz
-  KimlikMerkezi.exe --sec dosya|klasor   (iç kullanım) seçme penceresi
+  KimlikMerkezi.exe --sec dosya|dosyalar|klasor   (iç kullanım) seçme penceresi
 Kurulu pakette MCP için ayrıca konsol exe'si `kimlikmerkezi-mcp.exe` vardır (Claude buna bağlanır).
 """
 from __future__ import annotations
@@ -51,8 +51,13 @@ def sec(tur: str, cikti: str | None) -> int:
     kok = tkinter.Tk()
     kok.withdraw()
     kok.attributes("-topmost", True)
-    yol = filedialog.askdirectory(title="Klasör seçin") if tur == "klasor" else \
-        filedialog.askopenfilename(title="Dosya seçin", filetypes=[("Arşiv ve veri", "*.zip *.json *.csv *.jsonl"), ("Tümü", "*.*")])
+    belgeler = ("Belgeler", "*.pdf *.docx *.odt *.txt *.md")
+    if tur == "klasor":
+        yol = filedialog.askdirectory(title="Klasör seçin")
+    elif tur == "dosyalar":   # birden çok dosya: yollar satır satır
+        yol = "\n".join(filedialog.askopenfilenames(title="Dosya(lar) seçin", filetypes=[("Tüm dosyalar", "*.*"), belgeler]))
+    else:
+        yol = filedialog.askopenfilename(title="Dosya seçin", filetypes=[("Tüm dosyalar", "*.*"), belgeler, ("Arşiv ve veri", "*.zip *.json *.csv *.jsonl")])
     if cikti:
         Path(cikti).write_text(yol or "", encoding="utf-8")
     return 0
@@ -162,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--adlari-goster", action="store_true", help="tanila: dosya/klasör adlarını maskesiz yaz (kişi adı içerebilir)")
     p.add_argument("--ayrinti", action="store_true", help="tanila: uzun, ayrıntılı rapor")
     p.add_argument("--arka-plan", action="store_true", help="tarayıcıyı açma, tepside başla")
-    p.add_argument("--sec", choices=["dosya", "klasor"], help=argparse.SUPPRESS)
+    p.add_argument("--sec", choices=["dosya", "klasor", "dosyalar"], help=argparse.SUPPRESS)
     p.add_argument("--cikti", help=argparse.SUPPRESS)
     p.add_argument("--veri", help="saglik komutu için veri klasörü")
     a = p.parse_args(argv)

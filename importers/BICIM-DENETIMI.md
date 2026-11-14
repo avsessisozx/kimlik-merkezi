@@ -145,8 +145,17 @@ alan listesi) için **gerçek kaynak bulunamadı**; aşağıda ayrıntı.
 - Açık: Windows'ta açık tarayıcının kilitli dosyası gerçek makinede denenmedi (`copy_snapshot` yalnız sahte kilitle sınandı).
 
 ### Bilgisayar dosyaları
-- Bir dışa aktarma biçimi yok (kullanıcının klasörü taranır). Kaynak gerekmedi. Bozuk/boş PDF, DOCX, JPEG ve ikili metin dosyalarıyla
-  çökmediği test edildi.
+- Bir dışa aktarma biçimi yok (kullanıcının klasörü ya da seçtiği dosyalar taranır; arayüzde İçe aktar > "Bilgisayarımdaki dosyalar ve
+  klasörler"). Kaynak gerekmedi. Kural: okunabilen her şey içeriğiyle; sağlam ama okunamayan (ses, program, arşiv, eski .doc/.xls/.ppt,
+  bilinmeyen ikili, taranmış/parolalı PDF, boş) yalnız kayıt (ad, tür, boyut, tarih; `icerik_durumu = "yalnız kayıt"`); bozuk (açılamayan
+  PDF/DOCX/XLSX/PPTX/ODF/zip) atlanır, kayıt eklenmez, nedeniyle özette listelenir.
+- İçerik okunan biçimler: düz metin ve kod (çok sayıda uzantı; uzantısı bilinmeyen metin de içerik sezgisiyle), JSON/JSONL/CSV/TSV/XML/HTML/YAML/log,
+  EML, RTF, PDF (pypdf), DOCX (python-docx), XLSX, PPTX, ODT/ODS/ODP (yalnız standart kütüphane: zipfile+re). Kodlama: BOM, BOM'suz UTF-16, UTF-8, cp1254.
+- Sınırlar: OCR yok; eski ikili Office ve parolalı Office okunmaz; XLSX/PPTX metni düzenli ifadelerle çıkarılır (biçim/formül/grafik yok);
+  RTF çıkarımı temeldir (\'hh için cp1254 varsayımı); tek dosya için zaman aşımı YOK (pypdf'in takılma yaptığı bilinen bozuk bir PDF
+  tüm içe aktarmayı bekletebilir); gizli ve sistem dosyaları taranmaz.
+- Test: `tests/test_files_karisik.py` (karışık sahte klasör: 26 içerikli, 8 yalnız kayıt, 7 bozuk), `windows/tests/test_dosya_ice_aktar.py` (gerçek API),
+  `windows/tests/test_tarayici_dosya.py` (Playwright).
 
 ### Genel sohbet dosyası (DeepSeek vb.)
 - Resmî dışa aktarma bulunamadı (önceki oturum notu geçerli). Kendi biçimimiz; değişiklik: yarım JSON çökmesi giderildi.
