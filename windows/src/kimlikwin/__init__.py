@@ -5,5 +5,5 @@ Katmanlar (kabuk kararı değişirse yalnız üstteki katman değişir):
     saglik, hata_raporu, baslangic, cekirdek (Uygulama).
   - Arayüz: web (yerel HTTP, yalnız 127.0.0.1) + statik/index.html, tepsi, uygulama (giriş noktası).
 """
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 APP_AD = "Kimlik Merkezi"

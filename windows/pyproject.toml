@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kimlikwin"
-version = "0.1.1"
+version = "0.1.2"
 description = "Kimlik Merkezi Windows uygulaması: yerel web arayüzü (127.0.0.1), tepsi, kurulum mantığı"
 requires-python = ">=3.12"
 dependencies = ["kimlikcore", "kimlikserver", "kimlikimport"]

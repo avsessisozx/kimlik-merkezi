@@ -10,7 +10,7 @@ on:
       surum:
         description: "Sürüm numarası (ör. 0.1.1); windows/src/kimlikwin/__init__.py ile aynı olmalı"
         required: true
-        default: "0.1.1"
+        default: "0.1.2"
         type: string
       onsurum:
         description: "Ön sürüm olarak işaretle"
