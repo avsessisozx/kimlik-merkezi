@@ -21,6 +21,7 @@ sürümleri ve lisansları gösterir ve bu tablodan üstündür. Üst veride lis
 | ijson | Akışlı JSON ayrıştırma | BSD-3-Clause AND ISC |
 | pypdf | PDF metni | BSD-3-Clause |
 | python-docx | DOCX metni | MIT |
+| (standart kütüphane: zipfile, re, email, html) | XLSX, PPTX, ODT/ODS/ODP, RTF, EML metni; yeni bağımlılık YOK | Python-2.0 (PSF) |
 | Pillow | Görsel üst verisi, tepsi simgesi | MIT-CMU (HPND benzeri) |
 | pystray 0.19.5 (tepsi için, pakete dahil) | Windows tepsi simgesi | **LGPL-3.0** (üst veride "LGPLv3"), aşağıdaki nota bakın |
 | CPython 3.13 | Paketle gömülen çalışma zamanı | Python-2.0 (PSF) |

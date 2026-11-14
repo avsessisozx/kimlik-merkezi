@@ -59,7 +59,7 @@ saldırı metni gömülmüş olabilir.
     açık bir açma adımı yoktur (kodda `extractall`/`extract` kullanılmaz). Kaynak dosyaya yazılmaz.
   - Ayrıştırıcılar bozuk, yarım ve çok büyük girdiler için dayanıklılık testlerinden geçer
     (`importers/tests/test_dayaniklilik.py`); bozuk dosya atlanır/rapor edilir.
-  - Belge çıkarımında boyut sınırları vardır (PDF 100 MB/500 sayfa, DOCX 50 MB, düz metin 2 MB, çıkarılan metin
+  - Belge çıkarımında boyut sınırları vardır (PDF 100 MB/500 sayfa, DOCX/XLSX/PPTX/ODF 50 MB (zip içi tek parça en çok 50 MB okunur), düz metin 2 MB, çıkarılan metin
     en çok 100 000 karakter); sembolik bağlantılar izlenmez (klasör taramasında).
   - Kayıt metinleri arayüzde yalnızca `textContent`/metin düğümü olarak eklenir; kayıt içeriği için
     `innerHTML` kullanılmaz (depodaki tek `innerHTML` sabit bir simge çizgisidir). Böylece içe aktarılan

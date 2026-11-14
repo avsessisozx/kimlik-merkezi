@@ -32,6 +32,7 @@ class RunResult:
     raw_files: list[RawFile]
     report: FormatReport
     skipped: dict[str, int] = field(default_factory=dict)  # neden -> sayı (içerik yok)
+    files: dict | None = None  # bilgisayar dosyaları: içerikli/yalnız kayıt/bozuk özeti (+ 'metin')
 
     def __str__(self) -> str:
         L = [
@@ -41,6 +42,8 @@ class RunResult:
         ]
         if self.skipped:
             L.append("Atlanan kayıtlar: " + "; ".join(f"{k}: {v}" for k, v in sorted(self.skipped.items())))
+        if self.files and self.files.get("metin"):
+            L.append(self.files["metin"])
         if self.report.unsupported:
             L.append("Desteklenmediği için atlanan:")
             L += [f"  - {u}" for u in self.report.unsupported]
@@ -101,7 +104,8 @@ def _taninmama_mesaji(path: Path) -> str:
                         "dışa aktarma dosyasını yeniden indirip tekrar deneyin.")
     return ("Bu dosyayı tanıyamadım. Google Takeout, Reddit, ChatGPT, Claude, Spotify, Instagram/Facebook "
             "ya da GitHub dışa aktarma dosyası mı? Dosya sağlam ama tanınmıyorsa aşağıdaki teknik ayrıntıyı "
-            "geliştiriciyle paylaşın.")
+            "geliştiriciyle paylaşın. Bu bir dışa aktarma değil, bilgisayarınızdaki belgeler/dosyalarsa "
+            "\"Bilgisayarımdaki dosyalar ve klasörler\" seçeneğiyle (tür: computer_files) ekleyebilirsiniz.")
 
 
 def run(
@@ -111,11 +115,25 @@ def run(
     *,
     yine_de: bool = False,
     progress: ProgressFn | None = None,
+    file_progress: Callable[[int, int], None] | None = None,
 ) -> RunResult:
-    """Dosyayı/klasörü içe aktarır. `progress(asama, sayi)`: asama 'dogrula'|'kopyala'|'isle'."""
-    path = Path(path)
-    if not path.exists():
-        raise FormatError(f"Girdi yok: {path}")
+    """Dosyayı/klasörü içe aktarır. `progress(asama, sayi)`: asama 'dogrula'|'kopyala'|'isle'.
+    `file_progress(islenen, toplam)`: dosya taraması yapan içe aktarıcılar (bilgisayar dosyaları) için.
+    `path` bir liste de olabilir (birden çok dosya/klasör; yalnız `tur` ile bilgisayar dosyaları)."""
+    if isinstance(path, (list, tuple)):
+        yollar = [Path(p) for p in path]
+        if not yollar:
+            raise FormatError("Girdi yok: boş seçim")
+        path = yollar[0] if len(yollar) == 1 else yollar
+        for p in yollar:
+            if not p.exists():
+                raise FormatError(f"Girdi yok: {p}")
+        if isinstance(path, list) and not tur:
+            raise FormatError("Birden çok dosya/klasör yalnız bilgisayar dosyaları olarak (computer_files) içe aktarılabilir.")
+    else:
+        path = Path(path)
+        if not path.exists():
+            raise FormatError(f"Girdi yok: {path}")
     notify = progress or (lambda *_: None)
     clear_archive_cache()
 
@@ -134,6 +152,8 @@ def run(
             lines = "\n".join(f"  - {n}: {d.reason}" for n, d in results)
             raise FormatError(f"{_taninmama_mesaji(path)}\n\nTeknik ayrıntı (dosya hiçbir içe aktarıcıyla tanınmadı; her birinin nedeni):\n{lines}")
 
+    if file_progress is not None and hasattr(imp, "file_progress"):
+        imp.file_progress = file_progress
     try:
         return _run_with(hub, path, imp, yine_de, notify, progress)
     finally:
@@ -179,4 +199,12 @@ def _run_with(hub, path, imp, yine_de, notify, progress) -> RunResult:
     return RunResult(
         importer=imp.name, source_id=source_id, parsed=counter[0], added=res.added,
         duplicate=res.duplicate, raw_files=raws, report=report, skipped=imp.skipped_counts(),
+        files=_dosya_ozeti(imp),
     )
+
+
+def _dosya_ozeti(imp) -> dict | None:
+    ozet = getattr(imp, "ozet", None)
+    if not ozet:
+        return None
+    return {**ozet, "metin": imp.ozet_metni()}

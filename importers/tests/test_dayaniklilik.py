@@ -217,7 +217,9 @@ def test_dosyalar_bozuk_ve_bos_dosyalar_cokmez(hub, tmp_path):
     (kok / "ikili.txt").write_bytes(b"\xff\xfe\x00\x81" * 100)
     a = run(hub, kok, "computer_files")
     b = run(hub, kok, "computer_files")
-    assert a.added == 6 and b.added == 0
+    # bozuk/boş PDF ve bozuk docx ATLANIR (kayıt yok, raporda); bozuk.jpg, bos.txt, ikili.txt yalnız kayıt olarak girer
+    assert a.added == 3 and b.added == 0
+    assert a.files["bozuk"] == 3 and {d["yol"] for d in a.files["bozuk_dosyalari"]} == {"bos.pdf", "kesik.pdf", "bozuk.docx"}
 
 
 # ------------------------------------------------------------------ büyük dosya: akışla, bellek sabit
