@@ -145,7 +145,9 @@ Remove-Item $yukselt -Recurse -Force -ErrorAction SilentlyContinue
 if ($LASTEXITCODE) { throw 'iscc (yükseltme paketi)' }
 $kur2 = Get-Item "$yukselt\KimlikMerkezi-$Surum2-kurulum.exe"
 # Uygulamanın güncelleme sırasında çalıştırdığı bayraklar (guncelleme.py kurulum_komutu; girişte başlatma AÇIK senaryosu)
-$p2 = Start-Process $kur2.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=otobaslat', '/GUNCELLEME=1', "/LOG=$k\cikti\kur2.log" -Wait -PassThru
+# DİKKAT: -Wait kullanılmaz; /GUNCELLEME=1 kurulumun yeniden açtığı uygulamayı da bekler ve takılır. Yalnız kurulum işlemi beklenir.
+$p2 = Start-Process $kur2.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TASKS=otobaslat', '/GUNCELLEME=1', "/LOG=$k\cikti\kur2.log" -PassThru
+if (-not $p2.WaitForExit(300000)) { $p2 | Stop-Process -Force; throw 'üstüne kurulum 5 dakikada bitmedi' }
 $ozet['yukseltme_kurulum_cikis'] = $p2.ExitCode
 Dene 'üstüne kurulum çıkış kodu 0' { $p2.ExitCode -eq 0 }
 Dene 'kurulum kaydındaki sürüm yükseldi (Inno)' { (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object { $_.DisplayName -eq 'Kimlik Merkezi' } | Select-Object -First 1).DisplayVersion -eq $Surum2 }
