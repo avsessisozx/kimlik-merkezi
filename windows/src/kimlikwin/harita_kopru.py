@@ -60,9 +60,20 @@ def _uygun(fn: Callable[..., Any], kw: dict[str, Any]) -> tuple[dict[str, Any], 
     return ok, set(kw) - set(ok)
 
 
+def _aralik(aralik: Any) -> tuple[Any, Any] | None:
+    """Arayüzün `{"baslangic", "bitis"}` aralığını sunucunun `(baslangic, bitis)` çiftine çevirir.
+    Boş/None değerler None kalır; zaten çift/liste ise olduğu gibi (çifte) döner."""
+    if not aralik:
+        return None
+    if isinstance(aralik, dict):
+        a, b = aralik.get("baslangic") or None, aralik.get("bitis") or None
+        return (a, b) if (a, b) != (None, None) else None
+    return tuple(aralik)
+
+
 def harita(hub, ac_hassas: set[str], aralik: dict | None = None) -> dict[str, Any]:
     fn = _s().harita
-    kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "aralik": aralik})
+    kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "aralik": _aralik(aralik)})
     veri = fn(hub, **kw)
     for b in veri.get("bolgeler", []):
         if b.get("id") in HASSAS and b["id"] not in ac_hassas:
@@ -79,7 +90,7 @@ def bolge(hub, bolge_id: str, ac_hassas: set[str], filtre: dict | None = None, a
     istek = {"ac_hassas": frozenset(ac_hassas)}
     if filtre:
         istek["filtre"] = filtre
-    if aralik:
+    if aralik := _aralik(aralik):
         istek["aralik"] = aralik
     kw, yok = _uygun(fn, istek)
     veri = fn(hub, bolge_id, **kw)
@@ -102,7 +113,7 @@ def kayitlar(hub, bolge_id: str, ac_hassas: set[str], filtre: dict | None = None
     fn = _s().kayitlar
     if fn is None:
         raise OzellikYok("Kayıt listesi bu sürümde yok.")
-    kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "filtre": filtre, "aralik": aralik,
+    kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "filtre": filtre, "aralik": _aralik(aralik),
                         "limit": max(1, min(int(limit), 100)), "offset": max(0, int(offset))})
     veri = fn(hub, bolge_id, **kw)
     veri["kilitli"] = False

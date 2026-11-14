@@ -140,3 +140,24 @@ def test_statik_dosyalar_yerel_echarts_ve_cdn_yok(yonetici, veri):
                 al("/statik/" + ad)
     finally:
         s.durdur()
+
+
+def test_gercek_saglayici_dict_araligi_cokmez(kurulu):
+    """Regresyon: UI'nin {"baslangic","bitis"} aralığı GERÇEK kimlikserver.harita'ya çift olarak gitmeli
+    ("Zaman ISO-8601 biçiminde değil." hatası)."""
+    from kimlikcore import EventIn
+    harita_kopru.saglayici = None                       # sahte değil, gerçek sağlayıcı
+    hub = kurulu.uygulama.hub
+    sid = hub.add_source("instagram", "1", None)
+    hub.add_events(sid, [EventIn(ts=f"2025-0{m}-10T10:00:00Z", kind="instagram.gonderi", category="sosyal",
+                                 text="a", event_key=f"ig{m}") for m in (1, 3, 6)])
+    ar = {"baslangic": "2025-02-01T00:00:00Z", "bitis": "2025-12-31T23:59:59Z"}
+    tum = kurulu.api("harita_bolge", {"bolge_id": "agiz"})
+    kismi = kurulu.api("harita_bolge", {"bolge_id": "agiz", "aralik": ar})
+    assert tum["toplam"] == 3 and kismi["toplam"] == 2
+    assert kurulu.api("harita_bolge", {"bolge_id": "agiz", "aralik": {"baslangic": None, "bitis": ""}})["toplam"] == 3
+    k = kurulu.api("harita_kayitlar", {"bolge_id": "agiz", "aralik": ar})
+    assert k["toplam"] == 2
+    assert kurulu.api("harita_kayitlar", {"bolge_id": "agiz"})["toplam"] == 3
+    assert kurulu.api("harita", {"aralik": ar})["profil"]["olay"] == 3   # harita() aralık kabul etmez, yok sayılır
+    assert harita_kopru._aralik(("a", None)) == ("a", None) and harita_kopru._aralik({}) is None

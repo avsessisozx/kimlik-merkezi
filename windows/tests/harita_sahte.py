@@ -9,7 +9,7 @@ içe aktarılmış) SQL ile sayım yapar; sözleşme İ2'ye böyle gösterilir:
     ayrinti(hub, event_id) -> dict
     harita(hub, *, ac_hassas, now=None, aralik=None) -> dict
 
-`aralik = {"baslangic": ts|None, "bitis": ts|None}`; `filtre = {boyut: deger}` (VE ile birleşir).
+`aralik = (baslangic|None, bitis|None)` (köprü arayüzün {"baslangic","bitis"} sözlüğünü çifte çevirir); `filtre = {boyut: deger}` (VE ile birleşir).
 Boyutlar: ay (YYYY-MM), gun (0=Pzt..6=Paz), saat (0-23) + bölgeye özgü (kanal, terim, site, sanatci, ...).
 Çapraz filtreleme: bir grafik kendi boyutunun filtresini UYGULAMAZ (bağlam kalsın), `secili` ile vurgulanır.
 """
@@ -63,13 +63,13 @@ def _kosul(bolge_id, aralik, filtre, haric=()):
     kats = BOLGELER[bolge_id][1]
     w = [f"hidden = 0 AND category IN ({','.join('?' * len(kats))})"]
     a = list(kats)
-    aralik = aralik or {}
-    if aralik.get("baslangic"):
+    bas, bit = aralik or (None, None)
+    if bas:
         w.append("ts >= ?")
-        a.append(aralik["baslangic"])
-    if aralik.get("bitis"):
+        a.append(bas)
+    if bit:
         w.append("ts <= ?")
-        a.append(aralik["bitis"])
+        a.append(bit)
     ifadeler = _tum_ifadeler(bolge_id)
     for k, v in (filtre or {}).items():
         if k in haric or k not in ifadeler:
