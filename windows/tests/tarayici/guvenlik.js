@@ -8,6 +8,15 @@ try { ({ chromium } = require('playwright')); } catch (e) { process.stderr.write
 const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const mod = process.argv[3];
 const bekle = ms => new Promise(r => setTimeout(r, ms));
+// CSP (script-src bez 'unsafe-eval') altında page.waitForFunction çalışmaz; koşulu Node tarafında yoklarız (evaluate CSP'ye takılmaz).
+async function kosulBekle(p, fn, arg, { timeout = 30000 } = {}) {
+  const son = Date.now() + timeout;
+  for (;;) {
+    if (await p.evaluate(fn, arg === undefined ? null : arg)) return;
+    if (Date.now() > son) throw new Error(`kosulBekle: ${timeout} ms içinde koşul sağlanmadı`);
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
 const goruntu = async (p, ad) => { if (ayar.ekran_dizini) await p.screenshot({ path: `${ayar.ekran_dizini}/guvenlik-${ad}.png` }); };
 const metin = p => p.evaluate(() => document.body.innerText);
 const hatalar = [];
@@ -16,11 +25,11 @@ async function bildirimHatalari(p) {
   return p.evaluate(() => [...document.querySelectorAll('#bildirim div.h')].map(d => d.firstChild ? d.firstChild.textContent : d.textContent));
 }
 async function metinBekle(p, parca, ms = 8000) {
-  await p.waitForFunction(t => document.body.innerText.includes(t), parca, { timeout: ms });
+  await kosulBekle(p, t => document.body.innerText.includes(t), parca, { timeout: ms });
 }
 async function git(p, ad) {
   await p.locator('nav button', { hasText: new RegExp('^' + ad + '$') }).click();
-  await p.waitForFunction(() => document.querySelector('#ana').children.length > 0, null, { timeout: 15000 });
+  await kosulBekle(p, () => document.querySelector('#ana').children.length > 0, null, { timeout: 15000 });
   await bekle(500);
 }
 async function ifadeYaz(p, a, b) {
@@ -116,7 +125,7 @@ async function kilitYanlis(b) {
   await goruntu(p, '09-kilit');
   for (let i = 0; i < 3; i++) {
     await p.fill('#g-kilit-parola', 'yanlis-parola-0000-zzz'); await p.click('#g-kilit-ac');
-    await p.waitForFunction(() => document.querySelector('#g-hata').style.display !== 'none', null, { timeout: 8000 }); await bekle(300);
+    await kosulBekle(p, () => document.querySelector('#g-hata').style.display !== 'none', null, { timeout: 8000 }); await bekle(300);
     s['hata' + i] = await p.innerText('#g-hata');
   }
   s.dugme_metni = await p.innerText('#g-kilit-ac'); s.dugme_kapali = await p.isDisabled('#g-kilit-ac');
@@ -129,7 +138,7 @@ async function kilitYanlis(b) {
 async function kilitDogru(b) {
   const s = {}; const { c, p } = await kilitAc(b);
   await p.fill('#g-kilit-parola', ayar.parola); await p.click('#g-kilit-ac');
-  await p.waitForFunction(() => document.querySelector('#nav').children.length > 0, null, { timeout: 15000 }); await bekle(1200);
+  await kosulBekle(p, () => document.querySelector('#nav').children.length > 0, null, { timeout: 15000 }); await bekle(1200);
   s.kilit_kalkti = (await p.locator('#g-kilit-parola').count()) === 0;
   s.nav = await p.evaluate(() => document.querySelector('#nav').innerText);
   s.parola_alani_yok = (await p.locator('input[type=password]').count()) === 0;
@@ -143,11 +152,11 @@ async function kilitKurtar(b) {
   await p.click('#g-kilit-unuttum'); await p.waitForSelector('#g-kilit-ifade');
   await goruntu(p, '12-kurtar');
   await p.fill('#g-kilit-ifade', 'tamamen yanlis bir ifade burada 123'); await p.fill('#g-kilit-yeni', ayar.yeni_parola); await p.fill('#g-kilit-yeni2', ayar.yeni_parola); await bekle(700);
-  await p.click('#g-kilit-kurtar'); await p.waitForFunction(() => document.querySelectorAll('#g-kilit-kurtarma .hata').length && [...document.querySelectorAll('#g-kilit-kurtarma .hata')].some(e => e.style.display !== 'none'), null, { timeout: 8000 });
+  await p.click('#g-kilit-kurtar'); await kosulBekle(p, () => document.querySelectorAll('#g-kilit-kurtarma .hata').length && [...document.querySelectorAll('#g-kilit-kurtarma .hata')].some(e => e.style.display !== 'none'), null, { timeout: 8000 });
   s.yanlis_ifade = await p.evaluate(() => [...document.querySelectorAll('#g-kilit-kurtarma .hata')].filter(e => e.style.display !== 'none').map(e => e.innerText).join('|'));
   await p.fill('#g-kilit-ifade', ayar.ifade); await bekle(300);
   await p.click('#g-kilit-kurtar');
-  await p.waitForFunction(() => document.querySelector('#nav').children.length > 0, null, { timeout: 15000 }); await bekle(800);
+  await kosulBekle(p, () => document.querySelector('#nav').children.length > 0, null, { timeout: 15000 }); await bekle(800);
   s.acildi = (await p.locator('#g-kilit-parola').count()) === 0;
   s.bildirimler = await bildirimHatalari(p); s.konsol = hatalar.slice();
   await c.close(); return s;
@@ -188,7 +197,7 @@ async function sihirbaz(b) {
   p.on('pageerror', e => hatalar.push('pageerror: ' + e)); p.on('console', m => { if (m.type() === 'error') hatalar.push('console: ' + m.text()); });
   await p.goto(ayar.url); await p.waitForSelector('.pencere input[type=text]');
   await p.locator('.pencere input[type=text]').nth(1).fill(ayar.sihirbaz_yol);
-  await p.waitForFunction(() => !document.querySelector('.pencere button.d').disabled, null, { timeout: 10000 });
+  await kosulBekle(p, () => !document.querySelector('.pencere button.d').disabled, null, { timeout: 10000 });
   s.adim1 = await metin(p); await goruntu(p, '15-sihirbaz-1');
   await p.click('.pencere button.d'); await bekle(300);
   await p.locator('.pencere button.d', { hasText: 'Kur' }).click();

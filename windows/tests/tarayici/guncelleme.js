@@ -8,6 +8,15 @@ let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) { process.stderr.write('playwright yok: ' + e.message + '\n'); process.exit(77); }
 const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const bekle = ms => new Promise(r => setTimeout(r, ms));
+// CSP (script-src bez 'unsafe-eval') altında page.waitForFunction çalışmaz; koşulu Node tarafında yoklarız (evaluate CSP'ye takılmaz).
+async function kosulBekle(p, fn, arg, { timeout = 30000 } = {}) {
+  const son = Date.now() + timeout;
+  for (;;) {
+    if (await p.evaluate(fn, arg === undefined ? null : arg)) return;
+    if (Date.now() > son) throw new Error(`kosulBekle: ${timeout} ms içinde koşul sağlanmadı`);
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
 const sahte = (yol) => fetch(ayar.sahte + yol).then(r => r.json());
 const SN = 20000;
 
@@ -89,7 +98,7 @@ async function yok(p, sec) { return (await p.locator(sec).count()) === 0; }
     // ---- 5) iptal: yarım dosya silinir, soru yeniden gelir
     await sahte('/_ayar/kapi_esigi/1048576');
     await p.click('#gunc-yeniden');
-    await p.waitForFunction(() => { const e = document.querySelector('#gunc-ilerleme'); return e && Number(e.value) > 5; }, null, { timeout: SN });
+    await kosulBekle(p, () => { const e = document.querySelector('#gunc-ilerleme'); return e && Number(e.value) > 5; }, null, { timeout: SN });
     sonuc.ilerleme = { metin: await metin(p, '#gunc-metin'), deger: await p.evaluate(() => Number(document.querySelector('#gunc-ilerleme').value)),
       duraklat_var: !(await yok(p, '#gunc-duraklat')), iptal_var: !(await yok(p, '#gunc-iptal')) };
     await p.click('#gunc-iptal');
@@ -98,7 +107,7 @@ async function yok(p, sec) { return (await p.locator(sec).count()) === 0; }
 
     // ---- 6) duraklat / devam (HTTP Range)
     await p.click('#gunc-indir');
-    await p.waitForFunction(() => { const e = document.querySelector('#gunc-ilerleme'); return e && Number(e.value) > 5; }, null, { timeout: SN });
+    await kosulBekle(p, () => { const e = document.querySelector('#gunc-ilerleme'); return e && Number(e.value) > 5; }, null, { timeout: SN });
     await p.click('#gunc-duraklat');
     await p.waitForSelector('#gunc-devam', { timeout: SN });
     const v1 = await p.evaluate(() => Number(document.querySelector('#gunc-ilerleme').value));
@@ -119,7 +128,7 @@ async function yok(p, sec) { return (await p.locator(sec).count()) === 0; }
     sonuc.mobil = await p.evaluate(() => ({ tasma: document.documentElement.scrollWidth - innerWidth }));
     await p.setViewportSize({ width: 1280, height: 850 });
     await p.click('#gunc-kur');
-    await p.waitForFunction(() => { const e = document.querySelector('#gunc-baslik'); return e && e.innerText.includes('Kurulum başlatılıyor'); }, null, { timeout: SN });
+    await kosulBekle(p, () => { const e = document.querySelector('#gunc-baslik'); return e && e.innerText.includes('Kurulum başlatılıyor'); }, null, { timeout: SN });
     sonuc.kur = { baslik: await metin(p, '#gunc-baslik') };
     sonuc.bildirim_hatalari = await bildirimHatalari();
     await c.close();

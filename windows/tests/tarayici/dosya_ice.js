@@ -6,6 +6,15 @@ let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) { process.stderr.write('playwright yok: ' + e.message + '\n'); process.exit(77); }
 const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const bekle = ms => new Promise(r => setTimeout(r, ms));
+// CSP (script-src bez 'unsafe-eval') altında page.waitForFunction çalışmaz; koşulu Node tarafında yoklarız (evaluate CSP'ye takılmaz).
+async function kosulBekle(p, fn, arg, { timeout = 30000 } = {}) {
+  const son = Date.now() + timeout;
+  for (;;) {
+    if (await p.evaluate(fn, arg === undefined ? null : arg)) return;
+    if (Date.now() > son) throw new Error(`kosulBekle: ${timeout} ms içinde koşul sağlanmadı`);
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
 const hatalar = [];
 async function bildirimHatalari(p) {
   return p.evaluate(() => [...document.querySelectorAll('#bildirim div.h')].map(d => d.firstChild ? d.firstChild.textContent : d.textContent));
@@ -29,7 +38,7 @@ const metin = (p, sel) => p.evaluate(s => { const e = document.querySelector(s);
 
     // 1) Klasör seç -> başlat -> bitiş özeti (computer_files AÇIKÇA seçilir; tür kutusu 'Otomatik' kalır)
     await p.click('#dosya-klasor-sec');
-    await p.waitForFunction(() => !document.querySelector('#dosya-secim').innerText.startsWith('Henüz'), null, { timeout: 8000 });
+    await kosulBekle(p, () => !document.querySelector('#dosya-secim').innerText.startsWith('Henüz'), null, { timeout: 8000 });
     sonuc.klasor_secim = await metin(p, '#dosya-secim');
     sonuc.tur_kutusu = await p.evaluate(() => document.querySelector('#ana select').value);
     await p.click('#dosya-baslat');
@@ -43,10 +52,10 @@ const metin = (p, sel) => p.evaluate(s => { const e = document.querySelector(s);
 
     // 2) Birden çok dosya seç (sahte seçici satır satır yol döner)
     await p.click('#dosya-dosyalar-sec');
-    await p.waitForFunction(() => document.querySelector('#dosya-secim').innerText.includes('öğe seçildi'), null, { timeout: 8000 });
+    await kosulBekle(p, () => document.querySelector('#dosya-secim').innerText.includes('öğe seçildi'), null, { timeout: 8000 });
     sonuc.cok_secim = await metin(p, '#dosya-secim');
     await p.click('#dosya-baslat');
-    await p.waitForFunction(() => /Tamamlandı|bozuk\/okunamadığı/.test(document.querySelector('#ana').innerText), null, { timeout: 60000 });
+    await kosulBekle(p, () => /Tamamlandı|bozuk\/okunamadığı/.test(document.querySelector('#ana').innerText), null, { timeout: 60000 });
     await bekle(800);
     sonuc.cok_ozet = await metin(p, '#dosya-ozet-metin');
 

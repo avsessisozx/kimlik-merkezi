@@ -10,6 +10,15 @@ const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const SAYFALAR = [['Anasayfa', 'Ana sayfa'], ['Harita', 'Harita'], ['İçe aktar', 'İçe aktar'], ['Arama', 'Arama'],
   ['Zaman çizelgesi', 'Zaman çizelgesi'], ['Persona', 'Persona'], ['Erişim', 'Erişim'], ['Kaynaklar', 'Kaynaklar'], ['Güvenlik', 'Güvenlik'], ['Ayarlar', 'Ayarlar'], ['Hakkında', 'Hakkında']];
 const bekle = ms => new Promise(r => setTimeout(r, ms));
+// CSP (script-src bez 'unsafe-eval') altında page.waitForFunction çalışmaz; koşulu Node tarafında yoklarız (evaluate CSP'ye takılmaz).
+async function kosulBekle(p, fn, arg, { timeout = 30000 } = {}) {
+  const son = Date.now() + timeout;
+  for (;;) {
+    if (await p.evaluate(fn, arg === undefined ? null : arg)) return;
+    if (Date.now() > son) throw new Error(`kosulBekle: ${timeout} ms içinde koşul sağlanmadı`);
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
 
 async function toplayici(sayfa) {
   const hatalar = [];
@@ -24,7 +33,7 @@ async function bildirimHatalari(p) {
 }
 async function git(p, ad) {
   await p.locator('nav button', { hasText: new RegExp('^' + ad + '$') }).click();
-  await p.waitForFunction(() => document.querySelector('#ana').children.length > 0 || document.querySelector('#bildirim div.h'), null, { timeout: 15000 }).catch(() => {});
+  await kosulBekle(p, () => document.querySelector('#ana').children.length > 0 || document.querySelector('#bildirim div.h'), null, { timeout: 15000 }).catch(() => {});
   await bekle(900);
 }
 // Yatay taşma: sayfa ya da (kaydırılabilir bir kap içinde olmayan) bir öğe görünür genişliği aşıyor mu
