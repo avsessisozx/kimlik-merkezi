@@ -15,6 +15,7 @@ Biçim bilgisi kaynakları (DOĞRULANMADI: gerçek dışa aktarma dosyası gör�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Iterator
@@ -159,8 +160,28 @@ class _ConvImporter(ScanImporter):
             seen.setdefault(e.origin.path, e.origin)
         return list(seen.values())
 
+    def _reset_dedup(self) -> None:
+        self._seen: set[bytes] = set()
+
+    def _is_copy(self, conv_id: str, role: str, ts: str | None, text: str, *, cross: bool = False) -> bool:
+        """Aynı konuşmada (cross ise platform genelinde, başka konuşma kimliği ve dosya dahil) aynı
+        rol+ts+metin daha önce geldiyse True (kopya, sayılır). `ts` boşsa kural uygulanmaz. Bellekte metin
+        değil, 16 baytlık sha1 özeti tutulur (cross'ta konuşma kimliği anahtara girmez)."""
+        if not ts:
+            return False
+        if not hasattr(self, "_seen"):
+            self._reset_dedup()
+        scope = self.platform if cross else f"{self.platform}\x00{conv_id}"
+        k = hashlib.sha1(f"{scope}\x00{role}\x00{ts}\x00{text.strip()}".encode("utf-8", "replace")).digest()[:16]
+        if k in self._seen:
+            self._skip(f"{self.platform}: kopya mesaj atlandı")
+            return True
+        self._seen.add(k)
+        return False
+
     def parse(self, path: Path) -> Iterator[EventIn]:
         _, (files, *_r) = self._scan(path)
+        self._reset_dedup()
         for e in files:
             n = 0
             try:
@@ -194,7 +215,9 @@ class ChatGPT(_ConvImporter):
                        "pinned_time", "is_read_only", "conversation_origin"}
 
     def _notes(self, rep):
-        rep.notes.append("Yalnız güncel dal (current_node'dan köke) alınır; yeniden üretilen eski dallar alınmaz")
+        rep.notes.append("Yalnız güncel dal (current_node'dan köke) alınır; yeniden üretilen eski dallar alınmaz "
+                         "(current_node yoksa en yeni yapraktan köke tek dal)")
+        rep.notes.append("Aynı rol+zaman+metinli kopya mesajlar (dosyalar arası ve farklı konuşma kimliği dahil) tek sayılır")
         rep.notes.append("Sistem/araç/gizli mesajlar ve metin olmayan içerik (görsel, düşünce özeti) atlanır ve sayılır")
 
     @staticmethod
@@ -220,6 +243,22 @@ class ChatGPT(_ConvImporter):
             return "", "kullanıcı bağlamı"
         return "", str(ct)
 
+    @staticmethod
+    def _latest_leaf(mapping: dict):
+        """Çocuğu olmayan düğümler içinden message.create_time en yeni olan (zaman yoksa sonuncusu)."""
+        parents = {n.get("parent") for n in mapping.values() if isinstance(n, dict)}
+        best, best_t = None, None
+        for nid, n in mapping.items():
+            if not isinstance(n, dict) or nid in parents:
+                continue
+            if any(c in mapping for c in (n.get("children") or []) if isinstance(c, str)):
+                continue
+            t = (n.get("message") or {}).get("create_time") if isinstance(n.get("message"), dict) else None
+            t = t if isinstance(t, (int, float)) else None
+            if best is None or best_t is None and t is None or (t is not None and (best_t is None or t >= best_t)):
+                best, best_t = nid, t
+        return best
+
     def _conversation(self, conv):
         mapping = conv.get("mapping")
         if not isinstance(mapping, dict):
@@ -231,18 +270,17 @@ class ChatGPT(_ConvImporter):
         if cts is None:
             self._skip("chatgpt: konuşma zamanı yok")
             return
-        # güncel dal: current_node -> köke, tersine çevir
-        chain, seen, cur = [], set(), conv.get("current_node")
-        while cur and cur in mapping and cur not in seen:
+        # güncel dal: current_node -> köke; current_node yoksa/geçersizse en yeni yapraktan köke (tek dal)
+        start = conv.get("current_node")
+        if not (start and start in mapping):
+            start = self._latest_leaf(mapping)
+            self._skip("chatgpt: current_node yok/geçersiz, en yeni yapraktan köke tek dal alındı")
+        chain, seen, cur = [], set(), start
+        while cur and cur in mapping and cur not in seen and isinstance(mapping[cur], dict):
             seen.add(cur)
             chain.append(mapping[cur])
             cur = mapping[cur].get("parent")
-        if not chain:  # current_node yok: kökten ilk çocuk zinciri
-            chain = [n for n in mapping.values() if isinstance(n, dict)]
-            chain.sort(key=lambda n: (n.get("message") or {}).get("create_time") or 0)
-            self._skip("chatgpt: current_node yok, düğümler zamana göre sıralandı")
-        else:
-            chain.reverse()
+        chain.reverse()
         yield title_event(platform=self.platform, conv_id=cid, title=title, ts=cts)
         default_model = conv.get("default_model_slug")
         for node in chain:
@@ -271,11 +309,16 @@ class ChatGPT(_ConvImporter):
             if not text:
                 self._skip("chatgpt: boş metin")
                 continue
-            ts = epoch_to_iso(msg.get("create_time")) or cts
+            own_ts = epoch_to_iso(msg.get("create_time"))
+            ts = own_ts or cts
+            rol = USER if role == "user" else ASSISTANT
+            if self._is_copy(cid, rol, own_ts, text, cross=True):
+                continue
+            msg_id = clean(msg.get("id") or node.get("id")) or stable_key(
+                "m", rol, ts, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest())
             yield message_event(
                 platform=self.platform, conv_id=cid, title=title, text=text, ts=ts,
-                role=USER if role == "user" else ASSISTANT,
-                msg_id=clean(msg.get("id") or node.get("id")),
+                role=rol, msg_id=msg_id,
                 model=(meta.get("model_slug") or default_model) if role == "assistant" else None)
 
 
@@ -328,10 +371,14 @@ class Claude(_ConvImporter):
             if not text and not atts:
                 self._skip("claude: boş mesaj")
                 continue
-            ts = iso_utc(m.get("created_at")) or cts
+            own_ts = iso_utc(m.get("created_at"))
+            ts = own_ts or cts
+            rol = USER if sender == "human" else ASSISTANT
+            if self._is_copy(cid, rol, own_ts, text or " ".join(atts)):
+                continue
             yield message_event(
                 platform=self.platform, conv_id=cid, title=title, text=text or " ".join(atts), ts=ts,
-                role=USER if sender == "human" else ASSISTANT,
+                role=rol,
                 msg_id=clean(m.get("uuid")) or f"{i}:{ts}", model=conv.get("model"),
                 extra={"ekler": atts} if atts else None)
 
@@ -511,11 +558,18 @@ class GenericChat(ScanImporter):
         cts = conv_ts or file_ts
         yield title_event(platform=self.platform, conv_id=conv_id, title=title, ts=cts,
                           extra=None if conv_ts else {"zaman_kaynagi": "dosya_tarihi"})
+        seen: set[tuple[str, str, str]] = set()
         for i, (role, text, ts, model) in enumerate(msgs):
             text = clean(text).strip()
             if not text:
                 self._skip("boş mesaj")
                 continue
+            if ts:
+                k = (role, ts, hashlib.sha1(text.encode("utf-8", "replace")).hexdigest())
+                if k in seen:
+                    self._skip(f"{self.platform}: kopya mesaj atlandı")
+                    continue
+                seen.add(k)
             real = ts is not None
             yield message_event(platform=self.platform, conv_id=conv_id, title=title, role=role, text=text,
                                 ts=ts or cts, msg_id=str(i), model=model,

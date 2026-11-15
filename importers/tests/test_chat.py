@@ -158,3 +158,94 @@ def test_cekirdek_kategoriyi_bilmiyorsa_durur(hub, monkeypatch):
     with pytest.raises(ImportFormatError) as ei:
         run(hub, FIX / "chat_claude", "claude")
     assert "sohbet" in str(ei.value) and hub.sources() == []
+
+
+# --- Madde 2/3: kopya mesajlar (yeniden üretim, dosyalar arası, farklı kimlik) ---
+def _metinler(hub):
+    return [(e.payload["konusma_id"], e.payload["rol"], e.text) for e in msgs(hub, "chatgpt")]
+
+
+def test_chatgpt_kopya_fixture_tek_dal_ve_tek_kayit(hub):
+    r = run(hub, FIX / "chat_chatgpt_kopya")
+    ms = _metinler(hub)
+    # (a) current_node yok, 3 çocuk: yalnız en yeni yaprak
+    assert [m for m in ms if m[0] == "kopya-a"] == [
+        ("kopya-a", "kullanici", "Soru kopya-a"), ("kopya-a", "asistan", "Cevap uc")]
+    assert not any("Cevap bir" in m[2] or "Cevap iki" in m[2] for m in ms)
+    # (b) iki dosyada aynı sohbet: tek kopya
+    assert sum(1 for m in ms if m[0] == "kopya-a") == 2
+    # (c) farklı conversation_id/message.id ile ikinci kopya: tek
+    assert sum(1 for m in ms if m[2] == "Dallanma sorusu") == 1
+    assert sum(1 for m in ms if m[2] == "Dallanma cevabi") == 1
+    # (d) aynı dalda ikiz düğüm: tek kayıt
+    assert [m[2] for m in ms if m[0] == "kopya-d"] == ["Ikiz mesaj", "Tek cevap"]
+    # (e) message.id yok: kayıt üretilir
+    assert [m[2] for m in ms if m[0] == "kopya-e"] == ["Idsiz soru", "Idsiz cevap"]
+    assert r.skipped.get("chatgpt: kopya mesaj atlandı", 0) >= 5
+    assert "Cevap" not in "".join(str(v) for v in r.skipped)  # içerik sızmaz
+
+
+def test_chatgpt_kopya_ikinci_alim_ve_farkli_zip_adi_sifir_yeni(hub, tmp_path):
+    from conftest import make_zip
+    z1 = make_zip(FIX / "chat_chatgpt_kopya", tmp_path / "bir.zip")
+    a = run(hub, z1)
+    n = count_events(hub, categories=["sohbet"])
+    assert a.added == n and n > 0
+    b = run(hub, z1)
+    assert b.added == 0 and count_events(hub, categories=["sohbet"]) == n
+    z2 = make_zip(FIX / "chat_chatgpt_kopya", tmp_path / "iki-farkli-ad.zip")
+    c = run(hub, z2)
+    assert c.added == 0 and count_events(hub, categories=["sohbet"]) == n
+
+
+def test_chatgpt_ana_fixture_farkli_zip_adi_sifir_yeni(hub, tmp_path):
+    from conftest import make_zip
+    a = run(hub, make_zip(FIX / "chat_chatgpt", tmp_path / "ilk.zip"))
+    b = run(hub, make_zip(FIX / "chat_chatgpt", tmp_path / "baska-ad.zip"))
+    assert a.added == 8 and b.added == 0
+
+
+def test_chatgpt_anahtar_bicimi_degismedi():
+    from kimlikimport.base import stable_key
+    from kimlikimport.chat import message_event
+    e = message_event(platform="chatgpt", conv_id="c", title="t", role="kullanici", text="x",
+                      ts="2023-01-01T00:00:00Z", msg_id="m")
+    assert e.event_key == stable_key("chat", "chatgpt", "c", "m")
+
+
+def test_chatgpt_msg_id_yok_yedek_anahtar_kararli(hub):
+    run(hub, FIX / "chat_chatgpt_kopya")
+    e = [x for x in msgs(hub, "chatgpt") if x.payload["konusma_id"] == "kopya-e"]
+    assert all(x.payload["mesaj_id"] for x in e)
+
+
+def test_chatgpt_gecersiz_current_node_tek_dal(hub, tmp_path):
+    d = tmp_path / "g"
+    d.mkdir()
+    data = json.loads((FIX / "chat_chatgpt_kopya/conversations-000.json").read_text())
+    data[0]["current_node"] = "yok-boyle-dugum"
+    (d / "conversations.json").write_text(json.dumps(data), encoding="utf-8")
+    run(hub, d)
+    a = [e.text for e in msgs(hub, "chatgpt") if e.payload["konusma_id"] == "kopya-a"]
+    assert a == ["Soru kopya-a", "Cevap uc"]
+
+
+def test_claude_ve_genel_konusma_ici_kopya(hub, tmp_path):
+    d = tmp_path / "cl"
+    d.mkdir()
+    m = lambda u, t, s="human": {"uuid": u, "sender": s, "text": t, "created_at": "2024-01-01T10:00:00Z"}
+    (d / "conversations.json").write_text(json.dumps([{
+        "uuid": "cc1", "name": "Ikiz", "created_at": "2024-01-01T09:00:00Z",
+        "chat_messages": [m("1", "Merhaba"), m("2", " Merhaba "), m("3", "Merhaba", "assistant")]}]), encoding="utf-8")
+    r = run(hub, d)
+    assert [e.text for e in msgs(hub, "claude")] == ["Merhaba", "Merhaba"]
+    assert r.skipped.get("claude: kopya mesaj atlandı") == 1
+    g = tmp_path / "gn"
+    g.mkdir()
+    (g / "s.json").write_text(json.dumps({"id": "g1", "title": "G", "messages": [
+        {"role": "user", "content": "Selam", "ts": "2024-01-01T10:00:00Z"},
+        {"role": "user", "content": "Selam", "ts": "2024-01-01T10:00:00Z"},
+        {"role": "user", "content": "Selam", "ts": "2024-01-01T10:00:01Z"},
+        {"role": "user", "content": "Zamansiz"}, {"role": "user", "content": "Zamansiz"}]}), encoding="utf-8")
+    r = run(hub, g, "chat_file")
+    assert [e.text for e in msgs(hub, "dosya")] == ["Selam", "Selam", "Zamansiz", "Zamansiz"]
