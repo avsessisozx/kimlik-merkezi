@@ -423,12 +423,20 @@ def cmd_kopya_temizle(args):
         r = (kopya_temizle if args.uygula else kopya_raporu)(hub, gecerli_anahtarlar=gecerli)
     ozet = (f"İncelenen: {r['incelenen']}, tam kopya: {r['tam_kopya']}, dal dışı: {r['dal_disi']}, "
             f"kalacak: {r['kalacak']}.")
+    if r["geri_acilan"]:
+        ozet += f" Yanlışlıkla kopya sayılıp gizlenmiş {r['geri_acilan']} kayıt geri açılacak." if not args.uygula \
+            else f" {r['geri_acilan']} kayıt geri açıldı."
+    if r["zamani_belirsiz"]:
+        ozet += f" Zamanı belirsiz {r['zamani_belirsiz']} mesaj kopya denetimine alınmadı."
+    if r["atlanan_konusma"]:
+        ozet += (f" {r['atlanan_konusma']} konuşmanın tüm mesajları dal dışı göründü; paket başka sürümden "
+                 "olabileceği için bu konuşmalara dokunulmadı.")
     if args.uygula:
         ozet += f" {r['tam_kopya'] + r['dal_disi']} kayıt gizlendi (silinmedi)."
     else:
         ozet += " Hiçbir şey değiştirilmedi; uygulamak için --uygula."
     if gecerli is None:
-        ozet += " (Dal dışı denetimi için --paket verin.)"
+        ozet += " Dal dışı (yeniden üretilmiş) cevaplar yalnız --paket verilirse bulunur."
     _out(args, r, ozet)
 
 

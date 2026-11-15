@@ -120,3 +120,111 @@ def test_buyuk_olcek_sure(hub, capsys):
     t2 = time.perf_counter() - t
     print(f"\nOLCUM rapor={t1:.2f}s temizle={t2:.2f}s tam_kopya={r['tam_kopya']}")
     assert r["tam_kopya"] > 0 and t1 < 15 and t2 < 30
+
+
+# ------------------------------------------------------------------ düzeltme turu
+def baslik(kid="k1", ts="2026-05-01T09:00:00Z", plat="chatgpt"):
+    return EventIn(ts=ts, kind="sohbet.konusma", category="sohbet", text="B", event_key=f"baslik-{kid}",
+                   payload={"platform": plat, "konusma_id": kid, "baslik": "B", "ts": ts})
+
+
+def gorunur(hub):
+    return {x[0] for x in hub.query("SELECT event_key FROM events WHERE hidden = 0 AND kind = 'sohbet.mesaj'")}
+
+
+def test_zamani_belirsiz_k1e_girmez(hub):
+    yedek = "2026-05-01T09:00:00Z"
+    doldur(hub, [baslik(), msg("a1", ts=yedek), msg("a2", ts=yedek), msg("b1"), msg("b2")])
+    r = kopya_raporu(hub)
+    assert r["zamani_belirsiz"] == 2 and r["tam_kopya"] == 1 and r["incelenen"] == 4
+    kopya_temizle(hub)
+    assert gorunur(hub) == {"a1", "a2", "b1"}
+
+
+def test_k1_k2_cakismasi_ve_gecerli_olan_kalir(hub):
+    # küme: a1 (küçük seq, dal dışı), a2 ve a3 (geçerli, aynı içerik); a4 farklı içerik geçerli
+    doldur(hub, [msg("a1"), msg("a2"), msg("a3"), msg("a4", text="başka", ts="2026-05-01T10:05:00Z")])
+    g = {"k1": {"a2", "a3", "a4"}}
+    r = kopya_raporu(hub, gecerli_anahtarlar=g)
+    assert r["dal_disi"] == 1 and r["tam_kopya"] == 1 and r["kalacak"] == 2
+    kopya_temizle(hub, gecerli_anahtarlar=g)
+    assert gorunur(hub) == {"a2", "a4"}  # dal dışı a1 K1'e girmedi; geçerli kümede en küçük seq kaldı
+    # farklı konuşmalarda aynı içerik: geçerli dalda olan kalır (en küçük seq değil)
+    doldur(hub, [msg("p1", text="y", kid="k4"), msg("p2", text="y", kid="k5")])
+    kopya_temizle(hub, gecerli_anahtarlar={"k5": {"p2"}})
+    assert "p2" in gorunur(hub) and "p1" not in gorunur(hub)
+
+
+def test_iki_calistirma_senaryosu_gecerli_mesaj_gorunur(hub):
+    doldur(hub, [msg("A"), msg("B")])
+    kopya_temizle(hub)  # paketsiz: A kalır, B gizlenir
+    assert gorunur(hub) == {"A"}
+    g = {"k1": {"B"}}  # güncel dalda yalnız B
+    r = kopya_raporu(hub, gecerli_anahtarlar=g)
+    assert r["geri_acilan"] == 1 and r["dal_disi"] == 1 and r["tumu_dal_disi_konusma"] == 0
+    assert gorunur(hub) == {"A"}  # kuru çalıştırma dokunmadı
+    r = kopya_temizle(hub, gecerli_anahtarlar=g)
+    assert gorunur(hub) == {"B"}
+    assert hub.query("SELECT event_key, reason FROM tombstones t JOIN events e USING(event_id)") == [("A", "kopya:dal_disi")]
+    assert kopya_temizle(hub, gecerli_anahtarlar=g)["geri_acilan"] == 0
+
+
+def test_geri_acma_sinirlari_kaynak_kaldirma_ve_elle_gizleme(hub):
+    s1 = doldur(hub, [msg("A"), msg("B")])
+    kopya_temizle(hub)  # B kopya olarak gizli
+    g = {"k1": {"B"}}
+    # B'nin kaynağı kaldırılmış: geri açılmaz
+    hub.remove_source(s1, "x")
+    assert kopya_raporu(hub, gecerli_anahtarlar=g)["geri_acilan"] == 0
+    assert hub.query("SELECT count(*) FROM events WHERE hidden = 0")[0][0] == 0
+    # elle gizlenen geçerli kayıt geri açılmaz ve kümeye girmez
+    ev_id = None
+    s2 = doldur(hub, [msg("C", text="z", kid="k9"), msg("D", text="z", kid="k9")])
+    ev_id = hub.query("SELECT event_id FROM events WHERE event_key = 'D'")[0][0]
+    hub.hide_event(ev_id, "elle")
+    r = kopya_temizle(hub, gecerli_anahtarlar={"k9": {"D", "C"}})
+    assert r["geri_acilan"] == 0 and hub.query("SELECT hidden FROM events WHERE event_key = 'D'") == [(1,)]
+    assert hub.query("SELECT reason FROM tombstones WHERE event_id = ?", (ev_id,)) == [("elle",)]
+    # kaldırılmış kaynağın kayıtları kümeye girmez
+    assert kopya_raporu(hub)["incelenen"] == 1
+
+
+def test_kopya_gizli_yeniden_iceaktarmada_gizli_kalir(hub):
+    s = doldur(hub, [msg("a1"), msg("a2")])
+    kopya_temizle(hub)
+    hub.add_events(s, [msg("a1"), msg("a2")])
+    assert gorunur(hub) == {"a1"}
+
+
+def test_tumu_dal_disi_konusma_atlanir(hub):
+    doldur(hub, [msg("a1", text="1"), msg("a2", text="2", ts="2026-05-01T10:01:00Z"),
+                 msg("b1", kid="k2", text="3"), msg("b2", kid="k2", text="4", ts="2026-05-01T10:01:00Z")])
+    g = {"k1": {"eski-anahtar"}, "k2": {"b1"}}
+    r = kopya_temizle(hub, gecerli_anahtarlar=g)
+    assert r["etkilenen_konusma"] == 2 and r["tumu_dal_disi_konusma"] == 1 and r["atlanan_konusma"] == 1
+    assert r["dal_disi"] == 1
+    assert gorunur(hub) == {"a1", "a2", "b1"}
+
+
+def test_bellek_akisla(hub):
+    import tracemalloc
+    doldur(hub, [msg(f"m{i}", kid=f"k{i}", text=("x" * 2000) + str(i % 20000)) for i in range(25000)])
+    tracemalloc.start()
+    r = kopya_raporu(hub)
+    _, tepe = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    print(f"\nTEPE BELLEK {tepe / 1e6:.1f} MB")
+    assert r["tam_kopya"] == 5000 and tepe < 25e6
+
+
+def test_sifreli_hub_kopya_temizle(root, monkeypatch):
+    from kimlikcore import sifreleme as sif
+    monkeypatch.setattr(sif, "KDF_N", 1 << 4)
+    sif.saglayici_ayarla(sif.SahteSaglayici("birinci"))
+    with Hub.open(root, write=True, sifreli=True) as h:
+        doldur(h, [msg("a1"), msg("a2"), msg("a3", text="başka")])
+        assert kopya_temizle(h)["tam_kopya"] == 1
+    with Hub.open(root, write=False) as h:
+        assert h.sifreli and len(h.timeline(limit=10)) == 2
+        assert kopya_raporu(h)["tam_kopya"] == 0
+    sif.saglayici_ayarla(None)

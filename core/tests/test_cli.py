@@ -178,3 +178,24 @@ def test_cli_kopya_temizle_paket_dal_disi(cli, tmp_path, root):
     # sohbet olmayan paket: anlaşılır hata
     bad = cli("kopya-temizle", "--paket", FIXTURES / "reddit", ok=False)
     assert bad.returncode == 1 and "sohbet" in bad.stderr
+
+
+@pytest.mark.skipif(not IMPORTERS, reason="kimlikimport kurulu değil")
+def test_cli_kopya_temizle_paket_kuru_calistirma_degistirmez(cli, root):
+    import hashlib
+    cli("baslat")
+    paket = FIXTURES / "chat_chatgpt"
+    cli("ice-al", paket)
+
+    def durum():
+        out = {}
+        for p in sorted(root.rglob("*")):
+            if p.is_file() and not p.name.endswith(("-wal", "-shm")):
+                out[str(p.relative_to(root))] = (p.stat().st_size, hashlib.sha256(p.read_bytes()).hexdigest())
+        return out
+    once = durum()
+    assert "arsiv" in " ".join(once)
+    r = cli("kopya-temizle", "--paket", paket).stdout
+    assert "Hiçbir şey değiştirilmedi" in r
+    assert durum() == once
+    assert "yalnız --paket verilirse" in cli("kopya-temizle").stdout
