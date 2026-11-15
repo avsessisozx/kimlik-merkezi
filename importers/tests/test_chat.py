@@ -181,8 +181,9 @@ def test_chatgpt_kopya_fixture_tek_dal_ve_tek_kayit(hub):
     assert [m[2] for m in ms if m[0] == "kopya-d"] == ["Ikiz mesaj", "Tek cevap"]
     # (e) message.id yok: kayıt üretilir
     assert [m[2] for m in ms if m[0] == "kopya-e"] == ["Idsiz soru", "Idsiz cevap"]
-    assert r.skipped.get("chatgpt: kopya mesaj atlandı", 0) >= 5
-    assert "Cevap" not in "".join(str(v) for v in r.skipped)  # içerik sızmaz
+    assert r.skipped.get("chatgpt: kopya mesaj atlandı") == 5  # (b) 2 + (c) 2 + (d) 1
+    assert not any(w in f"{k} {v}" for k, v in r.skipped.items()
+                   for w in ("Cevap", "Soru", "Dallanma", "Ikiz", "Idsiz"))  # içerik sızmaz (anahtar+değer)
 
 
 def test_chatgpt_kopya_ikinci_alim_ve_farkli_zip_adi_sifir_yeni(hub, tmp_path):
@@ -206,17 +207,89 @@ def test_chatgpt_ana_fixture_farkli_zip_adi_sifir_yeni(hub, tmp_path):
 
 
 def test_chatgpt_anahtar_bicimi_degismedi():
-    from kimlikimport.base import stable_key
+    # değerler değişiklikten ÖNCEKİ (main) kodla hesaplandı
     from kimlikimport.chat import message_event
     e = message_event(platform="chatgpt", conv_id="c", title="t", role="kullanici", text="x",
                       ts="2023-01-01T00:00:00Z", msg_id="m")
-    assert e.event_key == stable_key("chat", "chatgpt", "c", "m")
+    assert e.event_key == "chat:272cd9a83d44a01fd1e6109344377421a94692a3"
+    got = sorted(e.event_key for e in ChatGPT().parse(FIX / "chat_chatgpt") if e.kind == "sohbet.mesaj")
+    assert got == ["chat:1c1e8f5219dfbdcf89b760b59a30c5526b755725", "chat:275bc0e532cdc08b7adfa9225fc678a8cde21360",
+                   "chat:427811e2690b9e173bd0f956031aa8cc23bc606c", "chat:616db1ba6a8371c0d47a45b35df1664eb8edf9ea",
+                   "chat:a1efa689fa8931897093f51e22306adb5a568bb7", "chat:c0feb557690a92b790e58863e0a2b4b8d5a5044d"]
 
 
-def test_chatgpt_msg_id_yok_yedek_anahtar_kararli(hub):
-    run(hub, FIX / "chat_chatgpt_kopya")
-    e = [x for x in msgs(hub, "chatgpt") if x.payload["konusma_id"] == "kopya-e"]
-    assert all(x.payload["mesaj_id"] for x in e)
+def _noid_conv(texts, ts=None):
+    """Kimliksiz mesajlı sohbet; ts verilmezse mesajın kendi zamanı yok (konuşma zamanı yedeği)."""
+    mp, prev = {"r": {"id": "r", "parent": None, "children": ["k0"], "message": None}}, "r"
+    for i, (role, text) in enumerate(texts):
+        nid = f"k{i}"
+        mp[nid] = {"parent": prev, "children": [f"k{i+1}"] if i + 1 < len(texts) else [],
+                   "message": {"author": {"role": role}, "create_time": ts,
+                               "content": {"content_type": "text", "parts": [text]}, "metadata": {}}}
+        prev = nid
+    return {"title": "Kimliksiz", "create_time": 1700000000.0, "conversation_id": "noid-1",
+            "current_node": prev, "mapping": mp}
+
+
+def _yaz(d, data):
+    d.mkdir(exist_ok=True)
+    (d / "conversations.json").write_text(json.dumps(data), encoding="utf-8")
+    return d
+
+
+def test_chatgpt_msg_id_yok_yedek_anahtar_kararli(hub, tmp_path):
+    keys = lambda: [e.event_key for e in ChatGPT().parse(FIX / "chat_chatgpt_kopya")
+                    if e.kind == "sohbet.mesaj" and e.payload["konusma_id"] == "kopya-e"]
+    k1, k2 = keys(), keys()
+    assert len(k1) == 2 and k1 == k2 and k1[0] != k1[1]  # iki parse aynı; farklı mesaj farklı anahtar
+    # id'siz + zamansız tekrarlar ("tamam","tamam"): ayrı kayıt, yeniden içe almada kararlı
+    d = _yaz(tmp_path / "t", [_noid_conv([("user", "tamam"), ("assistant", "ok"), ("user", "tamam"),
+                                          ("user", "tamam")])])
+    a = [e for e in ChatGPT().parse(d) if e.kind == "sohbet.mesaj"]
+    assert [e.text for e in a] == ["tamam", "ok", "tamam", "tamam"] and len({e.event_key for e in a}) == 4
+    from kimlikimport.base import stable_key
+    import hashlib
+    sha = hashlib.sha1(b"tamam").hexdigest()
+    ts = a[0].ts
+    assert a[0].event_key == stable_key("chat", "chatgpt", "noid-1", stable_key("m", "kullanici", ts, sha))
+    assert a[2].event_key == stable_key("chat", "chatgpt", "noid-1", stable_key("m", "kullanici", ts, sha, 2))
+    assert a[3].event_key == stable_key("chat", "chatgpt", "noid-1", stable_key("m", "kullanici", ts, sha, 3))
+    r1 = run(hub, d)
+    r2 = run(hub, d)
+    assert r1.added == 5 and r2.added == 0  # 4 mesaj + başlık
+
+
+def test_chatgpt_parse_arasi_sifirlama():
+    imp = ChatGPT()
+    p = FIX / "chat_chatgpt_kopya"
+    ilk = [(e.kind, e.event_key) for e in imp.parse(p)]
+    ikinci = [(e.kind, e.event_key) for e in imp.parse(p)]
+    assert ilk and ilk == ikinci
+
+
+def test_chatgpt_en_yeni_yaprak_secilir(tmp_path):
+    def n(i, parent, children, t=..., text=None, role="assistant"):
+        msg = None if t is ... and text is None else {
+            "id": i, "author": {"role": role}, "create_time": None if t is ... else t,
+            "content": {"content_type": "text", "parts": [text]}, "metadata": {}}
+        return {"id": i, "parent": parent, "children": children, "message": msg}
+    B = 1700000000.0
+    mp = {"r": n("r", None, ["u"]),
+          "u": n("u", "r", ["y1", "y2", "y3", "y4", "y5"], B + 1, "Soru", "user"),
+          "y1": n("y1", "u", [], B + 2, "Eski"),
+          "y2": n("y2", "u", [], t=..., text="Zamansiz yaprak"),
+          "y3": n("y3", "u", [], B + 9, "EN YENI"),   # sözlükte ortada
+          "y4": n("y4", "u", []),                      # message: null
+          "y5": n("y5", "u", [], B + 5, "Orta")}
+    conv = {"title": "Yaprak", "create_time": B, "conversation_id": "yaprak-1", "mapping": mp}
+    imp = ChatGPT()
+    ms = [e.text for e in imp.parse(_yaz(tmp_path / "y", [conv])) if e.kind == "sohbet.mesaj"]
+    assert ms == ["Soru", "EN YENI"]
+    # hiçbir yaprakta zaman yoksa mapping'teki son yaprak
+    for k in ("y1", "y3", "y5"):
+        mp[k]["message"]["create_time"] = None
+    ms = [e.text for e in ChatGPT().parse(_yaz(tmp_path / "y2", [conv])) if e.kind == "sohbet.mesaj"]
+    assert ms == ["Soru", "Orta"]  # hiç zaman yok: mapping'teki son yaprak (y5)
 
 
 def test_chatgpt_gecersiz_current_node_tek_dal(hub, tmp_path):
