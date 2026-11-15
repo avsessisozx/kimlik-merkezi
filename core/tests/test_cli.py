@@ -127,3 +127,54 @@ def test_kaynak_sil_tty_stdin_eof(monkeypatch, root, capsys):
     assert "--onayla" in err and "Traceback" not in err
     with Hub.open(root, write=False) as r:
         assert len(r.sources()) == 1  # silinmedi
+
+
+def _sohbet_jsonl(path):
+    def m(key, rol="user", text="selam", kid="k1"):
+        return {"ts": "2026-05-01T10:00:00Z", "kind": "sohbet.mesaj", "category": "sohbet", "event_key": key,
+                "text": text, "payload": {"platform": "chatgpt", "konusma_id": kid, "baslik": "B", "rol": rol,
+                                          "mesaj_id": key, "ts": "2026-05-01T10:00:00Z"}}
+    path.write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in [m("a1"), m("a2"), m("a3", text="öteki")]) + "\n",
+                    encoding="utf-8")
+
+
+def test_cli_kopya_temizle(cli, tmp_path):
+    f = tmp_path / "s.jsonl"
+    _sohbet_jsonl(f)
+    cli("baslat")
+    cli("ice-al", f, "--tur", "jsonl")
+    kuru = cli("kopya-temizle").stdout
+    assert "tam kopya: 1" in kuru and "Hiçbir şey değiştirilmedi" in kuru and "--uygula" in kuru
+    assert len(json.loads(cli("--json", "ara", "selam").stdout)) == 2  # değişmedi
+    r = json.loads(cli("--json", "kopya-temizle", "--uygula").stdout)
+    assert r["uygulandi"] is True and r["tam_kopya"] == 1
+    assert len(json.loads(cli("--json", "ara", "selam").stdout)) == 1
+    assert json.loads(cli("--json", "kopya-temizle", "--uygula").stdout)["tam_kopya"] == 0
+    # dışa aktarım gizlenenleri gizli işaretiyle verir
+    out = tmp_path / "d.jsonl"
+    cli("disa-aktar", out)
+    satirlar = [json.loads(s) for s in out.read_text(encoding="utf-8").splitlines()]
+    gizli = [s for s in satirlar if s.get("hidden") or (s.get("data") or {}).get("hidden")]
+    assert len(gizli) == 1, satirlar[:3]
+
+
+@pytest.mark.skipif(not IMPORTERS, reason="kimlikimport kurulu değil")
+def test_cli_kopya_temizle_paket_dal_disi(cli, tmp_path, root):
+    from kimlikcore import EventIn, Hub
+    cli("baslat")
+    paket = FIXTURES / "chat_chatgpt"
+    cli("ice-al", paket)
+    with Hub.open(root, write=True) as h:
+        sid = h.add_source("sentetik", "1", None)
+        kid = h.query("SELECT json_extract(payload, '$.konusma_id') FROM events WHERE kind = 'sohbet.mesaj' LIMIT 1")[0][0]
+        h.add_events(sid, [EventIn(ts="2026-05-01T10:00:00Z", kind="sohbet.mesaj", category="sohbet",
+                                   text="yeniden üretilen dal", event_key="dal-disi-1",
+                                   payload={"platform": "chatgpt", "konusma_id": kid, "baslik": "B", "rol": "assistant",
+                                            "mesaj_id": "x", "ts": "2026-05-01T10:00:00Z"})])
+    kuru = json.loads(cli("--json", "kopya-temizle", "--paket", paket).stdout)
+    assert kuru["dal_disi"] == 1 and kuru["tam_kopya"] == 0 and kuru["uygulandi"] is False
+    cli("kopya-temizle", "--paket", paket, "--uygula")
+    assert json.loads(cli("--json", "ara", "yeniden").stdout) == []
+    # sohbet olmayan paket: anlaşılır hata
+    bad = cli("kopya-temizle", "--paket", FIXTURES / "reddit", ok=False)
+    assert bad.returncode == 1 and "sohbet" in bad.stderr

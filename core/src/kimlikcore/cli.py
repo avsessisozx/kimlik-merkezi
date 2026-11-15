@@ -386,6 +386,52 @@ def cmd_kayit_gizle(args):
     _out(args, {"gizlendi": args.kayit}, "Kayıt gizlendi.")
 
 
+def _paketten_anahtarlar(yol: Path) -> dict[str, set[str]]:
+    """Dışa aktarma paketini içe aktarıcıyla yeniden okur (veritabanına yazmaz):
+    {konusma_id: güncel dalın event_key kümesi}."""
+    if not yol.exists():
+        raise FormatError(f"Paket yok: {yol}")
+    try:
+        from kimlikimport import registry
+    except ImportError as e:
+        raise FormatError(f"İçe aktarıcı paketi (kimlikimport) yüklenemedi ({e.name}).") from e
+    imp, _sonuclar = registry.detect_best(yol)
+    if imp is None:
+        raise FormatError("Paket tanınmadı; sohbet dışa aktarması (ChatGPT, Claude) olmalı.")
+    try:
+        rapor = imp.verify_format(yol)
+        if not rapor.ok:
+            raise FormatError("Paketin biçimi doğrulanamadı; sohbet dışa aktarması olmalı.")
+        anahtarlar: dict[str, set[str]] = {}
+        for ev in imp.parse(yol):
+            if ev.kind == "sohbet.mesaj" and ev.event_key:
+                anahtarlar.setdefault(str(ev.payload.get("konusma_id")), set()).add(ev.event_key)
+    finally:
+        kapat = getattr(imp, "close", None)
+        if kapat:
+            kapat()
+    if not anahtarlar:
+        raise FormatError("Bu paket bir sohbet dışa aktarması değil (sohbet mesajı bulunamadı).")
+    return anahtarlar
+
+
+def cmd_kopya_temizle(args):
+    from .kopya import kopya_raporu, kopya_temizle
+
+    gecerli = _paketten_anahtarlar(Path(args.paket)) if args.paket else None
+    with Hub.open(args.veri, write=bool(args.uygula)) as hub:
+        r = (kopya_temizle if args.uygula else kopya_raporu)(hub, gecerli_anahtarlar=gecerli)
+    ozet = (f"İncelenen: {r['incelenen']}, tam kopya: {r['tam_kopya']}, dal dışı: {r['dal_disi']}, "
+            f"kalacak: {r['kalacak']}.")
+    if args.uygula:
+        ozet += f" {r['tam_kopya'] + r['dal_disi']} kayıt gizlendi (silinmedi)."
+    else:
+        ozet += " Hiçbir şey değiştirilmedi; uygulamak için --uygula."
+    if gecerli is None:
+        ozet += " (Dal dışı denetimi için --paket verin.)"
+    _out(args, r, ozet)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="kimlikmerkezi", description="Kimlik Merkezi komut satırı")
     p.add_argument("--veri", type=Path, default=None, help="veri klasörü (varsayılan: KIMLIK_VERI ya da kullanıcı klasörü)")
@@ -445,6 +491,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("kayit-gizle", cmd_kayit_gizle, "tek kaydı gizler")
     sp.add_argument("kayit")
     sp.add_argument("--neden", default="")
+    sp = add("kopya-temizle", cmd_kopya_temizle,
+             "sohbet kayıtlarındaki kopyaları bulur (varsayılan kuru çalıştırma); --uygula ile gizler")
+    sp.add_argument("--uygula", action="store_true", help="bulunanları gizle (yoksa yalnız rapor)")
+    sp.add_argument("--paket", help="dışa aktarma paketi: yeniden okunur, güncel dal dışı mesajlar da bulunur")
     return p
 
 

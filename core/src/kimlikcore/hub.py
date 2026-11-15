@@ -851,6 +851,29 @@ class Hub:
             )
 
     @_write_only
+    def hide_events(self, event_ids: Iterable[str], reason: str) -> int:
+        """Birçok kaydı tek işlemde gizler (her olay için ayrı tombstone yazılır).
+        Olmayan ya da zaten gizlenmiş kayıtlar atlanır. Yeni gizlenen sayısını döner."""
+        n = 0
+        with self._tx() as c:
+            created = now_iso()
+            for eid in event_ids:
+                if c.execute("SELECT 1 FROM events WHERE event_id = ?", (eid,)).fetchone() is None:
+                    continue
+                if c.execute(
+                    "SELECT 1 FROM tombstones WHERE kind = 'event_hidden' AND event_id = ?", (eid,)
+                ).fetchone():
+                    continue
+                c.execute("UPDATE events SET hidden = 1 WHERE event_id = ?", (eid,))
+                c.execute(
+                    "INSERT INTO tombstones(tombstone_id, kind, event_id, reason, created) "
+                    "VALUES (?, 'event_hidden', ?, ?, ?)",
+                    (str(uuid.uuid4()), eid, reason, created),
+                )
+                n += 1
+        return n
+
+    @_write_only
     def remove_source(self, source_id: str, reason: str) -> int:
         """Kaynağı kaldırır: olayları gizlenir (silinmez). Yeni gizlenen kayıt sayısını döner."""
         with self._tx() as c:
