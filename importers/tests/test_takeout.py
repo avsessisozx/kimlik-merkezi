@@ -240,3 +240,11 @@ def test_ilerleme_geri_cagrisi(hub, zipper):
     calls = []
     run(hub, zipper("takeout_en"), progress=lambda a, n: calls.append((a, n)))
     assert calls[0][0] == "dogrula" and ("kopyala", 0) in calls and calls[-1] == ("isle", EXPECT_PARSED)
+
+
+def test_takeout_farkli_zip_adi_sifir_yeni(hub, tmp_path):
+    from conftest import make_zip
+    a = run(hub, make_zip(FIX / "takeout_en", tmp_path / "bir.zip"), "google_takeout")
+    n = count_events(hub)
+    b = run(hub, make_zip(FIX / "takeout_en", tmp_path / "takeout-baska-ad.zip"), "google_takeout")
+    assert a.added == n and b.added == 0 and count_events(hub) == n

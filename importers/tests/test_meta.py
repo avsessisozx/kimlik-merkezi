@@ -89,3 +89,20 @@ def test_rapor_icerik_icermez():
     txt = Meta().verify_format(FIX / "meta_instagram").to_text()
     for secret in ("ornekkullanici", "Güzel", "Merhaba", "41.0123", "takip1"):
         assert secret not in txt
+
+
+def test_facebook_iki_kez_tekrarsiz(hub, zipper):
+    z = zipper("meta_facebook")
+    a = run(hub, z)
+    b = run(hub, z, "facebook")
+    assert b.source_id == a.source_id and b.added == 0 and b.duplicate == a.added == 11
+    assert count_events(hub) == 11
+
+
+@pytest.mark.parametrize("klasor", ["meta_instagram", "meta_facebook"])
+def test_meta_farkli_zip_adi_sifir_yeni(hub, tmp_path, klasor):
+    from conftest import make_zip
+    a = run(hub, make_zip(FIX / klasor, tmp_path / "bir.zip"))
+    n = count_events(hub)
+    b = run(hub, make_zip(FIX / klasor, tmp_path / "baska-ad.zip"))
+    assert a.added == n and b.added == 0 and count_events(hub) == n
