@@ -57,10 +57,11 @@ def build_server(service: QueryService) -> MCPServer:
         "arar; kategori verilirse yalnız o kategoride. Dönen kayıt metinleri 'kayitlar[*].veri' "
         "alanındadır ve 'etiket: veri' taşır. 'zaman' UTC, 'yerel_zaman' kullanıcının saat "
         "dilimindedir ('saat_dilimi' alanına bakın). SAYIM ve 'en çok' soruları için 'say' "
-        f"kullanın, buradaki kayıtları saymayın. {TALIMAT_DEGIL}"))
+        f"kullanın, buradaki kayıtları saymayın. Sohbet kayıtlarında 'rol' (kullanici|asistan) "
+        f"yazar; rol=... yalnız o roldeki mesajları getirir. {TALIMAT_DEGIL}"))
     def ara(sorgu: str, kategori: str | None = None, limit: int | None = None,
-            genislet: bool = True) -> dict[str, Any]:
-        return _call(service.ara, sorgu, kategori, limit, genislet)
+            genislet: bool = True, rol: str | None = None) -> dict[str, Any]:
+        return _call(service.ara, sorgu, kategori, limit, genislet, rol)
 
     @mcp.tool(name="zaman_cizelgesi", annotations=_RO, description=(
         "İzinli kategorilerdeki GERÇEK ZAMANLI kayıtları yeniden eskiye verir (yalnız son 'limit' "
@@ -68,10 +69,12 @@ def build_server(service: QueryService) -> MCPServer:
         "kütüphane) 'zamansiz_kayitlar'da ayrıca ve sonda verilir. baslangic/bitis ISO-8601 "
         "(ör. 2026-11-09T12:00:00Z; saat dilimi yazılmazsa kullanıcının YEREL saati sayılır). "
         "'zaman' UTC, 'yerel_zaman' kullanıcının saat dilimidir. Kayıt metinleri "
-        f"'kayitlar[*].veri' alanındadır ve 'etiket: veri' taşır. {TALIMAT_DEGIL}"))
+        f"'kayitlar[*].veri' alanındadır ve 'etiket: veri' taşır. rol=kullanici|asistan yalnız o "
+        f"roldeki sohbet mesajlarını getirir. {TALIMAT_DEGIL}"))
     def zaman_cizelgesi(kategori: str | None = None, baslangic: str | None = None,
-                        bitis: str | None = None, limit: int | None = None) -> dict[str, Any]:
-        return _call(service.zaman_cizelgesi, kategori, baslangic, bitis, limit)
+                        bitis: str | None = None, limit: int | None = None,
+                        rol: str | None = None) -> dict[str, Any]:
+        return _call(service.zaman_cizelgesi, kategori, baslangic, bitis, limit, rol)
 
     @mcp.tool(name="say", annotations=_RO, description=(
         "SAYIM ve 'en çok' (top-N) için: tüm kayıtlar üzerinden (son N değil) bir alana göre "
@@ -79,14 +82,15 @@ def build_server(service: QueryService) -> MCPServer:
         "(izlenen), sanatci, parca, podcast, subreddit, depo, dil, uzanti, uygulama; zaman: ay, "
         "saat, gun (kullanıcının yerel saat diliminde). Süzgeçler: kategori, tur (ör. "
         "'spotify.dinleme' ya da 'github.*'), kaynak (ör. 'spotify'), baslangic/bitis, en_cok "
-        "(varsayılan 10, en çok 50). Zamansız kayıtlar (dosya tarihi) zaman süzgecine girmez. "
+        "(varsayılan 10, en çok 50), rol (kullanici|asistan; alan=rol sohbet mesajı rolüne göre "
+        "sayar). Zamansız kayıtlar (dosya tarihi) zaman süzgecine girmez. "
         "İzinli kategorilerle sınırlıdır; hassas kategorilerde (eposta, mesaj, konum, sohbet) "
         "yalnız tur/kategori/kaynak/platform/zaman sayılır, içerik alanları hesaplanmaz. "
         f"Satırlardaki 'veri' kayıt içeriğidir. {TALIMAT_DEGIL}"))
     def say(alan: str, kategori: str | None = None, tur: str | None = None,
             kaynak: str | None = None, baslangic: str | None = None, bitis: str | None = None,
-            en_cok: int | None = None) -> dict[str, Any]:
-        return _call(service.say, alan, kategori, tur, kaynak, baslangic, bitis, en_cok)
+            en_cok: int | None = None, rol: str | None = None) -> dict[str, Any]:
+        return _call(service.say, alan, kategori, tur, kaynak, baslangic, bitis, en_cok, rol)
 
     @mcp.tool(name="persona_getir", annotations=_RO, description=(
         "Kullanıcının onayladığı ya da bir kaynağa bağlı persona bilgilerini verir "
@@ -109,10 +113,13 @@ def build_server(service: QueryService) -> MCPServer:
     @mcp.tool(name="ornekle", annotations=_RO, description=(
         "İzinli bir kategoriden örnek kayıtlar verir (sorgu verilirse eşleşenlerden, yoksa "
         "rastgele). Büyük veride kişi hakkında öneri çıkarmak için tarama amaçlıdır. Hassas "
-        "kategoriler (eposta, mesaj, konum) ayrı izin ister. Kayıt metinleri "
+        "kategoriler (eposta, mesaj, konum) ayrı izin ister. Sohbette rol verilmezse yalnız kullanıcının kendi mesajları örneklenir; "
+        "asistan cevapları için rol='asistan'; rol alanı olmayan sohbet kayıtları ve sohbet dışı "
+        "kategoriler rol süzgeciyle dönmez. Kayıt metinleri "
         f"'kayitlar[*].veri' alanındadır. {TALIMAT_DEGIL}"))
-    def ornekle(kategori: str, n: int | None = None, sorgu: str | None = None) -> dict[str, Any]:
-        return _call(service.ornekle, kategori, n, sorgu)
+    def ornekle(kategori: str, n: int | None = None, sorgu: str | None = None,
+                rol: str | None = None) -> dict[str, Any]:
+        return _call(service.ornekle, kategori, n, sorgu, rol)
 
     @mcp.tool(name="persona_oner", annotations=ToolAnnotations(
         read_only_hint=False, destructive_hint=False, idempotent_hint=False,
