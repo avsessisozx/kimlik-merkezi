@@ -29,6 +29,7 @@ MAX_AY = 120
 DEGER_UZUNLUK = 200
 _GERCEK_ZAMAN = "COALESCE(json_extract(payload, '$.zaman_kaynagi'), '') <> 'dosya_tarihi'"
 _PLATFORM = "json_extract(payload, '$.platform')"
+_ROL = "json_extract(payload, '$.rol')"
 # Depo adı: URL biçimindeki ("<ana makine>/kullanici/depo") ve yalın "depo" aynı depo sayılsın -> son yol parçası
 _DEPO_HAM = "COALESCE(json_extract(payload, '$.depo'), json_extract(payload, '$.ad'))"
 _DEPO = f"replace({_DEPO_HAM}, rtrim({_DEPO_HAM}, replace({_DEPO_HAM}, '/', '')), '')"
@@ -40,6 +41,7 @@ ALANLAR: dict[str, tuple[str, str, bool]] = {
     "kategori": ("category", "1", False),
     "kaynak": (_KAYNAK, "1", False),
     "platform": (_PLATFORM, f"{_PLATFORM} IS NOT NULL", False),
+    "rol": (_ROL, f"{_ROL} IS NOT NULL", False),
     "terim": (_TERIM, "kind IN ('google.arama', 'youtube.arama')", True),
     "site": (_HOST, "kind = 'chrome.ziyaret'", True),
     "kanal": (_KANAL, "kind = 'youtube.izleme'", True),
@@ -68,8 +70,8 @@ class Toplulastirici:
 
     # ------------------------------------------------------------------ yardımcılar
     def _kosul(self, kategoriler: list[str], tur: str | None, kaynak: str | None,
-               since: str | None, until: str | None, gercek_zaman: bool
-               ) -> tuple[str, list[Any]]:
+               since: str | None, until: str | None, gercek_zaman: bool,
+               rol: str | None = None) -> tuple[str, list[Any]]:
         if not kategoriler:
             return "0", []
         w = "hidden = 0 AND category IN (%s)" % ",".join("?" * len(kategoriler))
@@ -84,6 +86,9 @@ class Toplulastirici:
         if kaynak:
             w += " AND source_id IN (SELECT source_id FROM sources WHERE kind = ?)"
             a.append(kaynak)
+        if rol:
+            w += f" AND {_ROL} = ?"
+            a.append(rol)
         if since is not None:
             w += " AND ts >= ?"
             a.append(since)
@@ -103,7 +108,7 @@ class Toplulastirici:
     # ------------------------------------------------------------------ ana işlev
     def say(self, alan: str, *, kategoriler: list[str], tur: str | None = None,
             kaynak: str | None = None, since: str | None = None, until: str | None = None,
-            en_cok: int | None = None) -> dict[str, Any]:
+            en_cok: int | None = None, rol: str | None = None) -> dict[str, Any]:
         """`since`/`until` UTC ISO (çağıran normalleştirir). `kategoriler` izin süzülmüş liste."""
         if alan not in TUM_ALANLAR:
             raise FormatError(f"Bilinmeyen alan '{alan}'. Geçerli alanlar: {', '.join(TUM_ALANLAR)}.")
@@ -122,9 +127,9 @@ class Toplulastirici:
                 notlar.append(f"'{alan}' içerik alanıdır; hassas kategorilerde hesaplanmaz.")
             cats = kalan
         # Aynı filtrenin toplamı ve zamansız dışlanan sayısı
-        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False)
+        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False, rol)
         toplam = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w_hepsi}", a_hepsi)[0][0]
-        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli)
+        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli, rol)
         if zaman_alani or aralikli:
             sayilan = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w}", a)[0][0]
             zamansiz = toplam - sayilan

@@ -41,7 +41,7 @@ def test_arac_listesi_ve_aciklamalar(world):
     assert "kullanıcı onaylamadan persona değişmez" in tools["persona_oner"].description
     assert all(t.annotations.read_only_hint for n, t in tools.items() if n != "persona_oner")
     assert tools["persona_oner"].annotations.read_only_hint is False
-    assert set(tools["ara"].input_schema["properties"]) == {"sorgu", "kategori", "limit", "genislet"}
+    assert set(tools["ara"].input_schema["properties"]) == {"sorgu", "kategori", "limit", "genislet", "rol"}
     assert tools["ara"].input_schema["required"] == ["sorgu"]
 
 
