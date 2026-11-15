@@ -19,7 +19,8 @@ local.properties
 *.log
 .env
 
-# Ajan geçici çalışma klasörleri
-.claude/
+# Ajan geçici çalışma klasörleri (ajan tanımları .claude/agents/ depoda kalır)
+.claude/*
+!.claude/agents/
 cikti/
 windows/paket/yukselt/
