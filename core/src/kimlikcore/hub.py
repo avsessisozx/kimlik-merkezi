@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -849,6 +850,77 @@ class Hub:
                 "VALUES (?, 'event_hidden', ?, ?, ?)",
                 (str(uuid.uuid4()), event_id, reason, now_iso()),
             )
+
+    @staticmethod
+    def _parcalar(ids: Iterable[str], boyut: int = 500):
+        it = iter(ids)
+        while True:
+            parca = list(itertools.islice(it, boyut))
+            if not parca:
+                return
+            yield parca
+
+    def _gizle_toplu(self, c: sqlite3.Connection, ids: Iterable[str], reason: str, created: str) -> int:
+        n = 0
+        for parca in self._parcalar(ids):
+            ph = ",".join("?" * len(parca))
+            var = {r[0] for r in c.execute(f"SELECT event_id FROM events WHERE event_id IN ({ph})", parca)}
+            zaten = {r[0] for r in c.execute(
+                f"SELECT event_id FROM tombstones WHERE kind = 'event_hidden' AND event_id IN ({ph})", parca)}
+            yapilacak = [i for i in dict.fromkeys(parca) if i in var and i not in zaten]
+            if not yapilacak:
+                continue
+            c.executemany("UPDATE events SET hidden = 1 WHERE event_id = ?", [(i,) for i in yapilacak])
+            c.executemany(
+                "INSERT INTO tombstones(tombstone_id, kind, event_id, reason, created) "
+                "VALUES (?, 'event_hidden', ?, ?, ?)",
+                [(str(uuid.uuid4()), i, reason, created) for i in yapilacak])
+            n += len(yapilacak)
+        return n
+
+    @_write_only
+    def hide_events(self, event_ids: Iterable[str], reason: str) -> int:
+        """Birçok kaydı tek işlemde gizler (her olay için ayrı tombstone yazılır). `event_ids`
+        üreteç olabilir. Olmayan ya da zaten gizlenmiş kayıtlar atlanır; yeni gizlenen sayısını döner."""
+        with self._tx() as c:
+            return self._gizle_toplu(c, event_ids, reason, now_iso())
+
+    def query_each(self, sql: str, params: Iterable[Any] | dict[str, Any], fn: Callable[[tuple], None]) -> None:
+        """Salt okunur SQL; satırları belleğe toplamadan tek tek `fn`'e verir (`fn` hub'a yazmamalı)."""
+        with self._mutex:
+            c = self._conn
+            if self._write:
+                c.execute("PRAGMA query_only = ON")
+            try:
+                for row in c.execute(sql, params):
+                    fn(row)
+            finally:
+                if self._write:
+                    c.execute("PRAGMA query_only = OFF")
+
+    @_write_only
+    def _kopya_uygula(self, gizle: Iterable[tuple[Iterable[str], str]], geri_ac: Iterable[str]) -> tuple[int, int]:
+        """kopya-temizle için dar yardımcı, TEK işlemde: yalnız nedeni `kopya:` ile başlayan
+        tombstone'la gizlenmiş kayıtları geri açar (tombstone satırı silinir), sonra `gizle`
+        ([(olay kimlikleri, neden)]) kayıtlarını gizler. (gizlenen, geri_acilan) döner."""
+        geri = giz = 0
+        with self._tx() as c:
+            for parca in self._parcalar(geri_ac):
+                ph = ",".join("?" * len(parca))
+                ok = [r[0] for r in c.execute(
+                    f"SELECT event_id FROM tombstones WHERE kind = 'event_hidden' AND reason LIKE 'kopya:%' "
+                    f"AND event_id IN ({ph})", parca)]
+                if not ok:
+                    continue
+                ph2 = ",".join("?" * len(ok))
+                c.execute(f"UPDATE events SET hidden = 0 WHERE event_id IN ({ph2})", ok)
+                c.execute(f"DELETE FROM tombstones WHERE kind = 'event_hidden' AND reason LIKE 'kopya:%' "
+                          f"AND event_id IN ({ph2})", ok)
+                geri += len(ok)
+            created = now_iso()
+            for ids, neden in gizle:
+                giz += self._gizle_toplu(c, ids, neden, created)
+        return giz, geri
 
     @_write_only
     def remove_source(self, source_id: str, reason: str) -> int:
