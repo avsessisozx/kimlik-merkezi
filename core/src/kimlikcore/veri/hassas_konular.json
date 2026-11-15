@@ -1,0 +1,77 @@
+{
+  "surum": 1,
+  "aciklama": "Konu bazında hassasiyet sözcük listesi. terimler: tek sözcük = sözcük ön eki (kök en az 4 harf), çok sözcük = ardışık öbek (son sözcük ön ek). tam: yalnız tam sözcük. Metin Türkçe katlanır (fold): büyük/küçük, İ/ı, aksanlar önemsiz.",
+  "konular": {
+    "saglik": {
+      "terimler": [
+        "doktor", "hastane", "teşhis", "ilaç", "reçete", "ameliyat", "depresyon", "anksiyete",
+        "psikiyatr", "psikolog", "terapi", "terapist", "kanser", "diyabet", "tansiyon", "hamile",
+        "gebelik", "hastalık", "hasta", "tedavi", "semptom", "migren", "astım", "alerji",
+        "enfeksiyon", "poliklinik", "klinik", "muayene", "eczane", "antidepresan", "kemoterapi",
+        "radyoterapi", "kolesterol", "tıbbi",
+        "kan tahlili", "tahlil sonuç", "laboratuvar sonuç", "şeker hastalığı", "ruh sağlığı",
+        "panik atak", "uyku bozukluğu", "kalp krizi", "ağrı kesici", "kesin tanı", "tanı konuldu",
+        "tanı koyuldu", "sağlık sorunu", "sağlık raporu", "doğum kontrol", "kısırlık tedavisi",
+        "doctor", "hospital", "diagnos", "prescription", "surgery", "depression", "anxiety",
+        "psychiatr", "therap", "medication", "medical", "medicine", "cancer", "diabetes", "pregnan",
+        "symptom", "chemotherapy",
+        "blood pressure", "mental health", "panic attack", "health condition", "sick leave"
+      ],
+      "tam": ["hiv", "aids"]
+    },
+    "hukuk": {
+      "terimler": [
+        "avukat", "dava", "mahkeme", "boşan", "savcı", "tutuklama", "tutuklu", "dilekçe",
+        "velayet", "nafaka", "hapis", "miras", "noter", "tazminat", "yargıtay", "istinaf",
+        "sanık", "mağdur", "gözaltı", "kovuşturma", "soruşturma", "arabulucu", "ihtarname",
+        "ceza davası", "hapis cezası", "para cezası", "adli sicil", "ceza mahkeme", "icra dairesi",
+        "icra takibi", "tahliye davası", "polis ifadesi", "iş davası", "hukuki destek",
+        "hukuki danışman", "sözleşme feshi", "kira davası", "tapu davası", "adli yardım",
+        "lawyer", "attorney", "lawsuit", "divorce", "custody", "alimony", "arrest", "indictment",
+        "prosecutor", "probation", "verdict", "plaintiff", "defendant", "subpoena", "litigation",
+        "restraining order", "criminal charge", "legal advice", "court hearing", "child support"
+      ],
+      "tam": ["icra", "icrası", "icraya", "icradan", "icralık", "court", "courts", "sued", "sue"]
+    },
+    "finans": {
+      "terimler": [
+        "maaş", "borç", "kredi", "iban", "haciz", "ipotek", "iflas", "konkordato", "taksit",
+        "faiz", "mevduat", "birikim", "yatırım", "findeks", "temerrüt",
+        "kredi kartı", "banka hesabı", "vergi borcu", "vergi dairesi", "vergi beyanname",
+        "gelir vergisi", "faiz oranı", "kredi notu", "hisse senedi", "ödeme planı", "sicil affı",
+        "banka kartı", "hesap numarası", "maaş zammı", "ek gelir", "emekli maaşı", "borsa hesabı",
+        "kripto cüzdan", "kredi başvuru", "limit aşımı",
+        "salary", "debt", "loan", "mortgage", "bankruptcy", "overdraft", "foreclosure",
+        "credit card", "bank account", "tax return", "income tax", "credit score", "savings account",
+        "net worth", "payday loan", "monthly income"
+      ],
+      "tam": ["ibanı"]
+    },
+    "din_siyaset": {
+      "terimler": [
+        "namaz", "oruç", "kilise", "ateist", "ateizm", "deist", "mezhep", "tarikat", "cemaat",
+        "imam", "ibadet", "tesbih", "kuran", "incil", "tevrat", "sinagog", "ramazan", "miting",
+        "ideoloji", "muhalefet", "iktidar", "milletvekili", "kemalist", "komünist", "komünizm",
+        "faşist", "faşizm", "sosyalist", "milliyetçi", "muhafazakâr", "tbmm",
+        "siyasi parti", "parti üyeliği", "parti üyesi", "parti kongresi", "oy verdim", "oy vereceğim",
+        "oy kullan", "genel seçim", "yerel seçim", "seçim sonuç", "seçim kampanya", "seçim sandığı",
+        "cumhurbaşkanlığı seçimi", "belediye başkan", "dini inanç", "dini görüş",
+        "prayer", "church", "mosque", "synagogue", "atheist", "religion", "religious", "ideology",
+        "bible", "quran", "political party", "voted for", "election result", "political view"
+      ],
+      "tam": ["dua", "duam", "duası", "duaya", "cami", "camii", "camide", "camiye", "pray", "prayed", "praying", "solcu", "sağcı"]
+    },
+    "cinsellik": {
+      "terimler": [
+        "cinsel", "eşcinsel", "biseksüel", "heteroseksüel", "lgbt", "lezbiyen", "porno", "erotik",
+        "sevişme", "mastürbasyon", "prezervatif", "orgazm", "fetiş", "bdsm", "onlyfans",
+        "escort", "cinsellik", "transseksüel",
+        "cinsel yönelim", "cinsel kimlik", "cinsel ilişki", "cinsel taciz", "yetişkin içerik",
+        "trans birey", "cinsiyet geçiş", "cinsel sağlık", "cinsel sorun", "cinsel hayat",
+        "sexual", "homosexual", "bisexual", "transgender", "lesbian", "erotic", "porn", "fetish",
+        "orgasm", "queer", "nsfw", "sex life", "coming out", "gender identity"
+      ],
+      "tam": ["seks", "sekse", "seksle", "seksten", "sex", "gey", "geyler", "gay", "gays"]
+    }
+  }
+}

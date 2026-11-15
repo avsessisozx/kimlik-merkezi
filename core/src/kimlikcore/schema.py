@@ -6,6 +6,7 @@ uygulanır; hata olursa geri alınır ve sürüm değişmez. Göçler yalnız ek
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timezone
@@ -202,7 +203,76 @@ _V4: Statements = [
     )""",
 ]
 
-MIGRATIONS: dict[int, Statements] = {1: _V1, 2: _V2, 3: _V3, 4: _V4}
+_GERI_DOLDURMA_GRUP = 5000
+
+
+def geri_isaretle(conn: sqlite3.Connection, siniflandirici=None, progress=None) -> tuple[int, int]:
+    """Tüm olayların `onem` ve `hassas_konu` değerlerini güncel kural/listeyle yeniden hesaplar.
+
+    Satırları `seq` sırasıyla gruplar halinde gezer (bellek sabit; 1 milyon satırda da şişmez),
+    yalnız değişen satırları günceller. (incelenen, değişen) döner. Çağıran işlemi yönetir.
+    """
+    from . import hassas as _hassas
+    from .onem import SOHBET_KIND, onem_hesapla
+
+    sn = siniflandirici or _hassas.paket_siniflandirici()
+    son = 0
+    incelenen = degisen = 0
+    while True:
+        rows = conn.execute(
+            "SELECT seq, kind, category, CASE WHEN kind = ? THEN payload END, text, onem, hassas_konu "
+            "FROM events WHERE seq > ? ORDER BY seq LIMIT ?", (SOHBET_KIND, son, _GERI_DOLDURMA_GRUP),
+        ).fetchall()
+        if not rows:
+            return incelenen, degisen
+        guncel = []
+        for seq, kind, cat, payload, text, onem, hk in rows:
+            try:
+                pl = json.loads(payload) if payload else {}
+            except ValueError:
+                pl = {}
+            yeni_onem = onem_hesapla(kind, cat, pl)
+            yeni_hk = _hassas.isaret(sn.konular(text))
+            if yeni_onem != onem or yeni_hk != hk:
+                guncel.append((yeni_onem, yeni_hk, seq))
+        if guncel:
+            conn.executemany("UPDATE events SET onem = ?, hassas_konu = ? WHERE seq = ?", guncel)
+        incelenen += len(rows)
+        degisen += len(guncel)
+        son = rows[-1][0]
+        if progress:
+            progress(incelenen)
+
+
+def _v5(conn: sqlite3.Connection, veri_klasoru=None) -> None:
+    """v5: `events.onem`, `events.hassas_konu`, `konu_izinleri`; mevcut olaylar geriye dönük işaretlenir."""
+    from . import hassas as _hassas
+
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+    if "onem" not in cols:
+        conn.execute("ALTER TABLE events ADD COLUMN onem INTEGER NOT NULL DEFAULT 1 CHECK (onem IN (0, 1, 2))")
+    if "hassas_konu" not in cols:
+        conn.execute("ALTER TABLE events ADD COLUMN hassas_konu TEXT")
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS konu_izinleri (
+        app_id TEXT NOT NULL REFERENCES app_keys(app_id),
+        konu TEXT NOT NULL,
+        granted_at TEXT NOT NULL,
+        expires_at TEXT,
+        PRIMARY KEY (app_id, konu)
+    )""")
+    sn, _uyari = _hassas.yukle(veri_klasoru)
+    geri_isaretle(conn, sn)
+
+
+def v5_adimi(veri_klasoru=None):
+    """Veri klasöründeki ek listeyi de kullanan v5 adımı (Hub açılışı bunu verir)."""
+    return lambda conn: _v5(conn, veri_klasoru)
+
+
+MIGRATIONS: dict[int, Statements | Callable[[sqlite3.Connection], None]] = {
+    1: _V1, 2: _V2, 3: _V3, 4: _V4, 5: _v5,
+}
 SCHEMA_VERSION = max(MIGRATIONS)
 
 

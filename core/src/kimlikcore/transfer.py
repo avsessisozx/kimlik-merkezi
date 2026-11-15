@@ -16,8 +16,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from . import hassas as _hassas
 from .errors import FormatError, HubNotEmptyError, SchemaTooNew
 from .models import ExportResult, ImportResult
+from .onem import onem_hesapla
 from .streaming import iter_lines
 from .turkish import fold
 
@@ -37,6 +39,7 @@ TYPES: list[tuple[str, str]] = [
     ("device", "devices"),
     ("app_key", "app_keys"),
     ("permission", "permissions"),
+    ("konu_izni", "konu_izinleri"),
     ("fact", "facts"),
     ("contradiction", "contradictions"),
     ("event", "events"),
@@ -185,6 +188,9 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
                     vals = dict(rec)
                     vals["payload"] = canonical_json(rec["payload"])
                     vals["hidden"] = int(bool(rec["hidden"]))
+                    # Önem ve hassas konu işareti içe alınırken yeniden hesaplanır (eski dosyalarda yok).
+                    vals["onem"] = onem_hesapla(rec["kind"], rec["category"], rec["payload"])
+                    vals["hassas_konu"] = _hassas.isaret(hub._siniflandirici.konular(rec["text"]))
                     names = list(vals)
                     cur = c.execute(
                         f"INSERT INTO events({', '.join(names)}) VALUES ({','.join('?' * len(names))})",
@@ -206,7 +212,13 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
         if header is None or footer is None:
             raise FormatError("Dosya eksik ya da kesik (header/footer yok).")
         got = acc.result()
-        if got != {"counts": footer.get("counts"), "digests": footer.get("digests")}:
+        # Eski dışa aktarımlarda sonradan eklenen kayıt türleri (ör. konu_izni) yoktur: yalnız
+        # dosyadakiler karşılaştırılır; dosyada olmayan türde kayıt çıkmamış olmalıdır.
+        fc, fd = footer.get("counts") or {}, footer.get("digests") or {}
+        if (not isinstance(fc, dict) or not isinstance(fd, dict)
+                or any(got["counts"][t] != fc.get(t, 0) for t in got["counts"])
+                or any(got["digests"][t] != fd[t] for t in got["digests"] if t in fd)
+                or any(t not in got["counts"] for t in fc)):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
             if summarize(c) != got:

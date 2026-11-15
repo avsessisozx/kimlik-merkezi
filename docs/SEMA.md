@@ -88,3 +88,33 @@ Gizli kayıt süzmesi bu yöntemlerde otomatik DEĞİLDİR: `events` sorguların
 
 ## 12. Gelen kutusu (v4)
 Birden çok MCP süreci erişim günlüğüne ve öneri kuyruğuna aynı anda yazmak ister; `kimlik.db` ise tek yazan süreçtir (şifreliyse bellek içi kapsayıcı, her yazımda dosyanın tamamı yeniden yazılır). Süreçlerin kapsayıcıyı kendi aralarında "oku-değiştir-yaz" yapması güncelleme kaybettirir, ayrı SQLite dosyası ise şifrelenemez. Bu yüzden: `GelenKutusu.yaz` her kaydı `gelen/` altında benzersiz adlı kendi dosyasına (geçici dosya + `fsync` + `os.replace`; şifreliyse aynı AES-GCM biçimi) bırakır; hiçbir iki yazar aynı dosyaya dokunmaz, kilit gerekmez. Yazan Hub `gelen_birlestir` ile tek işlemde tabloya işler (`synchronous=FULL`, şifreliyse kapsayıcı yazıldıktan sonra), sonra dosyaları siler; yarıda kalırsa öneri `oneri_id` ile yinelenmez, ama erişim satırı çökme anında bir kez çift yazılabilir (dosya silinmeden önce süreç ölürse). Okuyucular tablo + bekleyen dosyaları birlikte görür. Yazan Hub açık olsa da MCP yazabilir (kilit gerekmez).
+
+## 13. Şema v5: önem ve konu bazında hassasiyet
+Her olay içe alınırken iki işaret alır. Sunucu bunları ayrı bir işte kullanır; çekirdek yalnız hesaplar ve saklar.
+
+**Sütunlar (`events`)**
+- `onem INTEGER NOT NULL DEFAULT 1 CHECK (onem IN (0,1,2))`: 0 düşük, 1 olağan, 2 yüksek.
+- `hassas_konu TEXT`: `NULL` = işaret yok; aksi halde konu kimlikleri alfabetik, virgülle (`finans,saglik`). `Event.hassas_konu` bunu `tuple[str, ...]` olarak verir (boş = işaret yok); `Event.onem` int.
+
+**Tablo `konu_izinleri`**: `(app_id → app_keys, konu, granted_at, expires_at, PRIMARY KEY(app_id, konu))`. `permissions` ile aynı kalıp: dış anahtar, silme/iptal tarafı (sunucu) aynı davranır; dışa/içe aktarımda `konu_izni` kayıt türü olarak taşınır. Eski dışa aktarım dosyalarında bu tür yoktur; yine içe alınır.
+
+**Göç (v4 → v5)**: çağrılabilir adım. Sütunlar/tablo eklenir, sonra mevcut TÜM olaylar `seq` sırasıyla 5000'lik gruplarla gezilip yalnız değişenler güncellenir (bellek sabit). Hata olursa tüm adım geri alınır (sürüm 4 kalır). Idempotenttir. Salt okunur açış göç etmez: eski şemada `SchemaTooOld`. Veri klasöründeki ek liste (aşağıda) göçte de kullanılır.
+
+**Önem kural tablosu** (`kimlikcore/onem.py`, `onem_hesapla(kind, category, payload)`; kural verisi modülün başındadır)
+
+| Önem | Kural |
+|---|---|
+| 2 yüksek (kullanıcının kendi yazdığı) | `sohbet.mesaj` ve `payload.rol == "kullanici"`; kind'ın son parçası `gonderi` ya da `yorum` (instagram/facebook/meta/reddit ve diğerleri: kural son parçaya bakar, platform adına değil); category `notlar`; kind `github.depo`, `github.issue`, `github.pr` |
+| 0 düşük (etkileşim izi) | kind'ın son parçası `begeni`, `takip`, `takipci`, `tepki`, `oy`, `abone`, `abonelik`, `arkadas`, `kaydedilen`, `yildiz`; kind `github.izleme` (`youtube.izleme` düşük DEĞİL); `sohbet.mesaj` ve `payload.rol == "asistan"` |
+| 1 olağan | geri kalan her şey (mesaj kategorisi dahil: gönderenin hesap sahibi olup olmadığı bilinmez; `sohbet.mesaj` rolü başka/yoksa da 1) |
+
+**Hassas konu yöntemi ve SINIRLARI** (`kimlikcore/hassas.py`, veri: `kimlikcore/veri/hassas_konular.json`)
+Konular: `saglik`, `hukuk`, `finans`, `din_siyaset`, `cinsellik`. Yöntem yalnız bir SÖZCÜK LİSTESİdir:
+metin `fold()` ile katlanır (büyük/küçük, İ/ı, aksanlar önemsiz), sözcüklere ayrılır. Tek sözcüklü terim = sözcük ÖN EKİ (Türkçe ekler için; kök en az 4 harf: `doktor` → `doktorum`); `"tam"` listesi yalnız tam sözcük; çok sözcüklü terim = ardışık öbek (son sözcük ön ek eşleşmeli, öncekiler tam).
+- Bağlamı anlamaz. Yanlış pozitif ve yanlış negatif OLUR. Bilinen yanlış pozitif: `doktora tezi` `saglik` sayılır (`doktor` ön eki `doktora`yı yakalar); testle sabitlenmiştir. Aynı şekilde `hasta`, `klinik`, `kredi`, `dava` ön ekleri çağrışımlı sözcükleri de yakalar. Sözcük listede yoksa (yazım hatası, argo, başka dil, eş anlamlı) kaçırılır.
+- Yalnız `events.text` alanına bakar; `payload`, görsel, ek dosya, ses ya da ham arşiv içeriğine BAKMAZ.
+- Olumsuzlamayı, alıntıyı, şakayı, başkası hakkındaki konuşmayı ayırt etmez.
+- İşaret bir uyarı/süzgeç ipucudur; güvenlik sınırı ya da kesin sınıflandırma değildir.
+- Yeni terim: veri klasöründe `hassas_konular.json` (biçim paketteki ile aynı: `{"konular": {"saglik": {"terimler": [...], "tam": [...]}}, "cikar": ["terim", ...]}`). Paket listesine EKLENİR; `cikar` terimi (tek sözcük ya da öbek, katlanmış karşılaştırma) her konudan çıkarır. Yeni konu kimliği de eklenebilir. Bozuk ek dosya sessizce yok sayılmaz: `Hub.goc_uyarilari`na uyarı yazılır ve yalnız paket listesi kullanılır.
+- Liste ya da kural değişince mevcut olaylar kendiliğinden güncellenmez: `kimlikmerkezi yeniden-isaretle [--json]` ya da `Hub.yeniden_isaretle(progress=None) -> {"incelenen", "degisen"}` (yazan Hub) hepsini yeniden hesaplar. Yeni olaylar ekleme anında hesaplanır; içe aktarım (`import_jsonl`) da yeniden hesaplar, dışa aktarım biçimi değişmedi (alanlar yazılmaz).
+- Paketleme: JSON dosyası `importlib.resources` ile okunur; PyInstaller paketine `kimlikcore/veri/*.json` veri olarak eklenmelidir (`--collect-data kimlikcore`).
