@@ -114,7 +114,8 @@ def build_server(service: QueryService) -> MCPServer:
         "İzinli bir kategoriden örnek kayıtlar verir (sorgu verilirse eşleşenlerden, yoksa "
         "rastgele). Büyük veride kişi hakkında öneri çıkarmak için tarama amaçlıdır. Hassas "
         "kategoriler (eposta, mesaj, konum) ayrı izin ister. Sohbette rol verilmezse yalnız kullanıcının kendi mesajları örneklenir; "
-        "asistan cevapları için rol='asistan'. Kayıt metinleri "
+        "asistan cevapları için rol='asistan'; rol alanı olmayan sohbet kayıtları ve sohbet dışı "
+        "kategoriler rol süzgeciyle dönmez. Kayıt metinleri "
         f"'kayitlar[*].veri' alanındadır. {TALIMAT_DEGIL}"))
     def ornekle(kategori: str, n: int | None = None, sorgu: str | None = None,
                 rol: str | None = None) -> dict[str, Any]:

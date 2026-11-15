@@ -127,3 +127,61 @@ def test_kimlik_karti_sohbet_metni_tasimaz(d):
     govde = json.dumps(r, ensure_ascii=False)
     assert KULLANICI_METNI not in govde and ASISTAN_METNI not in govde
     assert "sohbet" not in r["ozet_kategorileri"]
+
+
+@pytest.fixture
+def d2(veri):
+    """Asistan mesajları FTS sıralamasında üstte ve çok sayıda; tek kullanıcı mesajı altta."""
+    with Hub.open(veri, write=True) as hub:
+        sid = hub.add_source("test", "1", None)
+        olaylar = [ev(f"kahve kahve kahve {i}", "sohbet", kind="sohbet.mesaj",
+                      payload={"platform": "chatgpt", "rol": "asistan"}, key=f"a{i}")
+                   for i in range(40)]
+        olaylar.append(ev("kahve sevdim", "sohbet", kind="sohbet.mesaj",
+                          payload={"platform": "chatgpt", "rol": "kullanici"}, key="k1"))
+        olaylar.append(ev("kahve gizlisi", "sohbet", kind="sohbet.mesaj",
+                          payload={"rol": "kullanici"}, key="k2"))
+        olaylar.append(ev("kahve rolsuz sohbet", "sohbet", kind="sohbet.mesaj", key="k3"))
+        olaylar.append(ev("kahve eposta", "eposta", payload={"rol": "kullanici"}, key="k4"))
+        olaylar.append(ev("fedora kurdum", "sohbet", kind="sohbet.mesaj",
+                          payload={"rol": "kullanici"}, key="k5"))
+        hub.add_events(sid, olaylar)
+        gizle = hub.query("SELECT event_id FROM events WHERE text='kahve gizlisi'")[0][0]
+        km = KeyManager(hub)
+        app, key = km.create_key("S")
+        km.grant(app, "sohbet", confirmed_sensitive=True)
+        km.grant(app, "persona")
+    return {"root": veri, "key": key, "gizle": gizle}
+
+
+def _gizle(d2):
+    import sqlite3
+    c = sqlite3.connect(d2["root"] / "kimlik.db")
+    c.execute("UPDATE events SET hidden = 1 WHERE event_id = ?", (d2["gizle"],))
+    c.commit()
+    c.close()
+
+
+def test_rol_suzgeci_siralamada_alttaki_kaydi_kacirmaz(d2):
+    _gizle(d2)
+    sv = s(d2, d2["key"])
+    r = sv.ara("kahve", rol="kullanici", limit=3, genislet=False)["kayitlar"]
+    assert [x["veri"] for x in r] == ["kahve sevdim"]          # gizli, rolsüz, eposta dönmez
+    o = sv.ornekle("sohbet", n=3, sorgu="kahve")["kayitlar"]
+    assert [x["veri"] for x in o] == ["kahve sevdim"]
+    assert len(sv.ara("kahve", rol="asistan", limit=5, genislet=False)["kayitlar"]) == 5
+    with pytest.raises(ServiceError, match="reddedildi"):
+        sv.ara("kahve", "eposta", rol="kullanici")
+
+
+def test_rol_suzgeci_esanlam_genislemesiyle(d2):
+    r = s(d2, d2["key"]).ara("linux", rol="kullanici", limit=5)["kayitlar"]
+    assert [(x["veri"], x["eslesme"]) for x in r] == [("fedora kurdum", "ilgili")]
+
+
+def test_rol_suzgecli_cagri_erisim_kaydi_yazar(d2):
+    from kimlikserver.access import AccessLog
+    s(d2, d2["key"]).ara("kahve", rol="kullanici", genislet=False)
+    s(d2, d2["key"]).ornekle("sohbet", sorgu="kahve")
+    kayit = AccessLog(d2["root"]).read_all()
+    assert [(k[2], k[5]) for k in kayit][-2:] == [("ara", "ok"), ("ornekle", "ok")]

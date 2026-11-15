@@ -27,6 +27,7 @@ from kimlikcore import (
 )
 
 from kimlikcore import norm_ts
+from kimlikcore.turkish import build_fts_query
 
 from . import esanlam
 from ._db import Clock, utc_now
@@ -72,6 +73,20 @@ def _rol_dogrula(rol: str | None) -> str | None:
     if not isinstance(rol, str) or rol not in ROLLER:
         raise ServiceError("Geçersiz rol. Geçerli değerler: " + ", ".join(ROLLER) + ".")
     return rol
+
+
+def _rol_ara(hub: Hub, sorgu: str, cats: list[str], rol: str, lim: int) -> list[Event]:
+    """Rol süzgeçli arama: `Hub.search` ile aynı FTS/katlama/sıralama, süzgeç SQL'de (kayıt kaçmaz)."""
+    match = build_fts_query(sorgu)
+    if match is None or not cats:
+        return []
+    rows = hub.query(
+        "SELECT e.event_id FROM events_fts f JOIN events e ON e.seq = f.rowid "
+        "WHERE events_fts MATCH ? AND e.hidden = 0 "
+        f"AND e.category IN ({','.join('?' * len(cats))}) "
+        "AND json_extract(e.payload, '$.rol') = ? "
+        "ORDER BY f.rank, e.ts DESC, e.seq DESC LIMIT ?", [match, *cats, rol, int(lim)])
+    return [hub.get_event(r[0]) for r in rows]
 
 
 def _limit(value: int | None, default: int) -> int:
@@ -240,9 +255,7 @@ class QueryService:
             def ara_(q: str) -> list[Event]:
                 if rl is None:
                     return hub.search(q, categories=cats, limit=lim)
-                # Çekirdek rol süzmez: fazladan getir, Python'da süz, limite kes.
-                ham = hub.search(q, categories=cats, limit=min(lim * 5, MAX_LIMIT * 5))
-                return [e for e in ham if e.payload.get("rol") == rl][:lim]
+                return _rol_ara(hub, q, cats, rl, lim)
             dogrudan = ara_(sorgu)
             iliskili: list[tuple[Event, esanlam.Varyant]] = []
             ozet: list[dict[str, Any]] = []
@@ -416,9 +429,8 @@ class QueryService:
                 rl = "kullanici"
             lim = _limit(n, 20)
             if sorgu:
-                ham = hub.search(sorgu, categories=cats,
-                                 limit=lim if rl is None else min(lim * 5, MAX_LIMIT * 5))
-                evs = ham if rl is None else [e for e in ham if e.payload.get("rol") == rl][:lim]
+                evs = (hub.search(sorgu, categories=cats, limit=lim) if rl is None
+                       else _rol_ara(hub, sorgu, cats, rl, lim))
             else:
                 kosul, arg = ("", []) if rl is None else (f" AND {_ROL} = ?", [rl])
                 ids = [r[0] for r in hub.query(
