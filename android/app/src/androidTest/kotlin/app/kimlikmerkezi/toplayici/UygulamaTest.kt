@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
@@ -79,7 +80,7 @@ class UygulamaTest {
         val gizli = "PANO-GIZLI-${System.nanoTime()}"
         depo.kutu.kayitEkle("not.hizli", "notlar", gizli)
         kural.onNodeWithTag("ayarlar_btn").performClick()
-        kural.onNodeWithTag("hata_raporu_btn").performClick()
+        kural.onNodeWithTag("hata_raporu_btn").performScrollTo().performClick()
         var metin = ""
         bekle {
             kural.runOnUiThread {
@@ -98,9 +99,9 @@ class UygulamaTest {
         for (t in listOf("tema_koyu", "tema_acik", "tema_sistem")) {
             kural.onNodeWithTag(t).performClick()
             kural.waitForIdle()
-            kural.onNodeWithTag("hata_raporu_btn").assertIsDisplayed()
+            kural.onNodeWithTag("hata_raporu_btn").performScrollTo().assertIsDisplayed()
         }
-        kural.onNodeWithTag("hakkinda_btn").performClick()
+        kural.onNodeWithTag("hakkinda_btn").performScrollTo().performClick()
         kural.onNodeWithTag("surum").assertIsDisplayed()
     }
 }
