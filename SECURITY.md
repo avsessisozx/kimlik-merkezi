@@ -38,6 +38,11 @@ Kapsam dışı olan ve beklenen durumlar [docs/TEHDIT-MODELI.md](docs/TEHDIT-MOD
 uygulamasının kendi davranışı; üçüncü taraf bağımlılıklardaki açıklar, bunları ilgili projeye bildirin).
 Kapsam dışı sayılan bir şeyin yine de gerçek bir risk olduğunu düşünüyorsanız bildirin; birlikte değerlendiririz.
 
+## Yönetilen blok ve hassas konu izni
+
+- İsteğe bağlı (varsayılan kapalı) yönetilen blok, onayladığınız persona bilgisini `~/.claude/CLAUDE.md` ve `~/.codex/AGENTS.md` içine yazar; o dosyaları okuyan her araç bu bilgiyi alır ve bu, izin/erişim kaydının dışındadır ([docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md) 2.7).
+- Sağlık, hukuk, finans, din/siyaset ve cinsellik sözcükleri geçen kayıtlar, kategori izni açık olsa da ayrı konu izni olmadan yapay zekâya verilmez; yöntem sözcük listesidir ve hata yapabilir (2.8).
+
 ## Yayın bütünlüğü
 
 Her yayında kurulum paketinin SHA-256 toplamı (`SHA256SUMS.txt`) ve yazılım malzeme listesi (SBOM,

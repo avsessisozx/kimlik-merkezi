@@ -153,10 +153,14 @@ class QueryService:
         except PermissionDenied as e:
             self._log_best_effort(app_id, tool, cat_label, 0, "reddedildi")
             raise ServiceError(f"reddedildi: {e}") from None
-        except (SchemaTooOld, SchemaTooNew):
+        except SchemaTooOld:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")
-            raise ServiceError("Veritabanı sürümü uyumsuz. Önce Kimlik Merkezi uygulamasını "
-                               "bir kez açın.") from None
+            raise ServiceError("Veritabanı eski biçimde. Önce Kimlik Merkezi uygulamasını bir kez "
+                               "açın, sonra yeniden deneyin.") from None
+        except SchemaTooNew:
+            self._log_best_effort(app_id, tool, cat_label, 0, "hata")
+            raise ServiceError("Bu bağlantı eski sürümle çalışıyor. Yapay zekâ uygulamasını "
+                               "(ör. Claude Desktop) tamamen kapatıp yeniden başlatın.") from None
         except AnahtarGerekli:
             self._log_best_effort(app_id, tool, cat_label, 0, "hata")
             raise ServiceError("Veri şifreli ve anahtar açılamadı. Parolalı klasörü MCP kendiliğinden "
