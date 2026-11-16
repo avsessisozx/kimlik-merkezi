@@ -73,6 +73,22 @@ const hepsi = p => p.evaluate(() => [...document.querySelectorAll('#izin-ekrani 
     await p.click('#izin-kaydet'); await bekle(1000);
     sonuc.onerili = { diyalog: [...sonuc.diyaloglar], api: await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Onerili').izinler.map(i => i.kategori).sort()) };
 
+    // kısmi hata: bir izin verilemezse hangileri verildi/verilemedi yazılır, ekran açık kalır
+    await p.fill('input[placeholder^="Uygulama adı"]', 'Kismi');
+    await p.getByRole('button', { name: 'Anahtar üret' }).click();
+    await p.waitForSelector('#anahtar-tamam', { timeout: 15000 });
+    await p.click('#anahtar-tamam');
+    await p.waitForSelector('#izin-ekrani', { timeout: 15000 });
+    await p.route('**/api/izin_ver', r => { const g = JSON.parse(r.request().postData() || '{}'); g.kategori === 'notlar' ? r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ hata: 'deneme hatası' }) }) : r.continue(); });
+    await p.click('#izin-kaydet'); await bekle(1500);
+    sonuc.kismi = { bildirim: await p.evaluate(() => [...document.querySelectorAll('#bildirim div')].map(d => d.textContent).join(' | ')), ekran_acik: (await p.locator('#izin-ekrani').count()) === 1,
+      api: await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Kismi').izinler.map(i => i.kategori)) };
+    await p.unroute('**/api/izin_ver');
+    sonuc.hatalar = sonuc.hatalar.filter(h => !h.includes('400'));   // bilerek üretilen hata
+    await p.evaluate(() => { document.querySelector('#bildirim').textContent = ''; });
+    await p.click('#izin-kaydet'); await bekle(1000);    // kalan seçim kaydedilir
+    sonuc.kismi.sonra = await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Kismi').izinler.length);
+
     // üçüncü: "Kaydetmeden kapat" izinsiz kalırsa uyarı
     await p.fill('input[placeholder^="Uygulama adı"]', 'Kapatilan');
     await p.getByRole('button', { name: 'Anahtar üret' }).click();

@@ -14,7 +14,7 @@ from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, f
 from kimlikcore import sifreleme as sif
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
-from kimlikserver.access import KeyManager
+from kimlikserver.access import KeyManager, hash_key
 from kimlikserver.oneri import OneriYonetici
 from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 
@@ -214,6 +214,7 @@ class Uygulama:
     def ice_aktar_baslat(self, yol: str = "", tur: str | None = None, yine_de: bool = False,
                          yollar: list[str] | None = None) -> dict:
         yol = (yol or "").strip().strip('"')
+        ag_yolu_reddet(yol, *(yollar or []))
         if yollar:
             yollar = [str(y).strip().strip('"') for y in yollar if str(y).strip()]
             if len(yollar) > 1 and tur not in ("computer_files", "dosyalar"):
@@ -228,6 +229,8 @@ class Uygulama:
         with self._is_kilit:
             if self.is_ and self.is_.durum == "calisiyor":
                 raise IslemHatasi("Başka bir içe aktarma sürüyor.", "mesgul")
+            if self.kopya_is is not None and self.kopya_is.canli:
+                raise IslemHatasi("Bir kopya denetimi sürüyor; bitince içe aktarabilirsiniz.", "mesgul")
             is_ = IceAktarmaIsi(yol, tur or None, bool(yine_de), yollar)
             self.is_ = is_
         self._is_dosyasi({"yol": yol, "yollar": yollar, "tur": tur, "durum": "calisiyor"})
@@ -369,6 +372,7 @@ class Uygulama:
         """Kopya denetimi (uygula=False: salt okur) ya da gizleme (uygula=True) arka planda. `paket`: isteğe bağlı
         ChatGPT dışa aktarma dosyası/klasörü; yalnız verilirse yeniden üretilmiş cevaplar bulunur."""
         paket = (paket or "").strip().strip('"') if isinstance(paket, str) else ""
+        ag_yolu_reddet(paket)
         if paket and not os.path.exists(paket):
             raise IslemHatasi("Seçilen dışa aktarma dosyası bulunamadı.")
         with self._is_kilit:
@@ -393,7 +397,9 @@ class Uygulama:
                 "id": app_id, "ad": ad, "olusturma": olusturma, "iptal": iptal,
                 "izinler": [{"kategori": g.category, "bitis": g.expires_at, "hassas_onay": g.confirmed_sensitive}
                             for g in izinler if g.app_id == app_id]})
-            uygulamalar[-1]["izinsiz"] = not iptal and not uygulamalar[-1]["izinler"]   # "Hiç izni yok" etiketi
+            simdi_ = simdi()
+            uygulamalar[-1]["izinsiz"] = not iptal and not any(   # "Hiç izni yok": yalnız SÜRESİ DOLMAMIŞ izinler sayılır
+                i["bitis"] is None or i["bitis"] > simdi_ for i in uygulamalar[-1]["izinler"])
         return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler()}
 
     def anahtar_uret(self, ad: str) -> dict:
@@ -435,6 +441,18 @@ class Uygulama:
                 "metin": claude_ayar.ayar_metni(giris),
                 "parola_uyari": MCP_PAROLA_NOTU if self.parola_var_mi() else None}
 
+    def _eski_claude_anahtarlari(self, yol) -> list[str]:
+        """Ayar dosyasındaki ESKİ `kimlik-merkezi` girişindeki anahtarın özetiyle eşleşen (iptal edilmemiş) uygulamalar.
+        Ada bakılmaz: kullanıcının elle "Claude Desktop" adını verdiği başka anahtar etkilenmez."""
+        if yol is None or not Path(yol).is_file():
+            return []
+        try:
+            duz = claude_ayar._oku(Path(yol))["mcpServers"][claude_ayar.GIRIS_AD]["env"]["KIMLIK_ANAHTAR"]
+            ozet = hash_key(duz)
+        except (ValueError, KeyError, TypeError, OSError, UnicodeDecodeError):
+            return []
+        return [r[0] for r in self.hub.query("SELECT app_id FROM app_keys WHERE key_hash = ? AND revoked = 0", (ozet,))]
+
     def claude_ekle(self) -> dict:
         if self.parola_var_mi():
             # Karar (docs/SIFRELEME.md §6): parolayı Claude ayar dosyasına koymayız; sessizce bozuk giriş de yazmayız.
@@ -455,7 +473,7 @@ class Uygulama:
                                   "Lütfen yeniden deneyin.", "izin_hatasi") from e
             return app_id, duz
 
-        onceki = [a[0] for a in self.anahtarlar.list_keys() if a[1] == CLAUDE_ANAHTAR_AD and not a[3]]
+        onceki = self._eski_claude_anahtarlari(yol)
         s = claude_ayar.ekle(yol, uret, self.veri)
         if s.durum in ("eklendi", "guncellendi"):
             # yenisi ayar dosyasına yazıldıktan SONRA eskileri iptal et (yazılamadıysa eskisi çalışmaya devam eder)
@@ -472,6 +490,17 @@ class Uygulama:
 
 
 CLAUDE_ANAHTAR_AD = "Claude Desktop"
+
+
+def ag_yolu_mu(yol: str) -> bool:
+    y = (yol or "").strip().strip('"')
+    return y.startswith("\\\\") or y.startswith("//")
+
+
+def ag_yolu_reddet(*yollar: str | None) -> None:
+    if any(ag_yolu_mu(y) for y in yollar if isinstance(y, str)):
+        raise IslemHatasi("Ağ yolları (\\\\sunucu\\klasör ya da //sunucu/klasör) desteklenmez. Dosyayı bu bilgisayara "
+                          "kopyalayıp oradan seçin.", "ag_yolu")
 
 
 def simdi() -> str:

@@ -218,4 +218,5 @@ def test_konsol_tanila_hatalar_ve_surum(tmp_path):
     assert r.returncode == 1 and "Girdi yok" in r.stderr
     s = konsol("surum", cwd=tmp_path)
     assert s.returncode == 0 and "pypdf: var" in s.stdout and "docx: var" in s.stdout and "ijson arka ucu" in s.stdout
-    assert "hassas konu listesi: var (1 konu)" in s.stdout       # çekirdek paket verisi (hassas_konular.json) okunuyor
+    import re
+    assert int(re.search(r"hassas konu listesi: var \((\d+) konu\)", s.stdout).group(1)) >= 5       # çekirdek paket verisi (hassas_konular.json) okunuyor

@@ -184,8 +184,8 @@ def main(argv: list[str] | None = None) -> int:
             except ImportError:
                 print(f"{modul}: YOK")
         try:                                         # çekirdek paket verisi (importlib.resources); pakette olmalı
-            from kimlikcore import hassas
-            print(f"hassas konu listesi: var ({len(hassas.hassas_konulari('doktor'))} konu)")
+            from kimlikserver.access import list_topics
+            print(f"hassas konu listesi: var ({len(list_topics())} konu)")
         except Exception as e:
             print(f"hassas konu listesi: YOK ({type(e).__name__})")
         return 0

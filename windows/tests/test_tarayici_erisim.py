@@ -92,3 +92,10 @@ def test_onerilenlerle_kaydet_uyarisiz_10_izin_verir(sonuc):
 def test_izinsiz_kapatmada_da_uyari(sonuc):
     k = sonuc["kapat_uyari"]
     assert k["diyalog"] == ["Bu anahtar hiçbir şeyi göremez. Yine de izinsiz bırakılsın mı?"] and k["ekran_acik"] is True
+
+
+def test_kismi_kayitta_verilen_ve_verilemeyen_yazilir(sonuc):
+    k = sonuc["kismi"]
+    assert "Kısmen kaydedildi" in k["bildirim"] and "VERİLEMEYEN: Notlar ve linkler" in k["bildirim"] and "deneme hatası" in k["bildirim"]
+    assert k["ekran_acik"] is True and "notlar" not in k["api"] and len(k["api"]) == 9
+    assert k["sonra"] == 10
