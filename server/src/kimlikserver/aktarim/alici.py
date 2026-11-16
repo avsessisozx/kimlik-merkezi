@@ -259,7 +259,9 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     def setup(self):
         s = self.server.a.sinirlar
-        self.request.settimeout(s["soket_zaman_asimi_s"])
+        # El sıkışma bu sürede bitmezse okuma kendiliğinden zaman aşımına düşer (bekçinin başka iş parçacığından
+        # yaptığı kesme Windows'ta engelli okumayı her zaman uyandırmayabilir; yuva geç boşalır).
+        self.request.settimeout(min(s["soket_zaman_asimi_s"], s["el_sikisma_zaman_asimi_s"]))
         bekci = _bekci(self.request, s["el_sikisma_zaman_asimi_s"])      # el sıkışmanın TOPLAM süresi
         try:
             self.request.do_handshake()

@@ -50,6 +50,7 @@ def sayaclar_bosalsin(d, en_gec=5.0):
     bitis = time.monotonic() + en_gec
     while d.alici._srv._toplam and time.monotonic() < bitis:
         time.sleep(0.02)
+    return d.alici._srv._toplam == 0
 
 
 def yeni(tmp_path, **sinirlar):
@@ -88,7 +89,7 @@ def test_ip_basina_dort_baglanti_besinci_reddedilir(tmp_path):
         besinci = tls(d.alici.port, el_sik=False)
         assert kapandi(besinci, 1.0)                                  # hemen kapatılır (kabul edilmez)
         assert all(kapandi(s, 4) for s in tutan)                      # el sıkışma sınırı: 2 sn'de kesilir
-        sayaclar_bosalsin(d)
+        assert sayaclar_bosalsin(d), f"sayaç boşalmadı: toplam={d.alici._srv._toplam} ip={d.alici._srv._ip_sayac}"
         assert i.durum(DOSYA) == ("yok", 0)
         i.kapat()
         for _ in range(40):                                           # kapanan bağlantılar sayaçtan düşer
@@ -109,7 +110,7 @@ def test_toplam_32_baglanti_sinirinda_33uncu_reddedilir(tmp_path):
         fazla = tls(d.alici.port, el_sik=False)
         assert kapandi(fazla, 1.0)                                    # 33. bağlantı kabul edilmez
         assert all(kapandi(s, 5) for s in tutan)
-        sayaclar_bosalsin(d)
+        assert sayaclar_bosalsin(d), f"sayaç boşalmadı: toplam={d.alici._srv._toplam} ip={d.alici._srv._ip_sayac}"
         assert i.durum(DOSYA) == ("yok", 0)                           # yer açılınca geçerli istemci hizmet alır
     finally:
         d.kapat()
