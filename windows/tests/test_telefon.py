@@ -195,6 +195,7 @@ def test_ice_aktarma_surerken_gelen_dosya_bekler_sonra_alinir(y, tmp_path):
 def test_alim_surerken_ice_aktarma_mesgul_der(y, tmp_path):
     uyg = y.uygulama
     uyg._telefon_ice = True
+    uyg.telefon_bekleme_s = 0.2
     try:
         with pytest.raises(IslemHatasi) as e:
             y.api("ice_aktar_baslat", {"yol": str(tmp_path)})
@@ -315,3 +316,67 @@ def test_varsayilan_port_47823_web_portuyla_cakisirsa_bos_porta_duser(tmp_path):
         assert IO.eslestirme_coz(y.api("telefon_kod_uret", {})["kod"])["p"] == d["port"]
     finally:
         y.kapat()
+
+
+# ---------------------------------------------------------------- açılış yarışı: telefon alımı kullanıcı işini reddettirmez
+def _yavas_alim(monkeypatch, sure):
+    import kimlikserver.aktarim as ak
+    monkeypatch.setattr(ak, "gelenleri_ice_al", lambda hub, *a, **k: (time.sleep(sure), {"dosya": 0, "yeni": 0, "yinelenen": 0, "eksik": 0})[1])
+
+
+def _alim_baslat(uyg):
+    t = threading.Thread(target=uyg.telefon_ice_al, daemon=True)
+    t.start()
+    assert bekle(lambda: uyg._telefon_ice, 5)
+    return t
+
+
+def test_acilista_ayar_kapali_bos_klasor_telefon_alimi_cagrilmaz(tmp_path, monkeypatch):
+    from kimlikwin.cekirdek import Uygulama
+    cagri = []
+    orijinal = Uygulama.telefon_ice_al
+    monkeypatch.setattr(Uygulama, "telefon_ice_al", lambda self: (cagri.append(1), orijinal(self))[1])
+    y = yap(tmp_path)
+    y.api("sihirbaz_tamamla", {"yol": str(tmp_path / "veri"), "otomatik_baslat": False})
+    y.kapat()
+    cagri.clear()
+    y.baslat()
+    try:
+        time.sleep(0.6)
+        assert cagri == [] and not y.uygulama._telefon_ice
+        assert y.api("kopya_baslat", {})["durum"] in ("calisiyor", "bitti")
+    finally:
+        y.kapat()
+
+
+def test_alim_surerken_kopya_ve_ice_aktar_bekleyip_baslar(y, tmp_path, monkeypatch):
+    uyg = y.uygulama
+    _yavas_alim(monkeypatch, 1.0)
+    t = _alim_baslat(uyg)
+    t0 = time.time()
+    assert y.api("kopya_baslat", {})["durum"] in ("calisiyor", "bitti")
+    assert time.time() - t0 >= 0.5 and not uyg._telefon_ice
+    t.join(5)
+    assert bekle(lambda: y.api("kopya_durum", {})["durum"] != "calisiyor")
+    veri = tmp_path / "ic"
+    veri.mkdir()
+    (veri / "a.txt").write_text("merhaba", encoding="utf-8")
+    t = _alim_baslat(uyg)
+    t0 = time.time()
+    y.api("ice_aktar_baslat", {"yol": str(veri), "tur": "dosyalar"})
+    assert time.time() - t0 >= 0.5
+    t.join(5)
+
+
+def test_alim_bekleme_suresi_asilinca_mesgul_hatasi(y, tmp_path):
+    uyg = y.uygulama
+    uyg.telefon_bekleme_s = 0.3
+    uyg._telefon_ice = True
+    try:
+        for ad, arg in (("kopya_baslat", {}), ("ice_aktar_baslat", {"yol": str(tmp_path)})):
+            t0 = time.time()
+            with pytest.raises(IslemHatasi) as e:
+                y.api(ad, arg)
+            assert e.value.kod == "mesgul" and 0.25 <= time.time() - t0 < 5
+    finally:
+        uyg._telefon_ice = False
