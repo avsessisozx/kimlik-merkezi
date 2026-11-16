@@ -1,3 +1,7 @@
+import os
+import sys as _sys
+from pathlib import Path as _Path
+
 import pytest
 
 from kimlikwin.ayarlar import Ayarlar
@@ -18,11 +22,29 @@ class SahteArkaUc:
         self.deger = None
 
 
+def _gercek_playwright_yolu():
+    """HOME yönlendirilmeden ÖNCE gerçek ev klasöründeki Playwright tarayıcı klasörü (yoksa None)."""
+    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        return None                               # zaten ayarlı: dokunma
+    ev = _Path.home()
+    if _sys.platform == "win32":
+        yerel = os.environ.get("LOCALAPPDATA")
+        aday = _Path(yerel) / "ms-playwright" if yerel else ev / "AppData" / "Local" / "ms-playwright"
+    elif _sys.platform == "darwin":
+        aday = ev / "Library" / "Caches" / "ms-playwright"
+    else:
+        aday = ev / ".cache" / "ms-playwright"
+    return str(aday) if aday.is_dir() else None
+
+
 @pytest.fixture(autouse=True)
 def ayar_ortami(tmp_path, monkeypatch):
     monkeypatch.setenv("KIMLIK_AYAR_DIZINI", str(tmp_path / "ayar"))
     monkeypatch.delenv("KIMLIK_VERI", raising=False)
-    ev = tmp_path / "ev"                      # gerçek ev klasörüne (CLAUDE.md/AGENTS.md) hiçbir test yazmasın
+    pw = _gercek_playwright_yolu()                # HOME değişmeden önce çöz; node tarayıcıyı yine bulsun
+    if pw:
+        monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", pw)
+    ev =tmp_path / "ev"                      # gerçek ev klasörüne (CLAUDE.md/AGENTS.md) hiçbir test yazmasın
     ev.mkdir(exist_ok=True)
     monkeypatch.setenv("HOME", str(ev))
     monkeypatch.setenv("USERPROFILE", str(ev))
