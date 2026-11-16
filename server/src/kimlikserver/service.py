@@ -32,7 +32,8 @@ from kimlikcore.turkish import build_fts_query, tokens
 from . import esanlam, kart as kartmod
 from .alinti import ALINTI_UZUNLUGU, alinti
 from ._db import Clock, utc_now
-from .access import AccessLog, AccessLogError, Authorizer, categories_label
+from .access import (AccessLog, AccessLogError, Authorizer, categories_label, konu_izinli_mi,
+                     konu_kosulu, list_topics)
 from .kart import OZET_KATEGORILERI
 from .oneri import (MAX_ONERI_CAGRI, OneriKuyrugu, OneriYazilamadi, dogrula_onerme)
 from .persona import CATEGORY_TITLES, FACT_CATEGORIES, PersonaReader, son_dogrulama
@@ -55,6 +56,8 @@ ZAMANSIZ_UST = 20          # zaman_cizelgesi sonunda gösterilen zamansız kayı
 _GERCEK_ZAMAN = "COALESCE(json_extract(payload, '$.zaman_kaynagi'), '') <> 'dosya_tarihi'"
 ROLLER = ("kullanici", "asistan")   # sohbet mesajı rolü (payload.rol)
 _ROL = "json_extract(payload, '$.rol')"
+_DUSUK_ONEM_RET = ("Kanıtlar yalnız düşük önemli kayıtlar (beğeni/takip gibi); kullanıcının kendi "
+                   "yazdığı bir kayıt gerekli. Hiçbir öneri eklenmedi.")
 _GPS_KEYS = frozenset({"gps", "lat", "lon", "lng", "latitude", "longitude", "enlem", "boylam",
                        "koordinat", "koordinatlar", "coordinates", "geo", "geolocation"})
 
@@ -81,17 +84,21 @@ def _rol_dogrula(rol: str | None) -> str | None:
     return rol
 
 
-def _rol_ara(hub: Hub, sorgu: str, cats: list[str], rol: str, lim: int) -> list[Event]:
-    """Rol süzgeçli arama: `Hub.search` ile aynı FTS/katlama/sıralama, süzgeç SQL'de (kayıt kaçmaz)."""
+def _sql_ara(hub: Hub, sorgu: str, cats: list[str], rol: str | None, lim: int,
+             konular: Iterable[str]) -> list[Event]:
+    """Servis içi FTS araması: `Hub.search` ile aynı FTS/katlama; sıra FTS sırası, eşitlikte önem
+    (yüksek önce), sonra zaman. Rol ve hassas konu süzgeçleri SQL'de (limit doğru dolar)."""
     match = build_fts_query(sorgu)
     if match is None or not cats:
         return []
+    kk, ka = konu_kosulu(konular, "e.hassas_konu")
+    rol_k, rol_a = ("", []) if rol is None else (" AND json_extract(e.payload, '$.rol') = ?", [rol])
     rows = hub.query(
         "SELECT e.event_id FROM events_fts f JOIN events e ON e.seq = f.rowid "
         "WHERE events_fts MATCH ? AND e.hidden = 0 "
-        f"AND e.category IN ({','.join('?' * len(cats))}) "
-        "AND json_extract(e.payload, '$.rol') = ? "
-        "ORDER BY f.rank, e.ts DESC, e.seq DESC LIMIT ?", [match, *cats, rol, int(lim)])
+        f"AND e.category IN ({','.join('?' * len(cats))}){rol_k} AND {kk} "
+        "ORDER BY f.rank, e.onem DESC, e.ts DESC, e.seq DESC LIMIT ?",
+        [match, *cats, *rol_a, *ka, int(lim)])
     return [hub.get_event(r[0]) for r in rows]
 
 
@@ -138,6 +145,7 @@ class QueryService:
                 ident = auth.authenticate(self._key)
                 app_id = ident.app_id
                 auth.ident = ident
+                auth.konular = auth.allowed_topics(app_id)   # her sorguda yeniden okunur
                 res = fn(hub, auth, auth.allowed_categories(app_id))
                 cat_label = res.category
             finally:
@@ -233,6 +241,8 @@ class QueryService:
                 r["veri"] = metin
             if e.payload.get("rol") is not None:
                 r["rol"] = e.payload["rol"]   # yalnız sohbet kayıtlarında vardır
+            if e.onem == 0:
+                r["dusuk"] = True             # beğeni/takip gibi; onem değeri token için yazılmaz
             if e.payload.get("zaman_kaynagi") == "dosya_tarihi":
                 r["zaman_gercek"] = False     # abonelik/kütüphane: zaman dosya tarihidir
             out.append(r)
@@ -256,7 +266,11 @@ class QueryService:
     def kategorileri_listele(self) -> dict[str, Any]:
         def fn(hub, auth, allowed):
             items = [{"kategori": k, "bitis": v} for k, v in sorted(allowed.items())]
-            return _Result({"kategoriler": items, "bitis_saat_dilimi": "UTC",
+            bilinen = set(list_topics(self.root))
+            konu = {"acik": sorted(auth.konular & bilinen),
+                    "kapali": sorted(bilinen - auth.konular)}
+            return _Result({"kategoriler": items, "hassas_konular": konu,
+                            "bitis_saat_dilimi": "UTC",
                             "saat_dilimi": self._zaman_bilgisi(),
                             "kullanim": ("Kayıtlarda 'veri' kısa alıntıdır (en çok "
                                          f"{ALINTI_UZUNLUGU} karakter); 'kisaltildi: true' ise tam "
@@ -276,9 +290,7 @@ class QueryService:
             cats = self._categories(allowed, kategori)
 
             def ara_(q: str) -> list[Event]:
-                if rl is None:
-                    return hub.search(q, categories=cats, limit=lim)
-                return _rol_ara(hub, q, cats, rl, lim)
+                return _sql_ara(hub, q, cats, rl, lim, auth.konular)
             dogrudan = ara_(sorgu)
             iliskili: list[tuple[Event, esanlam.Varyant]] = []
             ozet: list[dict[str, Any]] = []
@@ -348,6 +360,9 @@ class QueryService:
             if rl is not None:
                 w += f" AND {_ROL} = ?"
                 a.append(rl)
+            kk, ka = konu_kosulu(auth.konular, "events.hassas_konu")
+            w += f" AND {kk}"
+            a += ka
             ids = [r[0] for r in hub.query(
                 f"SELECT event_id FROM events WHERE {w} AND ({_GERCEK_ZAMAN}) "
                 "ORDER BY ts DESC, seq DESC LIMIT ?", [*a, lim])]
@@ -387,7 +402,7 @@ class QueryService:
             since, until = self._aralik(baslangic, bitis)
             veri = Toplulastirici(hub, self.tz).say(alan, kategoriler=cats, tur=tur, kaynak=kaynak,
                                                     since=since, until=until, en_cok=en_cok,
-                                                    rol=rl)
+                                                    rol=rl, konular=auth.konular)
             veri.update(self._sd())
             filtre = {k: v for k, v in (("tur", tur), ("kaynak", kaynak), ("rol", rl),
                                         ("baslangic_utc", since), ("bitis_utc", until)) if v}
@@ -438,11 +453,13 @@ class QueryService:
         return self._run("kimlik_karti", Category.PERSONA, fn)
 
     def ornekle(self, kategori: str, n: int | None = None, sorgu: str | None = None,
-                rol: str | None = None) -> dict[str, Any]:
+                rol: str | None = None, dusuk_onem: bool = False) -> dict[str, Any]:
         """İzinli bir kategoriden örnek kayıtlar (persona çıkarımı için tarama). `sorgu` verilirse
         eşleşenlerden, verilmezse rastgele örneklenir (zamana göre sıralı döner).
         Sohbet kategorisinde `rol` verilmezse yalnız `kullanici` mesajları örneklenir (asistan
-        cevapları persona kanıtı olmasın); asistan için açıkça rol="asistan" verilir."""
+        cevapları persona kanıtı olmasın); asistan için açıkça rol="asistan" verilir.
+        Sorgusuz yolda önem kovaları: önce önem 2, yetmezse 1, eksik kalan 0'dan (her kovada
+        rastgele); `dusuk_onem=True` önem ayrımı yapmadan rastgele örnekler."""
         def fn(hub, auth, allowed):
             if kategori is None:
                 raise ServiceError("kategori gerekli.")
@@ -452,13 +469,14 @@ class QueryService:
                 rl = "kullanici"
             lim = _limit(n, 20)
             if sorgu:
-                evs = (hub.search(sorgu, categories=cats, limit=lim) if rl is None
-                       else _rol_ara(hub, sorgu, cats, rl, lim))
+                evs = _sql_ara(hub, sorgu, cats, rl, lim, auth.konular)
             else:
                 kosul, arg = ("", []) if rl is None else (f" AND {_ROL} = ?", [rl])
+                kk, ka = konu_kosulu(auth.konular, "events.hassas_konu")
+                sira = "random()" if dusuk_onem else "onem DESC, random()"
                 ids = [r[0] for r in hub.query(
                     f"SELECT event_id FROM events WHERE hidden = 0 AND category = ?{kosul} "
-                    "ORDER BY random() LIMIT ?", [cats[0], *arg, lim])]
+                    f"AND {kk} ORDER BY {sira} LIMIT ?", [cats[0], *arg, *ka, lim])]
                 evs = sorted((hub.get_event(i) for i in ids), key=lambda e: e.ts)
             recs = self._records(evs, allowed)
             for r in recs:                      # tek kategori: kayıt başına tekrar edilmez
@@ -482,9 +500,10 @@ class QueryService:
             except (TypeError, ValueError):
                 raise ServiceError("baslangic ve uzunluk sayı olmalı.") from None
             b, u = max(0, b), max(1, min(u, KAYIT_PARCA_UST))
-            satir = hub.query("SELECT category FROM events WHERE event_id = ? AND hidden = 0",
-                              [id.strip()])
-            if not satir or satir[0][0] not in allowed:
+            satir = hub.query("SELECT category, hassas_konu FROM events "
+                              "WHERE event_id = ? AND hidden = 0", [id.strip()])
+            if not satir or satir[0][0] not in allowed \
+                    or not konu_izinli_mi(satir[0][1], auth.konular):
                 raise PermissionDenied(_KAYIT_RET)
             e = hub.get_event(id.strip())
             kayit = self._records([e], allowed, kisalt=False)
@@ -511,13 +530,17 @@ class QueryService:
             ids = sorted({k for o in norm for k in o["kanit"]})
             bulunan: dict[str, str] = {}
             roller: dict[str, str | None] = {}
+            onemler: dict[str, int] = {}
             for i in range(0, len(ids), 200):
                 parca = ids[i:i + 200]
-                for eid, cat, rl in hub.query(
-                        f"SELECT event_id, category, {_ROL} FROM events WHERE hidden = 0 AND "
-                        f"event_id IN ({','.join('?' * len(parca))})", parca):
+                for eid, cat, rl, on, hk in hub.query(
+                        f"SELECT event_id, category, {_ROL}, onem, hassas_konu FROM events "
+                        f"WHERE hidden = 0 AND event_id IN ({','.join('?' * len(parca))})", parca):
+                    if not konu_izinli_mi(hk, auth.konular):
+                        continue                # izinsiz konulu kanıt: "yok" gibi
                     bulunan[eid] = cat
                     roller[eid] = rl
+                    onemler[eid] = on
             # Yok, gizli ve izinsiz kategori aynı iletiyle reddedilir (varlık sızmasın).
             if any(k not in bulunan or bulunan[k] not in allowed for k in ids):
                 raise PermissionDenied("Kanıt olay kimliği geçersiz ya da kategorisi için "
@@ -526,6 +549,8 @@ class QueryService:
                 raise PermissionDenied("Kanıt yapay zekânın cevabı, kullanıcının kendi mesajı "
                                        "değil; yalnız kullanıcının kendi kayıtları kanıt olabilir. "
                                        "Hiçbir öneri eklenmedi.")
+            if any(all(onemler[k] == 0 for k in o["kanit"]) for o in norm):
+                raise PermissionDenied(_DUSUK_ONEM_RET)
             kuyruk = OneriKuyrugu(self.root, clock=self._clock)
             durum, _ = kuyruk.on_kontrol(norm, hub)
             planli = sum(1 for d in durum if d is None)

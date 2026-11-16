@@ -19,6 +19,7 @@ from typing import Any
 
 from kimlikcore import Category, FormatError
 
+from .access import konu_kosulu
 from .harita import (_DIL, _HOST, _KANAL, _PROGRAM, _SANATCI, _SARKI, _SUB, _TERIM, _UZ,
                      _URUN, GUNLER)
 from .yerelsaat import YerelSaat
@@ -71,11 +72,21 @@ class Toplulastirici:
     # ------------------------------------------------------------------ yardımcılar
     def _kosul(self, kategoriler: list[str], tur: str | None, kaynak: str | None,
                since: str | None, until: str | None, gercek_zaman: bool,
-               rol: str | None = None) -> tuple[str, list[Any]]:
+               rol: str | None = None, konular: set[str] | None = None,
+               onem_min: int = 0) -> tuple[str, list[Any]]:
+        """`konular` verilirse (boş küme dahil) yalnız hassas_konu'sunun HER konusu bu kümede olan
+        (ya da işaretsiz) kayıtlar; None: konu süzgeci yok. `onem_min`: en düşük önem."""
         if not kategoriler:
             return "0", []
         w = "hidden = 0 AND category IN (%s)" % ",".join("?" * len(kategoriler))
         a: list[Any] = list(kategoriler)
+        if konular is not None:
+            kk, ka = konu_kosulu(konular, "events.hassas_konu")
+            w += f" AND {kk}"
+            a += ka
+        if onem_min > 0:
+            w += " AND onem >= ?"
+            a.append(onem_min)
         if tur:
             if tur.endswith("*"):
                 w += " AND kind LIKE ? ESCAPE '\\'"
@@ -108,8 +119,14 @@ class Toplulastirici:
     # ------------------------------------------------------------------ ana işlev
     def say(self, alan: str, *, kategoriler: list[str], tur: str | None = None,
             kaynak: str | None = None, since: str | None = None, until: str | None = None,
-            en_cok: int | None = None, rol: str | None = None) -> dict[str, Any]:
-        """`since`/`until` UTC ISO (çağıran normalleştirir). `kategoriler` izin süzülmüş liste."""
+            en_cok: int | None = None, rol: str | None = None,
+            konular: set[str] | frozenset[str] = frozenset(),
+            isaretli_haric: bool = False,
+            onem_min: int = 0) -> dict[str, Any]:
+        """`since`/`until` UTC ISO (çağıran normalleştirir). `kategoriler` izin süzülmüş liste.
+        `konular`: çağıranın izinli hassas konuları; İÇERİK alanlarında hassas konulu kayıtlar,
+        her konusu izinli değilse sayıma girmez (içerik olmayan alanlarda girer). `isaretli_haric`:
+        tüm alanlarda hassas_konu işaretli kayıtlar hiç girmez (kimlik kartı)."""
         if alan not in TUM_ALANLAR:
             raise FormatError(f"Bilinmeyen alan '{alan}'. Geçerli alanlar: {', '.join(TUM_ALANLAR)}.")
         try:
@@ -126,10 +143,12 @@ class Toplulastirici:
             if len(kalan) != len(cats):
                 notlar.append(f"'{alan}' içerik alanıdır; hassas kategorilerde hesaplanmaz.")
             cats = kalan
+        icerik = alan in ALANLAR and ALANLAR[alan][2]
+        kn: set[str] | None = set() if isaretli_haric else (set(konular) if icerik else None)
         # Aynı filtrenin toplamı ve zamansız dışlanan sayısı
-        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False, rol)
+        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False, rol, kn, onem_min)
         toplam = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w_hepsi}", a_hepsi)[0][0]
-        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli, rol)
+        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli, rol, kn, onem_min)
         if zaman_alani or aralikli:
             sayilan = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w}", a)[0][0]
             zamansiz = toplam - sayilan
@@ -188,12 +207,14 @@ class Toplulastirici:
                 until: str | None = None, tur: str | None = None, limit: int = 2000
                 ) -> list[tuple[str, int]]:
         """(değer, sayı) satırları, sayıya göre azalan; `limit` iç kullanım içindir (kart:
-        sözcük sayımı). İçerik alanları hassas kategorilerde hesaplanmaz. Zaman alanı verilemez."""
+        sözcük sayımı). İçerik alanları hassas kategorilerde hesaplanmaz. Zaman alanı verilemez.
+        Kart içindir: hassas_konu işaretli ve önem 0 kayıtlar sayıma girmez."""
         if alan not in ALANLAR:
             raise FormatError(f"Bilinmeyen alan '{alan}'.")
         ifade, kosul, icerik = ALANLAR[alan]
         cats = [c for c in kategoriler if not (icerik and c in Category.SENSITIVE)]
-        w, a = self._kosul(cats, tur, None, since, until, since is not None or until is not None)
+        w, a = self._kosul(cats, tur, None, since, until, since is not None or until is not None,
+                           None, set(), 1)
         rows = self.hub.query(
             f"SELECT {ifade} AS v, COUNT(*) FROM events WHERE {w} AND ({kosul}) AND "
             f"{ifade} IS NOT NULL AND {ifade} <> '' GROUP BY v ORDER BY 2 DESC, v LIMIT ?",
