@@ -48,6 +48,21 @@ def calis(calisma: Path, port: int) -> int:
     import logging
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stdout)
+    import traceback
+
+    from kimlikserver.aktarim import alici as _al
+
+    _ham_hata, _ham_islem = _al._Sunucu.handle_error, _al._Sunucu.process_request
+
+    def _hata(self, request, client_address):      # tanilama: sunucu hatasini yutma, yaz
+        print("SUNUCU HATA", client_address, traceback.format_exc().strip().splitlines()[-1], flush=True)
+
+    def _islem(self, request, client_address):
+        n = self._ip_sayac.get(client_address[0], 0)
+        print(f"BAGLANTI {client_address} acik_ip={n} sem_acik={len(self._acik)}", flush=True)
+        return _ham_islem(self, request, client_address)
+
+    _al._Sunucu.handle_error, _al._Sunucu.process_request = _hata, _islem
     y = yollar(calisma)
     y["veri"].mkdir(parents=True, exist_ok=True)
     hub = Hub.open(y["veri"], write=True)
