@@ -60,4 +60,6 @@ Kotlin + Jetpack Compose. `minSdk 30`, `targetSdk 35`, `compileSdk 35`. Birincil
 - Yanıt kodları: tamamlanma `201 X-Durum: var`; zaten alınmış dosyaya PUT `200 X-Durum: var`; yanlış ofset ya da aynı dosyaya eşzamanlı ikinci PUT `409 + X-Alinan`; doğrulama hatası `422`; kimlik `401`; başka cihazın yolu `403`; geçersiz yol `400`; boyut `413`; başlık `431`; `Content-Length` yok `411`.
 - Daha önce alınmış ama içe alınıp klasörden kaldırılmış dosya için `HEAD` yanıtı `X-Durum: var`, `X-Alinan: 0` olabilir; telefon `var` gördüğünde bayt sayısına bakmaz.
 - Devam, son TAMAMLANAN parça sınırından olur (yarım kalan parça diske yazılmaz). Telefon parça boyutunu en fazla 1 MiB tutar.
-- `GET /durum` kimliksizdir ve PC adını yerel ağa gösterir.
+- `GET /durum` kimliksizdir ve YALNIZ `{"protokol": 1}` döner (PC adı ve sürüm yerel ağa gösterilmez; §3'teki `surum`/`pc_adi` alanları kaldırıldı, PC adı eşleştirme kodundadır). `/giden/` altında kimliksiz her istek aynı 401'i alır.
+- Sınırlar: başlıklar için toplam 10 sn; aynı adresten en çok 4, toplam 32 eşzamanlı bağlantı; cihaz başına en çok 8 yarım yükleme ve 1 GiB geçici alan; 7 günden eski yarım yüklemeler silinir. Aynı ağdaki bir cihaz 5 yanlış denemeyle bekleyen eşleştirme kodunu geçersiz kılabilir (yenisi üretilir; güvenlik kaybı yok).
+- PC sertifikası yenilenirse (açılamayan anahtar) parmak izi değişir; PC kullanıcıyı uyarır ve telefonlar yeniden eşleştirilir.
