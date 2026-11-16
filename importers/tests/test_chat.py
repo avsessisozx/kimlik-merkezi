@@ -322,3 +322,17 @@ def test_claude_ve_genel_konusma_ici_kopya(hub, tmp_path):
         {"role": "user", "content": "Zamansiz"}, {"role": "user", "content": "Zamansiz"}]}), encoding="utf-8")
     r = run(hub, g, "chat_file")
     assert [e.text for e in msgs(hub, "dosya")] == ["Selam", "Selam", "Zamansiz", "Zamansiz"]
+
+
+@pytest.mark.parametrize("sonu", [b"\r\n"])
+def test_genel_metin_dosyasi_crlf_ile_lf_ayni_sonuc(hub, tmp_path, sonu):
+    kaynak = FIX / "chat_generic"
+    d = tmp_path / "crlf"
+    d.mkdir()
+    for ad in ("sohbet.md", "kisa.txt"):
+        ham = (kaynak / ad).read_bytes().replace(b"\r\n", b"\n")
+        (d / ad).write_bytes(ham.replace(b"\n", sonu))
+    run(hub, d, "chat_file")
+    metinler = [e.text for e in msgs(hub)]
+    assert metinler and not any("\r" in t for t in metinler)
+    assert "Türkçe soru: ışık nedir?\nikinci satır" in metinler

@@ -670,7 +670,7 @@ class GenericChat(ScanImporter):
 
         with e.open() as raw:
             for line in raw:
-                s = line.decode("utf-8", "replace")
+                s = line.decode("utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
                 sp = self._speaker(s)
                 if sp:
                     flush()
