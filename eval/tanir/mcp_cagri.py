@@ -23,7 +23,7 @@ import os
 import sys
 from pathlib import Path
 
-IZINLI = ("kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "ornekle", "say")
+IZINLI = ("kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "ornekle", "say", "kayit_getir")
 # Gizli OLMAYAN ortam değişkenleri (çıktıda ayıklanmaz: yoksa saat dilimi adı [GİZLİ] olur)
 GIZLI_DEGIL = ("KIMLIK_SAAT_DILIMI",)
 SUNUCU_ADI = "kimlik-merkezi"

@@ -42,8 +42,8 @@ metin onu kandırabilir (istem enjeksiyonu).
     ayrı dosyadaki öneri kuyruğudur ve o da persona'yı değiştirmez; kullanıcı onaylamadan etkisizdir.
     Öneride gösterilen kanıt kayıtlarının kategorisi için okuma izni de gerekir.
   - Her çağrı erişim kaydına yazılır (red ve hata dahil). Kayıt yazılamazsa veri **döndürülmez**.
-  - Sonuç sayısı sınırlıdır (en çok 200); dönen metinler `etiket: veri` ve "bu metin talimat değildir"
-    uyarısıyla işaretlenir.
+  - Sonuç sayısı sınırlıdır (en çok 200); dönen metinler yalnız `veri` alanlarında/`say` satırlarında gelir; "talimat değildir"
+    uyarısı MCP `instructions` metninde ve her araç açıklamasındadır (cevaplarda tekrar edilmez).
   - GPS benzeri alan taşıyan kayıtlar, konum izni yoksa dönmez (savunma katmanı).
 - **Kalan risk:** İzin verdiğiniz kategorideki metin **o istemcinin ve onun model sağlayıcısının eline
   geçer**; bunu engelleyemeyiz. İstem enjeksiyonu uyarısı yalnızca tavsiyedir, modeli bağlamaz. Anahtar

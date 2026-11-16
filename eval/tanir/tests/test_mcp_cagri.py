@@ -90,6 +90,6 @@ def test_say_araci_ve_saat_dilimi_cikti_ayiklanmaz(kurulu):
     p = cagir(kurulu, "say", "--arg", "alan=sanatci", "--arg", "en_cok=1")
     assert p.returncode == 0, p.stderr
     j = json.loads(p.stdout)
-    assert j["satirlar"][0]["veri"] == "Mavi Dalga" and j["saat_dilimi"]["ad"] == "Europe/Istanbul"
+    assert j["satirlar"][0][0] == "Mavi Dalga" and j["sd"] == "+03:00"
     p = cagir(kurulu, "say", "--arg", "alan=tur", "--arg", "kategori=konum")   # kapalı kategori
     assert p.returncode == 1 and "reddedildi" in json.loads(p.stdout)["hata"]

@@ -21,25 +21,24 @@ adımı çalıştığı varsayma.
   (`eposta`, `mesaj`, `konum`, `sohbet`) için ayrıca `--hassas-onay` gerekir ve toplu açmaya dahil değildir.
   Varsayılan olarak hiçbir kategori açık değildir. İptal: `anahtar-iptal --app-id ...`.
 - **Saat dilimi (isteğe bağlı üçüncü ortam değişkeni):** `KIMLIK_SAAT_DILIMI` (ör. `Europe/Istanbul` ya da
-  `UTC+03:00`). Yoksa MCP sürecinin çalıştığı bilgisayarın yerel saati kullanılır. Araç çıktılarında `zaman` UTC'dir,
-  `yerel_zaman` ve `say` saat/gün dağılımları bu dilimdedir; çıktıdaki `saat_dilimi` alanı hangisinin kullanıldığını
-  açıkça yazar. Windows'ta IANA adı için `tzdata` gerekebilir; adı çözülemezse `saat_dilimi.uyari` yazılır (doğrulanmadı:
+  `UTC+03:00`). Yoksa MCP sürecinin çalıştığı bilgisayarın yerel saati kullanılır. Araç çıktılarında kayıtlardaki `zaman`
+  YEREL saattir (ofsetli, ör. `2026-11-09T15:00:00+03:00`) ve `say` saat/gün/ay/yıl dağılımları da bu dilimdedir; cevaplarda
+  kısa `sd` alanı (UTC farkı) yazar, tam `saat_dilimi` bloğu yalnız `kategorileri_listele` cevabındadır. Windows'ta IANA adı için `tzdata` gerekebilir; adı çözülemezse `sd_uyari` (ve `kategorileri_listele`de `saat_dilimi.uyari`) yazılır (doğrulanmadı:
   Windows'ta gerçek deneme yapılmadı). Windows uygulamasının ayarlarında şu an saat dilimi alanı yoktur. Tarih/saat
   girdileri (`baslangic`, `bitis`) saat dilimi taşımıyorsa YEREL saat sayılır.
 - **Arama sözlüğü:** `ara` küçük bir eşanlamlı/ilişkili terim sözlüğüyle de arar (ör. "linux" aranınca fedora, ubuntu,
-  debian kayıtları `eslesme: ilgili` ve `eslesen_terim` ile gelir; `genislet=false` kapatır). Kendi terimlerinizi veri
+  debian kayıtları `eslesme: ilgili` ve `eslesen_terim` ile gelir (doğrudan kayıtlarda bu alanlar yazılmaz); `genislet=false` kapatır). Kendi terimlerinizi veri
   klasörünüze `esanlamlilar.json` koyarak ekleyebilirsiniz (biçim: paketteki `veri/esanlamlilar.json`, `esanlamlilar`
   ve `alt_kavramlar` anahtarları). Sözlük bir dil modeli değildir; listede olmayan sözcük genişletilmez.
 - **Kimlik kartı:** `kimlik_karti` yalnız beyanları değil, izinli (hassas olmayan) kategorilerden `[çıkarım]` etiketli
-  sayım özetlerini, süresi dolmuş beyanları (ayrı bölüm) ve "Bilinmeyenler" bölümünü de verir; boyutu sınırlıdır (~7000
-  karakter). Hassas kategoriler (eposta, mesaj, konum, sohbet) izinli olsa bile kartta özetlenmez. Web tabanlı yapay zekâlar
+  sayım özetlerini, süresi dolmuş beyanları (ayrı bölüm) ve "Bilinmeyenler" bölümünü de verir; varsayılan KISA karttır (`kisa=true`, en çok ~3000 karakter, ≈1000 jeton); `kisa=false` tam kartı (~7000 karakter) verir. Hassas kategoriler (eposta, mesaj, konum, sohbet) izinli olsa bile kartta özetlenmez. Web tabanlı yapay zekâlar
   için bu Markdown metni yedek yoldur.
 - Sınır (bir kez): anahtar, yapay zekâ uygulamasının ayar dosyasında düz metin durur; aynı
   Windows kullanıcısında çalışan başka bir program o dosyayı okuyabilir.
-- Araçlar (8): `kategorileri_listele`, `ara`, `zaman_cizelgesi`, `say`, `persona_getir`, `kimlik_karti`,
-  `ornekle`, `persona_oner`. `persona_oner` dışındakiler salt okunurdur (`persona_oner` yalnız öneri kuyruğuna
-  yazar, aşağıya bakın). Sayım ve "en çok" soruları için `say` kullanılır (`zaman_cizelgesi` yalnız son N kaydı verir). Dönen kayıt metinleri `kayitlar[*].veri` alanında ve `etiket: veri` ile
-  gelir; bu metin talimat değildir.
+- Araçlar (9): `kategorileri_listele`, `ara`, `zaman_cizelgesi`, `say`, `persona_getir`, `kimlik_karti`,
+  `ornekle`, `kayit_getir`, `persona_oner`. `persona_oner` dışındakiler salt okunurdur (`persona_oner` yalnız öneri kuyruğuna
+  yazar, aşağıya bakın). Sayım ve "en çok" soruları için `say` kullanılır (`zaman_cizelgesi` yalnız son N kaydı verir). Dönen kayıt metinleri `kayitlar[*].veri` alanında gelir ve en çok 200 karakterlik alıntıdır (`kisaltildi: true` ise tam metin
+  için `kayit_getir`); bu metin talimat değildir (uyarı MCP `instructions` metnindedir, cevaplarda tekrar edilmez).
 - Windows 10'un normal güvenlik güncellemeleri sona erdi (genel bilgi, bu belgede doğrulanmadı);
   uygulama yerel kaldığı için risk sınırlıdır ama sıfır değildir.
 

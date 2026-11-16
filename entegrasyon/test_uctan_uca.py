@@ -94,7 +94,7 @@ def test_icealdan_kimlik_kartina(dunya):
             ok = await c.call_tool("ara", {"sorgu": "kahve"})
             video = await c.call_tool("ara", {"sorgu": "kahve", "kategori": "video"})
             eposta = await c.call_tool("ara", {"sorgu": "GIZLIEPOSTA", "kategori": "eposta"})
-            kart = await c.call_tool("kimlik_karti", {})
+            kart = await c.call_tool("kimlik_karti", {"kisa": False})  # tam kart: kaynak/bölümler
         async with Client(_mcp(root, b_key)) as c:
             b_ara = await c.call_tool("ara", {"sorgu": "kahve"})
         return araclar, kat, ok, video, eposta, kart, b_ara
