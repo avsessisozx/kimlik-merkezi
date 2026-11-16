@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - "android/**"
+      - "server/src/kimlikserver/aktarim/**"
+      - "importers/src/kimlikimport/android_giden.py"
+      - "core/src/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
     inputs:
@@ -89,6 +92,51 @@ jobs:
         with:
           name: emulator-rapor
           path: android/app/build/reports/androidTests
+          if-no-files-found: ignore
+
+  # Emülatördeki GERÇEK uygulama -> GERÇEK PC alıcısı (kimlikserver.aktarim) uçtan uca; ayrıca altın örnek sözleşme testi.
+  uctan-uca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: PC paketlerini kur
+        run: pip install -e core -e server -e importers
+      - name: Sözleşme testi (altın örnek -> gerçek içe aktarıcı)
+        run: python android/ci/sozlesme_testi.py
+      - name: APK'ları derle
+        working-directory: android
+        run: ./gradlew assembleDebug assembleDebugAndroidTest --console=plain
+      - name: KVM etkinleştir
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Uçtan uca (emülatör -> gerçek PC alıcısı)
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CALISMA: ${{ runner.temp }}/uctan_uca
+        with:
+          api-level: 31
+          arch: x86_64
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: sh android/ci/uctan_uca.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: uctan-uca-gunlukleri
+          path: |
+            ${{ runner.temp }}/uctan_uca/*.log
+            ${{ runner.temp }}/uctan_uca/*.cikti
           if-no-files-found: ignore
 
   # YALNIZ elle ve `imzali: true` ile çalışır. Secrets yoksa KIRMIZI olur; debug anahtarına düşmez.
