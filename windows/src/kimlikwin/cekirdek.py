@@ -3,6 +3,7 @@ Arayüz katmanından (web/tepsi) bağımsızdır ve doğrudan test edilir."""
 from __future__ import annotations
 
 import json
+import os
 import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -18,6 +19,7 @@ from kimlikserver.oneri import OneriYonetici
 from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 
 from . import claude_ayar, gunluk, harita_kopru
+from .kopya_is import KopyaIsi
 from .yollar import ayar_dizini
 
 MCP_PAROLA_NOTU = (
@@ -107,6 +109,7 @@ class Uygulama:
         self.anahtarlar = KeyManager(self.hub)
         self.oneriler = OneriYonetici(self.hub, self.veri, persona=self.persona)
         self.is_: IceAktarmaIsi | None = None
+        self.kopya_is: KopyaIsi | None = None
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Lock()
@@ -360,6 +363,26 @@ class Uygulama:
 
     def kimlik_karti(self, kategoriler: list[str] | None = None) -> dict:
         return {"markdown": self.persona.export_identity_card(kategoriler or None)}
+
+    # ------------------------------------------------------------------ sohbet kopyaları
+    def kopya_baslat(self, uygula: bool = False, paket: str = "") -> dict:
+        """Kopya denetimi (uygula=False: salt okur) ya da gizleme (uygula=True) arka planda. `paket`: isteğe bağlı
+        ChatGPT dışa aktarma dosyası/klasörü; yalnız verilirse yeniden üretilmiş cevaplar bulunur."""
+        paket = (paket or "").strip().strip('"') if isinstance(paket, str) else ""
+        if paket and not os.path.exists(paket):
+            raise IslemHatasi("Seçilen dışa aktarma dosyası bulunamadı.")
+        with self._is_kilit:
+            if self.is_ and self.is_.durum == "calisiyor":
+                raise IslemHatasi("Bir içe aktarma sürüyor; bitince kopyaları denetleyebilirsiniz.", "mesgul")
+            if self.kopya_is is not None and self.kopya_is.canli:
+                raise IslemHatasi("Bir kopya denetimi sürüyor; bitmesini bekleyin.", "mesgul")
+            self.kopya_is = KopyaIsi(self.hub, bool(uygula), paket or None)
+            self.kopya_is.baslat()
+        gunluk.log().info("kopya %s başladı", "gizleme" if uygula else "denetimi")
+        return self.kopya_is.to_dict()
+
+    def kopya_durum(self) -> dict:
+        return self.kopya_is.to_dict() if self.kopya_is else {"durum": "yok"}
 
     # ------------------------------------------------------------------ erişim
     def erisim(self) -> dict:

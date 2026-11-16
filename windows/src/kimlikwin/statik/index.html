@@ -484,6 +484,34 @@ function hassasOnay(u,k,bitis){
   c.onchange=()=>{dugme.disabled=!c.checked;};
   const kapat=pencere('Hassas kategori onayı',h('p',{},`"${u.ad}" uygulamasına ${k.ad} kategorisini açmak üzeresiniz. Bu kategori özel bilgiler içerir ve "hepsini aç" ile asla açılmaz.`),
     h('label',{},c,' Ne açtığımı biliyorum ve bu uygulamaya güveniyorum.'),h('div',{class:'satir'},dugme,h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}
+// ------------------------------------------------------------------ sohbet kopyaları
+function kopyaKarti(){
+  const yol=h('input',{type:'text',id:'kopya-paket',placeholder:'(isteğe bağlı) ChatGPT dışa aktarma dosyası ya da klasörü'});
+  const sonuc=h('div',{id:'kopya-sonuc'});
+  const kart=h('div',{class:'kart',id:'kopya-karti'},h('h3',{},'Sohbet kopyalarını denetle'),
+    h('p',{class:'soluk'},'Aynı sohbet birden çok kez eklenmişse ya da ChatGPT\'de bir cevap yeniden üretilmişse fazla kayıtlar aramayı ve sayıları şişirir. Önce yalnız denetlenir; hiçbir şey değişmez.'),
+    h('div',{class:'satir'},yol,h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'dosya'}).catch(hataGoster);if(r&&r.yol)yol.value=r.yol;}},'Dosya seç…'),
+      h('button',{class:'i',onclick:async()=>{const r=await api('sec',{tur:'klasor'}).catch(hataGoster);if(r&&r.yol)yol.value=r.yol;}},'Klasör seç…')),
+    h('p',{class:'soluk'},'ChatGPT dışa aktarma dosyasını da seçerseniz yeniden üretilmiş (artık geçerli olmayan) cevaplar da bulunur. Seçmezseniz yalnız birebir aynı kopyalar bulunur.'),
+    h('div',{class:'satir'},h('button',{class:'d',id:'kopya-denetle',onclick:()=>basla(false)},'Denetle')),sonuc);
+  function basla(uygula){
+    sonuc.textContent='';sonuc.append(h('p',{class:'soluk'},uygula?'Kopyalar gizleniyor…':'Denetleniyor…'));
+    api('kopya_baslat',{uygula,paket:yol.value}).then(()=>{
+      if(yoklama)clearInterval(yoklama);
+      yoklama=setInterval(async()=>{const d=await api('kopya_durum').catch(()=>null);if(!d)return;
+        if(d.durum!=='calisiyor'){clearInterval(yoklama);yoklama=null;goster(d);}},400);}).catch(e=>{sonuc.textContent='';hataGoster(e);});}
+  function goster(d){sonuc.textContent='';
+    if(d.durum==='hata'){sonuc.append(h('div',{class:'eklenemedi',id:'kopya-hata'},d.hata));return;}
+    const r=d.rapor;
+    sonuc.append(h('div',{class:r.uygulandi?'eklendi-kutu':'kart',id:'kopya-ozet'},d.ozet));
+    const satir=h('div',{class:'satir'});
+    if(!r.uygulandi&&(r.tam_kopya+r.dal_disi+r.geri_acilan)>0)satir.append(h('button',{class:'t',id:'kopya-gizle',onclick:()=>{
+      const kapat=pencere('Kopyalar gizlensin mi?',h('p',{},`${r.tam_kopya} kopya mesaj ve ${r.dal_disi} yeniden üretilmiş cevap gizlenecek. Kayıtlar silinmez, gizlenir.`),
+        h('div',{class:'satir'},h('button',{class:'d',id:'kopya-onay',onclick:()=>{kapat();basla(true);}},'Evet, gizle'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Kopyaları gizle'));
+    if(!r.uygulandi&&!(r.tam_kopya+r.dal_disi+r.geri_acilan))sonuc.append(h('p',{class:'tamam'},'Gizlenecek kopya yok.'));
+    satir.append(h('button',{class:'i',id:'kopya-rapor',onclick:()=>kopyala(d.metin)},'Raporu kopyala'),h('span',{class:'soluk'},' (yalnız sayılar; sohbet metni yok)'));
+    sonuc.append(satir);}
+  return kart;}
 // ------------------------------------------------------------------ kaynaklar
 SF.kaynak=async a=>{
   const r=await api('kaynaklar');a.append(h('h2',{},'Kaynaklar'),h('p',{class:'soluk'},['"Kaldır" kayıtları gizler (geri alınabilir değildir ama veri diskte kalır). "Kalıcı sil" veriyi ve ',terim('ham arşivi','harsiv'),' diskten siler.']));
@@ -493,6 +521,7 @@ SF.kaynak=async a=>{
       h('button',{class:'t',onclick:()=>{const g=h('input',{type:'text',placeholder:'SİL'});const kapat=pencere('Kalıcı silme',
         h('p',{class:'hata'},'Bu kaynağın tüm kayıtları ve ham arşiv dosyaları diskten KALICI olarak silinir. Geri alınamaz.'),h('p',{},'Onaylamak için SİL yazın:'),g,
         h('div',{class:'satir'},h('button',{class:'t',onclick:async()=>{const x=await api('kaynak_sil',{kaynak_id:s.id,onay:g.value}).catch(hataGoster);if(!x)return;kapat();bildir(`${x.silinen_olay} kayıt, ${x.silinen_dosya} dosya silindi.`);git('kaynak');}},'Kalıcı olarak sil'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Kalıcı sil')))));
+  a.append(kopyaKarti());
 };
 // ------------------------------------------------------------------ ayarlar, hakkında
 SF.ayar=async a=>{
