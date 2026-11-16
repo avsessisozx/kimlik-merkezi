@@ -72,4 +72,4 @@ Kotlin + Jetpack Compose. `minSdk 30`, `targetSdk 35`, `compileSdk 35`. Birincil
 - Aktarım başlarken açık giden kutusu dosyası kapatılır (§1). Dosyalar eskiden yeniye gönderilir.
 - Ne zaman: kullanıcı "PC'ye gönder"e basınca her zaman; ayrıca uygulama açılışında ve arka planda en iyi çabayla (sınırsız/Wi-Fi ağda, periyodik). Arka plan gönderimi garanti DEĞİLDİR (üretici pil kısıtlamaları); ekranda "son başarılı gönderim" zamanı gösterilir.
 - Adres: eşleştirmedeki adresler sırayla denenir; hiçbiri yanıt vermezse UDP bulma (§3), o da olmazsa kullanıcı adresi elle girebilir. Yalnız yerel ağ adreslerine (RFC1918, link-local) bağlanılır.
-
+- Alıcının varsayılan TCP portu 47823'tür (47821 Windows uygulamasının kendi yerel arayüz portuyla çakıştığı için §2 ve §3'teki 47821 örnekleri geçersizdir). Port doluysa işletim sisteminin verdiği boş port kullanılır; geçerli port her zaman eşleştirme kodundaki `p` alanında ve UDP bulma yanıtındadır. UDP bulma portu 47822 olarak kalır.
