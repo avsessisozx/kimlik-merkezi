@@ -37,6 +37,17 @@ def _simdi() -> str:
 _OTOMATIK = object()      # saglayici verilmediyse alıcının kendi varsayılanı (platform anahtar sağlayıcısı)
 
 
+def _bekleyen_dosya_var(uygulama) -> bool:
+    """`gelen_aktarim/<cihaz>/` altında içe alınmayı bekleyen tamamlanmış dosya var mı (içe alıcıyla aynı ölçüt)."""
+    from kimlikserver.aktarim.alici import GELEN_KLASOR, UUID_DOSYA_RE
+    try:
+        kok = Path(uygulama.hub.root) / GELEN_KLASOR
+        return kok.is_dir() and any(UUID_DOSYA_RE.fullmatch(y.name) for d in kok.iterdir() if d.is_dir()
+                                    for y in d.glob("*.jsonl"))
+    except OSError:
+        return True
+
+
 class _Ekli:
     """Bir uygulamaya (Hub) bağlı durum: içe alma iş parçacığı ve (açıksa) alıcı."""
 
@@ -94,8 +105,9 @@ class TelefonAktarimi:
                 self._ekli = _Ekli(u)
                 self._ekli.yonetim = self
                 self._ekli.is_.start()
-                self._ekli.bekleyen.set()              # önceki oturumdan kalanlar
             istenen = bool(self.y.ayarlar["telefon_aktarimi"])
+            if istenen or _bekleyen_dosya_var(u):      # kapalı + bekleyen yok: hiç iş başlatma (kullanıcı işi reddedilmesin)
+                self._ekli.bekleyen.set()              # önceki oturumdan kalanlar
             if istenen and self._ekli.alici is None:
                 self._alici_baslat(self._ekli)
             elif not istenen and self._ekli.alici is not None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -112,7 +113,8 @@ class Uygulama:
         self.kopya_is: KopyaIsi | None = None
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
-        self._is_kilit = threading.Lock()
+        self._is_kilit = threading.Condition(threading.Lock())   # Condition: telefon alımı bitince bekleyenler uyandırılır
+        self.telefon_bekleme_s = 30.0            # kopya/içe aktarma, süren telefon alımını en çok bu kadar bekler
         self._telefon_ice = False                # telefondan gelen dosyalar içe alınıyor (yazma sırası: _is_kilit)
         self.eskiyen = self.persona.check_expiry()   # açılışta süre kontrolü
         gunluk.log().info("hub açıldı; süresi dolan bilgi: %d", self.eskiyen)
@@ -228,6 +230,7 @@ class Uygulama:
         if not yol:
             raise IslemHatasi("Bir dosya ya da klasör yolu yazın ya da seçin.")
         with self._is_kilit:
+            self._telefon_alimini_bekle()
             if self.is_ and self.is_.durum == "calisiyor":
                 raise IslemHatasi("Başka bir içe aktarma sürüyor.", "mesgul")
             if self.kopya_is is not None and self.kopya_is.canli:
@@ -379,6 +382,7 @@ class Uygulama:
         if paket and not os.path.exists(paket):
             raise IslemHatasi("Seçilen dışa aktarma dosyası bulunamadı.")
         with self._is_kilit:
+            self._telefon_alimini_bekle()
             if self.is_ and self.is_.durum == "calisiyor":
                 raise IslemHatasi("Bir içe aktarma sürüyor; bitince kopyaları denetleyebilirsiniz.", "mesgul")
             if self.kopya_is is not None and self.kopya_is.canli:
@@ -389,6 +393,16 @@ class Uygulama:
             self.kopya_is.baslat()
         gunluk.log().info("kopya %s başladı", "gizleme" if uygula else "denetimi")
         return self.kopya_is.to_dict()
+
+    def _telefon_alimini_bekle(self) -> None:
+        """`_is_kilit` ELDEYKEN çağrılır. Telefon alımı sürüyorsa bitmesini (en çok `telefon_bekleme_s`) bekler;
+        bekleme sırasında kilit bırakılır (alım kilidi tutmaz => kilitlenme yok). Süre aşılırsa 'meşgul'."""
+        son = time.monotonic() + self.telefon_bekleme_s
+        while self._telefon_ice:
+            kalan = son - time.monotonic()
+            if kalan <= 0:
+                raise IslemHatasi("Telefondan gelen dosyalar alınıyor; birazdan yeniden deneyin.", "mesgul")
+            self._is_kilit.wait(kalan)
 
     def kopya_durum(self) -> dict:
         return self.kopya_is.to_dict() if self.kopya_is else {"durum": "yok"}
@@ -409,6 +423,7 @@ class Uygulama:
         finally:
             with self._is_kilit:
                 self._telefon_ice = False
+                self._is_kilit.notify_all()
 
     # ------------------------------------------------------------------ erişim
     def erisim(self) -> dict:
