@@ -407,6 +407,10 @@ class Guvenlik:
                     is_.durum = "bitti"
                     is_.mesaj = "Tamamlandı."
                     is_.sonuc = {k: v for k, v in (sonuc or {}).items() if isinstance(v, (int, str, bool))}
+        try:        # mesgul kalktı: telefon alıcısı (ayar açıksa) yeni uygulamayla yeniden açılsın (API kilidi dışında)
+            self.y.telefon.uyumlandir()
+        except Exception as e:  # noqa: BLE001
+            gunluk.log().error("dönüşüm sonrası telefon alıcısı uyumlandırılamadı: %s", type(e).__name__)
         gunluk.log().info("dönüşüm %s: %s", is_.tur, "hata" if hata else "bitti")
 
     def api_guvenlik_donusum_durum(self) -> dict:

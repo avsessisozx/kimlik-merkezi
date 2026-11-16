@@ -114,7 +114,7 @@ class Uygulama:
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Condition(threading.Lock())   # Condition: telefon alımı bitince bekleyenler uyandırılır
-        self.telefon_bekleme_s = 30.0            # kopya/içe aktarma, süren telefon alımını en çok bu kadar bekler
+        self.telefon_bekleme_s = 10.0            # kopya/içe aktarma, süren telefon alımını en çok bu kadar bekler
         self._telefon_ice = False                # telefondan gelen dosyalar içe alınıyor (yazma sırası: _is_kilit)
         self.eskiyen = self.persona.check_expiry()   # açılışta süre kontrolü
         gunluk.log().info("hub açıldı; süresi dolan bilgi: %d", self.eskiyen)

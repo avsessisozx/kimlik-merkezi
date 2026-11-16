@@ -380,3 +380,24 @@ def test_alim_bekleme_suresi_asilinca_mesgul_hatasi(y, tmp_path):
             assert e.value.kod == "mesgul" and 0.25 <= time.time() - t0 < 5
     finally:
         uyg._telefon_ice = False
+
+
+def test_sifreleme_donusumunden_sonra_alici_yeniden_acilir(tmp_path, monkeypatch):
+    from kimlikcore import sifreleme as sif
+    monkeypatch.setattr(sif, "KDF_N", 1 << 4)
+    sif.saglayici_ayarla(sif.SahteSaglayici("telefon-donusum-testi"))
+    y = yap(tmp_path)
+    try:
+        y.api("sihirbaz_tamamla", {"yol": str(tmp_path / "veri"), "otomatik_baslat": False})
+        d = y.api("telefon_ac", {"acik": True})
+        assert d["calisiyor"]
+        y.api("guvenlik_donustur_baslat", {"tur": "kapat", "onay": "KALDIR"})
+
+        def bitti():
+            return y.api("guvenlik_donusum_durum", {})["durum"] != "calisiyor"
+        assert bekle(bitti, 60)
+        assert bekle(lambda: y.api("telefon_durum", {})["calisiyor"]), "dönüşümden sonra alıcı kapalı kaldı"
+        assert dinliyor(y.api("telefon_durum", {})["port"])
+    finally:
+        y.kapat()
+        sif.saglayici_ayarla(None)

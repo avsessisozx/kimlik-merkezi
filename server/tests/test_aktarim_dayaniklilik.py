@@ -580,3 +580,73 @@ def test_bosta_keepalive_baglantilar_ip_sinirini_tuketmez(tmp_path):
             s.close()
     finally:
         d.kapat()
+
+
+def test_hizli_kimliksiz_baglantilar_siniri_asmaz(tmp_path):
+    """El sıkışıp geçersiz istek gönderen ve soketi açık bırakan 200 hızlı bağlantı: canlı bağlantı IP sınırını aşmaz."""
+    d = yeni(tmp_path)
+    acik, en_cok = [], 0
+    try:
+        d.eslesmis()
+        for _ in range(200):
+            try:
+                s = tls(d.alici.port)
+                s.sendall(b"GARBAGE\r\n\r\n")
+                acik.append(s)
+            except (OSError, ssl.SSLError):
+                pass
+            en_cok = max(en_cok, d.alici._srv._toplam, *d.alici._srv._ip_sayac.values(), 0)
+        assert en_cok <= 4
+        bitis = time.monotonic() + 8
+        while d.alici._srv._toplam and time.monotonic() < bitis:
+            time.sleep(0.05)
+        assert d.alici._srv._toplam == 0 and d.alici._srv._bosaltan == 0
+    finally:
+        for s in acik:
+            try:
+                s.close()
+            except OSError:
+                pass
+        d.kapat()
+
+
+def test_tahliyede_kimliksiz_bosta_once_ve_sayac_hemen_duser(tmp_path):
+    d = yeni(tmp_path)
+    try:
+        i = d.eslesmis()
+        srv = d.alici._srv
+        assert i.durum(DOSYA) == ("yok", 0)           # kimlikli, keep-alive: boşta
+        kimlikli = [k for k in srv._kimlikli]
+        assert len(kimlikli) == 1
+        kimliksiz = [tls(d.alici.port) for _ in range(3)]
+        for _ in range(100):
+            if len(srv._bosta) >= 4:
+                break
+            time.sleep(0.05)
+        assert srv._ip_sayac and sum(srv._ip_sayac.values()) == 4
+        yeni_s = tls(d.alici.port)                   # 5.: en eski KİMLİKSİZ boşta tahliye edilir
+        assert sum(srv._ip_sayac.values()) <= 4      # tahliyenin sayacı hemen düştü
+        assert kimlikli[0] in srv._acik              # kimlikli bağlantıya dokunulmadı
+        assert kapandi(kimliksiz[0], 3)
+        for s in kimliksiz + [yeni_s]:
+            s.close()
+    finally:
+        d.kapat()
+
+
+def test_durdur_ucustaki_isleyicileri_bekler(tmp_path):
+    d = yeni(tmp_path)
+    d.eslesmis()
+    srv = d.alici._srv
+    s = tls(d.alici.port, el_sik=False)
+    for _ in range(100):
+        if srv._toplam:
+            break
+        time.sleep(0.02)
+    t0 = time.monotonic()
+    d.alici.durdur()
+    assert time.monotonic() - t0 < 7.5       # en çok 5 sn bekler, sonra döner
+    if sys.platform != "win32":              # Windows'ta başka iş parçacığından shutdown engelli okumayı uyandırmayabilir
+        assert srv._toplam == 0
+    s.close()
+    d.kapat()
