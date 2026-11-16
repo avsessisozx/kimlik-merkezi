@@ -643,7 +643,10 @@ def test_durdur_ucustaki_isleyicileri_bekler(tmp_path):
         if srv._toplam:
             break
         time.sleep(0.02)
+    t0 = time.monotonic()
     d.alici.durdur()
-    assert srv._toplam == 0
+    assert time.monotonic() - t0 < 7.5       # en çok 5 sn bekler, sonra döner
+    if sys.platform != "win32":              # Windows'ta başka iş parçacığından shutdown engelli okumayı uyandırmayabilir
+        assert srv._toplam == 0
     s.close()
     d.kapat()
