@@ -59,7 +59,7 @@ sealed class EslesmeSonucu {
 }
 
 /** `POST /eslestir` (AKTARIM §2). */
-class Eslestirici(private val uretici: BaglantiUretici, private val depo: EslesmeDeposu) {
+class Eslestirici(private val ureticiFabrikasi: (parmakIzi: String) -> BaglantiUretici, private val depo: EslesmeDeposu) {
     fun eslestir(kod: EslesmeKodu, cihazId: String, model: String): EslesmeSonucu {
         val govde = kotlinx.serialization.json.buildJsonObject {
             put("cihaz_id", kotlinx.serialization.json.JsonPrimitive(cihazId))
@@ -71,7 +71,7 @@ class Eslestirici(private val uretici: BaglantiUretici, private val depo: Eslesm
         var ulasildi = false
         for (a in kod.adresler) {
             val y = try {
-                uretici.ac(a, kod.port).eslestir(govde)
+                ureticiFabrikasi(kod.parmakIzi).ac(a, kod.port).eslestir(govde)
             } catch (e: Exception) {
                 if (e.sertifikaHatasiMi()) return EslesmeSonucu.SertifikaUyusmadi
                 continue

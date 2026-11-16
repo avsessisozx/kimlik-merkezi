@@ -75,4 +75,68 @@
 
     <string name="geri">Geri</string>
     <string name="ayarlar">Ayarlar</string>
+    <string name="ana_pc_gonder_aktif">PC\'ye gönder</string>
+    <string name="ana_son_basari">Son başarılı gönderim: %1$s</string>
+    <string name="ana_son_basari_yok">Henüz başarılı gönderim yok</string>
+    <string name="ak_araniyor">PC aranıyor…</string>
+    <string name="ak_gonderiliyor">Gönderiliyor: dosya %1$d/%2$d, %3$s / %4$s</string>
+    <string name="ak_tamam">Tamam: %1$d dosya, %2$d kayıt gönderildi</string>
+    <string name="ak_hata_eslesme_yok">Önce PC ile eşleştir.</string>
+    <string name="ak_hata_yetkisiz">Eşleştirme iptal edilmiş. PC\'den yeniden eşleştir. Dosyaların silinmedi.</string>
+    <string name="ak_hata_sertifika">PC\'nin güvenlik sertifikası değişmiş; yeniden eşleştir.</string>
+    <string name="ak_hata_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık ve "Telefon aktarımı" açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
+    <string name="ak_hata_reddedildi">PC bir dosyayı reddetti. Dosya telefonda duruyor.</string>
+    <string name="ak_hata_bekle">PC şu an meşgul ya da yer yok; sonra tekrar dene.</string>
+    <string name="ak_hata_sunucu">Gönderim tamamlanamadı. Hata raporunu kopyalayabilirsin.</string>
+    <string name="ak_hata_kutu">Giden kutusu okunamadı. Hata raporunu kopyalayabilirsin.</string>
+
+    <string name="es_baslik">PC ile eşleştir</string>
+    <string name="es_aciklama">PC\'de Kimlik Merkezi uygulamasında "Telefon ekle"yi aç. Gösterilen QR kodu tara ya da kodu buraya yapıştır.</string>
+    <string name="es_qr_tara">QR kodu tara</string>
+    <string name="es_kamera_yok">Kamera izni verilmedi. Kodu yapıştırarak da eşleştirebilirsin.</string>
+    <string name="es_kod_alani">Eşleştirme kodu (km1:…)</string>
+    <string name="es_devam">Devam</string>
+    <string name="es_kod_bozuk">Kod okunamadı ya da bu ağ için geçersiz. PC\'den yeni kod üret.</string>
+    <string name="es_onay_baslik">Eşleştirilsin mi?</string>
+    <string name="es_onay_metin">%1$s adlı bilgisayarla eşleştirilsin mi?</string>
+    <string name="es_onayla">Eşleştir</string>
+    <string name="es_vazgec">Vazgeç</string>
+    <string name="es_calisiyor">Eşleştiriliyor…</string>
+    <string name="es_tamam">Eşleştirildi.</string>
+    <string name="es_kod_gecersiz">Kod yanlış ya da süresi dolmuş. PC\'den yeni kod üret.</string>
+    <string name="es_sertifika">PC\'nin güvenlik sertifikası koddakiyle uyuşmadı. Eşleştirme yapılmadı.</string>
+    <string name="es_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
+    <string name="es_beklenmeyen">PC beklenmeyen bir yanıt verdi. Yeni kod üretip tekrar dene.</string>
+    <string name="es_eslesmis">Eşleşti: %1$s</string>
+    <string name="es_adres_alani">PC adresi (ör. 192.168.1.20)</string>
+    <string name="es_adres_kaydet">Adresi kaydet</string>
+    <string name="es_adres_gecersiz">Yalnız yerel ağ adresi girilebilir (192.168.x.x, 10.x.x.x, 172.16-31.x.x).</string>
+    <string name="es_kaldir">Eşleştirmeyi kaldır</string>
+    <string name="es_kaldir_bilgi">Kayıtların silinmez; yalnız PC ile bağlantı kalkar.</string>
+
+    <string name="ay_arka_plan">Arka planda otomatik gönder</string>
+    <string name="ay_arka_plan_bilgi">Wi-Fi gibi sınırsız ağda en iyi çabayla gönderir. Garanti değildir.</string>
+    <string name="ay_eslesme">PC ile eşleştir</string>
+    <string name="ay_pil">Arka planda gönderim çalışmıyorsa</string>
+    <string name="ay_dosyaya_aktar">Dosyaya aktar</string>
+    <string name="ay_dosya_uyari">Bu dosya şifresizdir. İçindeki notlar ve bilgiler okunabilir; güvenli bir yere kaydet.</string>
+    <string name="ay_devam">Devam</string>
+    <string name="ay_dosya_yok">Aktarılacak kapatılmış dosya yok.</string>
+    <string name="ay_dosya_yazildi">Dosya yazıldı (%1$d dosya).</string>
+    <string name="ay_dosya_hata">Dosya yazılamadı.</string>
+    <string name="ay_silme_baslik">PC\'ye aldın mı?</string>
+    <string name="ay_silme_metin">Dosyayı PC\'ye aldıysan telefondan silebilirsin. Silersen bu kayıtlar telefonda kalmaz.</string>
+    <string name="ay_sil">PC\'ye alındı, telefondan sil</string>
+    <string name="ay_silme">Şimdilik silme</string>
+
+    <string name="pil_baslik">Arka planda gönderim çalışmıyorsa</string>
+    <string name="pil_metin">Bazı telefonlar arka planda çalışan uygulamaları kısıtlar; bu yüzden otomatik gönderim gecikebilir ya da hiç çalışmayabilir.</string>
+    <string name="pil_adim">Aşağıdaki düğmeye bas. Açılan ekranda Kimlik Merkezi için pil kısıtlamasını kaldır.</string>
+    <string name="pil_pil_ayari">Pil kısıtlama ayarlarını aç</string>
+    <string name="pil_uygulama_ayari">Uygulama ayrıntılarını aç</string>
+    <string name="pil_garanti">Her zaman çalışan yol: uygulamayı açıp "PC\'ye gönder"e basmak.</string>
+
+    <string name="bildirim_kanal">Gönderim</string>
+    <string name="bildirim_baslik">Kimlik Merkezi</string>
+    <string name="bildirim_metin">%1$d dosya PC\'ye gönderildi</string>
 </resources>

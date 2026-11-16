@@ -14,6 +14,13 @@ import app.kimlikmerkezi.toplayici.gunluk.Gunluk
 import app.kimlikmerkezi.toplayici.gunluk.HataRaporu
 import app.kimlikmerkezi.toplayici.topla.TercihDepolama
 import app.kimlikmerkezi.toplayici.topla.ToplayiciYonetici
+import app.kimlikmerkezi.toplayici.aktarim.AdresSuzgeci
+import app.kimlikmerkezi.toplayici.aktarim.BaglantiUretici
+import app.kimlikmerkezi.toplayici.aktarim.EslesmeDeposu
+import app.kimlikmerkezi.toplayici.aktarim.Eslestirici
+import app.kimlikmerkezi.toplayici.aktarim.Gonderici
+import app.kimlikmerkezi.toplayici.aktarim.HttpsBaglanti
+import app.kimlikmerkezi.toplayici.giden.AesGcmSifreleyici
 import java.io.File
 import java.util.UUID
 
@@ -50,6 +57,29 @@ class Depo(ctx: Context) {
 
     val depolama = TercihDepolama(tercihler)
     val yonetici = ToplayiciYonetici(ctx, kutu, gunluk, depolama)
+
+    val eslesme = EslesmeDeposu(depolama, AesGcmSifreleyici(KeystoreAnahtar.al("km_eslesme_v1")))
+
+    val gonderici = Gonderici(
+        kutu, eslesme, depolama, gunluk,
+        BaglantiUretici { a, p -> HttpsBaglanti(a, p, eslesme.parmakIzi() ?: error("eslesme yok")) },
+        { cihazId },
+    )
+
+    val eslestirici = Eslestirici({ pin -> BaglantiUretici { a, p -> HttpsBaglanti(a, p, pin) } }, eslesme)
+
+    /** Arka plan gönderimi (varsayılan açık). */
+    var arkaPlanAcik: Boolean
+        get() = depolama.mantik("arka_plan_kapali", false).not()
+        set(v) { depolama.yazMantik("arka_plan_kapali", !v); ayarDegisti() }
+
+    /** "PC'ye gönder": arka iş parçacığında, tek seferde bir gönderim. */
+    fun gonder() {
+        Thread {
+            try { gonderici.gonder() } catch (e: Exception) { gunluk.hata("gonder", e) }
+            ayarDegisti()
+        }.start()
+    }
 
     /** Ayarlar ekranını yenilemek için (izin sonuçları, anahtarlar). */
     var ayarSayaci by mutableIntStateOf(0)
@@ -97,6 +127,10 @@ class Depo(ctx: Context) {
             bekleyenKayit = kutu.bekleyenKayitSayisi(),
             bekleyenDosya = kutu.bekleyenDosyaSayisi(),
             bozukDosya = kutu.bozukDosyaSayisi(),
+            eslesme = eslesme.eslesmis(),
+            yerelAdres = eslesme.adresler().any { AdresSuzgeci.yerelMi(it) },
+            sonGonderimKodu = gonderici.sonKod(),
+            reddedilenDosya = gonderici.reddedilenSayisi(),
         ),
     )
 }

@@ -39,6 +39,17 @@ android {
         abortOnError = true
         warningsAsErrors = false
     }
+    sourceSets {
+        // Sahte PC sunucusu ve yalnız-test anahtar deposu hem JVM hem emülatör testlerinde ortak.
+        getByName("test") {
+            java.srcDir("src/ortakTest/kotlin")
+            resources.srcDir("src/ortakTest/resources")
+        }
+        getByName("androidTest") {
+            java.srcDir("src/ortakTest/kotlin")
+            resources.srcDir("src/ortakTest/resources")
+        }
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -54,6 +65,12 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.zxing.core)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)

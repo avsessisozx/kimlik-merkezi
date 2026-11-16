@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import app.kimlikmerkezi.toplayici.BuildConfig
 import app.kimlikmerkezi.toplayici.Depo
 import app.kimlikmerkezi.toplayici.R
+import app.kimlikmerkezi.toplayici.aktarim.AktarimDurumu
 import app.kimlikmerkezi.toplayici.giden.KayitOzeti
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,24 +62,33 @@ private const val ANA = "ana"
 private const val NOT = "not"
 private const val AYARLAR = "ayarlar"
 private const val HAKKINDA = "hakkinda"
+private const val ESLES = "esles"
+private const val PIL = "pil"
 
 @Composable
 fun Uygulama(depo: Depo) {
     var ekran by rememberSaveable { mutableStateOf(ANA) }
     var duzenlenen by rememberSaveable { mutableStateOf<String?>(null) }
+    var oncekiAyar by rememberSaveable { mutableStateOf(false) }
     LaunchedEffectAdim(depo, ekran)
     BackHandler(enabled = ekran != ANA) {
-        ekran = if (ekran == HAKKINDA) AYARLAR else ANA
+        ekran = if (ekran == HAKKINDA || ekran == PIL || ekran == ESLES) AYARLAR.takeIf { oncekiAyar } ?: ANA else ANA
     }
     when (ekran) {
         NOT -> NotEkrani(depo, duzenlenen, geri = { ekran = ANA })
-        AYARLAR -> AyarlarEkrani(depo, geri = { ekran = ANA }, hakkinda = { ekran = HAKKINDA })
+        AYARLAR -> AyarlarEkrani(
+            depo, geri = { ekran = ANA }, hakkinda = { oncekiAyar = true; ekran = HAKKINDA },
+            eslestir = { oncekiAyar = true; ekran = ESLES }, pil = { oncekiAyar = true; ekran = PIL },
+        )
+        ESLES -> EslesmeEkrani(depo, geri = { ekran = if (oncekiAyar) AYARLAR else ANA })
+        PIL -> PilEkrani(geri = { ekran = AYARLAR })
         HAKKINDA -> HakkindaEkrani(depo, geri = { ekran = AYARLAR })
         else -> AnaEkran(
             depo,
             yeniNot = { duzenlenen = null; ekran = NOT },
             notuDuzenle = { duzenlenen = it; ekran = NOT },
-            ayarlar = { ekran = AYARLAR },
+            ayarlar = { oncekiAyar = false; ekran = AYARLAR },
+            eslestir = { oncekiAyar = false; ekran = ESLES },
         )
     }
 }
@@ -89,7 +100,7 @@ private fun LaunchedEffectAdim(depo: Depo, ekran: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Cerceve(baslik: String, geri: (() -> Unit)?, eylem: @Composable () -> Unit = {}, icerik: @Composable (Modifier) -> Unit) {
+internal fun Cerceve(baslik: String, geri: (() -> Unit)?, eylem: @Composable () -> Unit = {}, icerik: @Composable (Modifier) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -122,7 +133,7 @@ private fun turAdi(tur: String): String = when (tur) {
 }
 
 @Composable
-private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> Unit, ayarlar: () -> Unit) {
+private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> Unit, ayarlar: () -> Unit, eslestir: () -> Unit) {
     // degisim okunur: giden kutusu değişince yeniden çizilir.
     val degisim = depo.degisim
     val bekleyen = remember(degisim) { depo.kutu.bekleyenKayitSayisi() }
@@ -148,11 +159,21 @@ private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> U
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = yeniNot, modifier = Modifier.testTag("hizli_not_btn")) { Text(stringResource(R.string.ana_hizli_not)) }
-                // Aktarım işi bağlayana kadar devre dışı.
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.testTag("pc_gonder_btn")) {
-                    Text(stringResource(R.string.ana_pc_gonder))
-                }
+                val eslesmis = depo.eslesme.eslesmis()
+                Button(
+                    onClick = { if (eslesmis) depo.gonder() else eslestir() },
+                    modifier = Modifier.testTag("pc_gonder_btn"),
+                ) { Text(stringResource(if (eslesmis) R.string.ana_pc_gonder_aktif else R.string.ana_pc_gonder)) }
             }
+            val ak by depo.gonderici.durum.collectAsState()
+            val sonBasari = depo.gonderici.sonBasariMs()
+            Text(
+                if (sonBasari > 0) stringResource(R.string.ana_son_basari, yerelZaman(java.time.Instant.ofEpochMilli(sonBasari).toString()))
+                else stringResource(R.string.ana_son_basari_yok),
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("son_basari"),
+            )
+            val akMetin = aktarimMetni(ak)
+            if (akMetin != null) Text(akMetin, modifier = Modifier.testTag("aktarim_durumu"))
             Text(stringResource(R.string.ana_son_kayitlar), style = MaterialTheme.typography.titleMedium)
             if (son.isEmpty()) {
                 Text(stringResource(R.string.ana_kayit_yok), color = MaterialTheme.colorScheme.secondary)
@@ -223,7 +244,7 @@ private fun NotEkrani(depo: Depo, duzenlenenId: String?, geri: () -> Unit) {
 }
 
 @Composable
-private fun AyarlarEkrani(depo: Depo, geri: () -> Unit, hakkinda: () -> Unit) {
+private fun AyarlarEkrani(depo: Depo, geri: () -> Unit, hakkinda: () -> Unit, eslestir: () -> Unit, pil: () -> Unit) {
     val bekleyen = remember(depo.degisim) { depo.kutu.bekleyenKayitSayisi() }
     val ctx = LocalContext.current
     Cerceve(stringResource(R.string.ayarlar_baslik), geri) { mod ->
@@ -256,6 +277,8 @@ private fun AyarlarEkrani(depo: Depo, geri: () -> Unit, hakkinda: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             ToplayiciBolumu(depo)
             Spacer(Modifier.height(8.dp))
+            AktarimBolumu(depo, eslestir, pil)
+            Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.ayarlar_hata_raporu_bilgi), color = MaterialTheme.colorScheme.secondary)
             OutlinedButton(
                 onClick = { raporuKopyala(ctx, depo) },
@@ -283,4 +306,28 @@ private fun HakkindaEkrani(depo: Depo, geri: () -> Unit) {
             Text(stringResource(R.string.hakkinda_lisans))
         }
     }
+}
+
+@Composable
+private fun aktarimMetni(d: AktarimDurumu): String? = when (d) {
+    AktarimDurumu.Bosta -> null
+    AktarimDurumu.Araniyor -> stringResource(R.string.ak_araniyor)
+    is AktarimDurumu.Gonderiliyor -> stringResource(
+        R.string.ak_gonderiliyor, d.dosyaNo, d.dosyaSayisi,
+        android.text.format.Formatter.formatShortFileSize(LocalContext.current, d.bayt),
+        android.text.format.Formatter.formatShortFileSize(LocalContext.current, d.toplamBayt),
+    )
+    is AktarimDurumu.Tamam -> stringResource(R.string.ak_tamam, d.dosya, d.kayit)
+    is AktarimDurumu.Hata -> stringResource(
+        when (d.kod) {
+            "eslesme_yok" -> R.string.ak_hata_eslesme_yok
+            "yetkisiz" -> R.string.ak_hata_yetkisiz
+            "sertifika" -> R.string.ak_hata_sertifika
+            "ulasilamadi" -> R.string.ak_hata_ulasilamadi
+            "reddedildi" -> R.string.ak_hata_reddedildi
+            "bekle" -> R.string.ak_hata_bekle
+            "kutu" -> R.string.ak_hata_kutu
+            else -> R.string.ak_hata_sunucu
+        },
+    )
 }

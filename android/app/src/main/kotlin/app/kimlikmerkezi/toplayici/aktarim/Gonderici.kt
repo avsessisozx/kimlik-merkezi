@@ -134,23 +134,23 @@ class Gonderici(
         throw Dur("ulasilamadi")
     }
 
-    private fun <T> yeniden(is_: () -> T): T {
-        var bekleme = 1000L
-        var son: Exception? = null
-        repeat(denemeSiniri) { n ->
-            try {
-                return is_()
-            } catch (e: IOException) {
-                if (e.sertifikaHatasiMi()) throw Dur("sertifika")
-                son = e
-                if (n < denemeSiniri - 1) { bekle(bekleme); bekleme *= 2 }
-            }
-        }
-        gunluk.hata("ag", son!!)
-        throw Dur("ulasilamadi")
+    private class RedEdildi : Exception()
+
+    /** 401 tüm gönderimi durdurur (dosya silinmez); 422 o dosyayı reddedilmiş işaretletir. */
+    private fun kodKontrol(kod: Int) {
+        if (kod == 401) throw Dur("yetkisiz")
+        if (kod == 422) throw RedEdildi()
     }
 
-    private fun dosyaGonder(b: PcBaglanti, anahtar: String, id: String, no: Int, n: Int): Sonuc {
+    private fun dosyaGonder(b: PcBaglanti, anahtar: String, id: String, no: Int, n: Int): Sonuc = try {
+        dosyaGonderIc(b, anahtar, id, no, n)
+    } catch (e: RedEdildi) {
+        reddet(id)
+        gunluk.bilgi("gonder", "pc dosyayi reddetti")
+        Sonuc.REDDEDILDI
+    }
+
+    private fun dosyaGonderIc(b: PcBaglanti, anahtar: String, id: String, no: Int, n: Int): Sonuc {
         val cihaz = cihazId()
         // 1. geçiş: özet ve boyut (çözülmüş akış, diske yazılmaz)
         val md = MessageDigest.getInstance("SHA-256")
@@ -167,56 +167,51 @@ class Gonderici(
         val sha = md.digest().joinToString("") { "%02x".format(it) }
         var alinan = 0L
         var hizalama = 0
+        var basarisiz = 0
         var durumKontrol = true
         while (true) {
-            if (durumKontrol) {
-                val h = yeniden { b.head(cihaz, id, anahtar) }
-                yanitIsle(h.kod)?.let { return it }
-                if (h.kod !in 200..299) throw Dur("sunucu")
-                if (h.baslik("x-durum") == "var") return sil(id)
-                alinan = h.baslik("x-alinan")?.toLongOrNull() ?: 0L
-                durumKontrol = false
-            }
-            if (alinan >= toplam) throw Dur("sunucu")
-            val parca = kutu_ac(id).use { s ->
-                var atla = alinan
-                while (atla > 0) { val k = s.skip(atla); if (k <= 0) throw Dur("kutu"); atla -= k }
-                s.readNBytes(minOf(parcaBayt.toLong(), toplam - alinan).toInt())
-            }
-            _durum.value = AktarimDurumu.Gonderiliyor(no, n, alinan, toplam)
-            val y = try {
-                b.put(cihaz, id, anahtar, alinan, toplam, sha, parca)
+            try {
+                if (durumKontrol) {
+                    val h = b.head(cihaz, id, anahtar)
+                    kodKontrol(h.kod)
+                    if (h.kod == 429 || h.kod == 507) { bekle(2000); throw Dur("bekle") }
+                    if (h.kod !in 200..299) throw Dur("sunucu")
+                    if (h.baslik("x-durum") == "var") return sil(id)
+                    alinan = h.baslik("x-alinan")?.toLongOrNull() ?: 0L
+                    durumKontrol = false
+                }
+                if (alinan >= toplam) throw Dur("sunucu")
+                val parca = kutu_ac(id).use { s ->
+                    var atla = alinan
+                    while (atla > 0) { val k = s.skip(atla); if (k <= 0) throw Dur("kutu"); atla -= k }
+                    s.readNBytes(minOf(parcaBayt.toLong(), toplam - alinan).toInt())
+                }
+                _durum.value = AktarimDurumu.Gonderiliyor(no, n, alinan, toplam)
+                val y = b.put(cihaz, id, anahtar, alinan, toplam, sha, parca)
+                kodKontrol(y.kod)
+                when {
+                    y.kod == 409 -> {
+                        if (++hizalama > 5) throw Dur("sunucu")
+                        alinan = y.baslik("x-alinan")?.toLongOrNull() ?: throw Dur("sunucu")
+                    }
+                    y.kod in 200..299 -> {
+                        if (y.baslik("x-durum") == "var") return sil(id)
+                        alinan = y.baslik("x-alinan")?.toLongOrNull() ?: (alinan + parca.size)
+                    }
+                    y.kod == 429 || y.kod == 507 -> { bekle(2000); throw Dur("bekle") }
+                    y.kod >= 500 -> throw IOException("sunucu hatasi")
+                    else -> throw Dur("sunucu")
+                }
+                basarisiz = 0
             } catch (e: IOException) {
                 if (e.sertifikaHatasiMi()) throw Dur("sertifika")
-                // bağlantı koptu: bekle, PC'nin gerçek ofsetini HEAD ile öğren, kaldığı yerden sürdür
-                yeniden { bekle(0); durumKontrol = true; b.head(cihaz, id, anahtar) }.let { }
-                continue
-            }
-            yanitIsle(y.kod)?.let { return it }
-            when {
-                y.kod == 409 -> {
-                    if (++hizalama > 5) throw Dur("sunucu")
-                    alinan = y.baslik("x-alinan")?.toLongOrNull() ?: throw Dur("sunucu")
-                }
-                y.kod in 200..299 -> {
-                    if (y.baslik("x-durum") == "var") return sil(id)
-                    alinan = y.baslik("x-alinan")?.toLongOrNull() ?: (alinan + parca.size)
-                }
-                y.kod == 429 || y.kod == 507 -> { bekle(2000); throw Dur("bekle") }
-                y.kod >= 500 -> { bekle(1000); durumKontrol = true }
-                else -> throw Dur("sunucu")
+                // Bağlantı koptu: üstel beklemeyle sınırlı yeniden deneme; PC'nin gerçek ofseti HEAD ile öğrenilir.
+                if (++basarisiz >= denemeSiniri) { gunluk.hata("ag", e); throw Dur("ulasilamadi") }
+                bekle(1000L shl (basarisiz - 1))
+                durumKontrol = true
             }
         }
     }
-
-    /** Ortak kodlar: 401 tümünü durdurur (dosya silinmez), 422 dosyayı reddedilmiş işaretler. */
-    private fun yanitIsle(kod: Int): Sonuc? {
-        if (kod == 401) throw Dur("yetkisiz")
-        if (kod == 422) return null.also { throw RedEdildi() }
-        return null
-    }
-
-    private class RedEdildi : Exception()
 
     private fun kutu_ac(id: String): InputStream = try {
         kutu.dosyayiOku(id)
