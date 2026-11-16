@@ -21,13 +21,13 @@ def _v4_kur(root):
     c.close()
 
 
-def test_v4_klasor_uygulamada_v5e_goc_eder(tmp_path):
+def test_v4_klasor_uygulamada_guncel_surume_goc_eder(tmp_path):
     veri = tmp_path / "veri"
     _v4_kur(veri)
     uyg = Uygulama(veri, ayar_dizin=tmp_path / "ayar", claude_yolu=lambda: None)
     try:
         c = uyg.hub._conn
-        assert c.execute("PRAGMA user_version").fetchone()[0] == schema.SCHEMA_VERSION == 5
+        assert c.execute("PRAGMA user_version").fetchone()[0] == schema.SCHEMA_VERSION
         satirlar = {r[0]: r[1:] for r in c.execute("SELECT event_id, onem, hassas_konu FROM events")}
         assert "saglik" in (satirlar["id0"][1] or "")
         assert not satirlar["id1"][1]

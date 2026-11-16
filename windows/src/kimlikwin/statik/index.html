@@ -86,6 +86,8 @@ details.nedir>summary{cursor:pointer;font-weight:600}
 <script src="/statik/harita.js"></script>
 <script src="/statik/guvenlik.js"></script>
 <script src="/statik/guncelleme.js"></script>
+<script src="/statik/qrcode.js"></script>
+<script src="/statik/telefon.js"></script>
 <script>
 "use strict";
 const JETON=document.querySelector('meta[name=kimlik-jeton]').content;
@@ -153,7 +155,7 @@ function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
     kap.append(h('label',{},c,' ',k.ad,k.hassas?hassasRozet():null));});
   kap.sec=()=>kutular.filter(c=>c.checked).map(c=>c.value);return kap;}
 
-const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['guvenlik','Güvenlik'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
+const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['telefon','Telefon'],['guvenlik','Güvenlik'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
 let sayfa='harita',AYAR_TEMA='sistem',yoklama=null,yoklamaT=null;
 function menu(){const n=$('#nav');n.textContent='';SAYFALAR.forEach(([id,ad])=>n.append(h('button',{class:id===sayfa?'secili':'',onclick:()=>git(id)},ad)));}
 function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}if(yoklamaT){clearInterval(yoklamaT);yoklamaT=null;}
@@ -162,6 +164,7 @@ function temaUygula(t){document.documentElement.dataset.tema=t;AYAR_TEMA=t;}
 
 const SF={};
 SF.guvenlik=a=>guvenlikSayfasi(a);   // guvenlik.js
+SF.telefon=a=>telefonSayfasi(a);     // telefon.js (+ qrcode.js)
 
 // ------------------------------------------------------------------ kişiler
 let KISILER={kisiler:[],secili:null},SECILI_BOLGE=null;

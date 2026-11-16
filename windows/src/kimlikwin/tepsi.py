@@ -1,4 +1,4 @@
-"""Tepsi simgesi (pystray; isteğe bağlı bağımlılık). Menü: Aç, Girişte başlat, Çıkış."""
+"""Tepsi simgesi (pystray; isteğe bağlı bağımlılık). Menü: Aç, Telefon aktarımı, Girişte başlat, Çıkış."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -19,14 +19,20 @@ def simge_olustur(boyut: int = 64):
     return im
 
 
+def telefon_metni(acik: bool) -> str:
+    return "Telefon aktarımı: " + ("açık" if acik else "kapalı")
+
+
 class Tepsi:
     def __init__(self, ac: Callable[[], None], cik: Callable[[], None],
-                 oto_oku: Callable[[], bool], oto_yaz: Callable[[bool], None]):
+                 oto_oku: Callable[[], bool], oto_yaz: Callable[[bool], None],
+                 tel_oku: Callable[[], bool] | None = None, tel_yaz: Callable[[bool], None] | None = None):
         import pystray
         self._pystray = pystray
         m = pystray.MenuItem
         menu = pystray.Menu(
             m("Aç", lambda *_: ac(), default=True),
+            *([m(lambda *_: telefon_metni(tel_oku()), lambda *_: tel_yaz(not tel_oku()))] if tel_oku and tel_yaz else []),
             m("Girişte otomatik başlat", lambda *_: oto_yaz(not oto_oku()), checked=lambda *_: oto_oku()),
             m("Çıkış", lambda *_: cik()),
         )
