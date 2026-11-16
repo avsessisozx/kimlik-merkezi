@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kimlik Merkezi</string>
+
+    <string name="ana_bekleyen">%1$d kayıt henüz PC\'ye gitmedi</string>
+    <string name="ana_bekleyen_yok">PC\'ye gidecek kayıt yok</string>
+    <string name="ana_son_kayitlar">Son kayıtlar</string>
+    <string name="ana_kayit_yok">Henüz kayıt yok. Bir not yaz ya da başka bir uygulamadan buraya paylaş.</string>
+    <string name="ana_hizli_not">Hızlı not</string>
+    <string name="ana_pc_gonder">Önce PC ile eşleştir</string>
+
+    <string name="not_baslik">Hızlı not</string>
+    <string name="not_duzenle_baslik">Notu düzenle</string>
+    <string name="not_ipucu">Notunu yaz</string>
+    <string name="not_kaydet">Kaydet</string>
+    <string name="not_bos">Önce bir şeyler yaz.</string>
+    <string name="not_kaydedildi">Kaydedildi</string>
+    <string name="not_kisaltildi">Kaydedildi (çok uzun metin kısaltıldı)</string>
+    <string name="paylasim_kisaltildi">Kaydedildi (çok uzun metin kısaltıldı)</string>
+    <string name="not_kaydedilemedi">Kaydedilemedi. Hata raporunu Ayarlar\'dan kopyalayabilirsin.</string>
+
+    <string name="tur_not">Not</string>
+    <string name="tur_link">Bağlantı</string>
+    <string name="tur_metin">Paylaşılan metin</string>
+    <string name="tur_diger">Kayıt</string>
+
+    <string name="tur_foto">Fotoğraf</string>
+    <string name="tur_video">Video</string>
+    <string name="tur_konum">Fotoğraf konumu</string>
+    <string name="tur_indirilen">İndirilen dosya</string>
+    <string name="tur_kullanim">Uygulama kullanımı</string>
+
+    <string name="tp_baslik">İsteğe bağlı toplayıcılar</string>
+    <string name="tp_bilgi">Hepsi kapalı başlar. Bir tanesini açarsan yalnız altında yazanlar toplanır.</string>
+    <string name="tp_izin_verildi">İzin: verildi</string>
+    <string name="tp_izin_verilmedi">İzin: verilmedi</string>
+    <string name="tp_izin_reddedildi">İzin verilmedi, bu yüzden kapalı kaldı.</string>
+    <string name="tp_simdi_tara">Şimdi tara</string>
+    <string name="tp_tarama_durumu">Tarama: %1$s</string>
+
+    <string name="tp_medya_baslik">Fotoğraf ve video bilgisi</string>
+    <string name="tp_medya_aciklama">Toplanır: dosya adı, boyut, tür, ölçü, video süresi, çekim zamanı. Toplanmaz: fotoğrafın ve videonun kendisi.</string>
+    <string name="tp_medya_kismi">Android\'e yalnız seçtiğin fotoğraf ve videolara erişim verdin; yalnız onlar görünür.</string>
+    <string name="tp_konum_baslik">Fotoğraf konumlarını da al</string>
+    <string name="tp_konum_aciklama">Toplanır: fotoğrafın çekildiği yerin enlem ve boylamı, ayrı bir kayıt olarak. Toplanmaz: fotoğrafın kendisi.</string>
+    <string name="tp_indirilen_baslik">İndirilenler klasörü</string>
+    <string name="tp_indirilen_aciklama">Toplanır: seçtiğin klasördeki dosyaların adı, boyutu ve türü. Toplanmaz: dosyaların içi.</string>
+    <string name="tp_indirilen_ipucu">Açılan ekranda bir klasör seç. Android bazı sürümlerde İndirilenler\'in kendisini seçtirmez; içindeki bir klasörü seç.</string>
+    <string name="tp_kullanim_baslik">Uygulama kullanım süreleri</string>
+    <string name="tp_kullanim_aciklama">Toplanır: her uygulamanın bir günde ne kadar açık kaldığı (yalnız bitmiş günler). Toplanmaz: uygulamaların içinde ne yaptığın.</string>
+    <string name="tp_kullanim_yonlendirme">Açılan ekranda Kimlik Merkezi\'ni bulup izni aç, sonra geri dön.</string>
+    <string name="tp_ekran_acilamadi">Bu ayar ekranı bu cihazda açılamadı.</string>
+
+    <string name="paylasim_kaydedildi">Kimlik Merkezi\'ne kaydedildi</string>
+    <string name="paylasim_bos">Paylaşılacak metin yok</string>
+    <string name="paylasim_hata">Kaydedilemedi</string>
+
+    <string name="ayarlar_baslik">Ayarlar</string>
+    <string name="ayarlar_tema">Tema</string>
+    <string name="tema_sistem">Sistem</string>
+    <string name="tema_koyu">Koyu</string>
+    <string name="tema_acik">Açık</string>
+    <string name="ayarlar_toplanan">Toplanan veriler</string>
+    <string name="veri_not">Notlar</string>
+    <string name="veri_paylasim">Paylaşılan metin ve bağlantılar</string>
+    <string name="ayarlar_uyari">Aktarılmamış %1$d kayıt var; uygulamayı kaldırırsan kaybolur.</string>
+    <string name="ayarlar_hata_raporu">Hata raporunu kopyala</string>
+    <string name="ayarlar_hata_raporu_bilgi">Panoya düz metin kopyalanır. Kayıtlarının metni raporda yer almaz.</string>
+    <string name="hata_raporu_kopyalandi">Hata raporu panoya kopyalandı</string>
+    <string name="ayarlar_hakkinda">Hakkında</string>
+
+    <string name="hakkinda_baslik">Hakkında</string>
+    <string name="hakkinda_surum">Sürüm %1$s</string>
+    <string name="hakkinda_cihaz">Cihaz kimliği: %1$s</string>
+    <string name="hakkinda_lisans">Kimlik Merkezi açık kaynaklıdır (MIT lisansı). Ayrıntılar kaynak deposundaki LICENSE ve THIRD-PARTY-NOTICES dosyalarında.</string>
+    <string name="hakkinda_gizlilik">Veri yalnız bu cihazda ve senin bilgisayarında durur.</string>
+
+    <string name="geri">Geri</string>
+    <string name="ayarlar">Ayarlar</string>
+    <string name="ana_pc_gonder_aktif">PC\'ye gönder</string>
+    <string name="ana_son_basari">Son başarılı gönderim: %1$s</string>
+    <string name="ana_son_basari_yok">Henüz başarılı gönderim yok</string>
+    <string name="ak_araniyor">PC aranıyor…</string>
+    <string name="ak_gonderiliyor">Gönderiliyor: dosya %1$d/%2$d, %3$s / %4$s</string>
+    <string name="ak_tamam">Tamam: %1$d dosya, %2$d kayıt gönderildi</string>
+    <string name="ak_hata_eslesme_yok">Önce PC ile eşleştir.</string>
+    <string name="ak_hata_yetkisiz">Eşleştirme iptal edilmiş. PC\'den yeniden eşleştir. Dosyaların silinmedi.</string>
+    <string name="ak_hata_sertifika">PC\'nin güvenlik sertifikası değişmiş; yeniden eşleştir.</string>
+    <string name="ak_hata_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık ve "Telefon aktarımı" açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
+    <string name="ak_hata_reddedildi">PC bir dosyayı reddetti. Dosya telefonda duruyor.</string>
+    <string name="ak_hata_pc_tamamlayamadi">PC dosyayı tamamlayamadı; daha sonra yeniden denenecek.</string>
+    <string name="ak_hata_durduruldu">Gönderim durduruldu.</string>
+    <string name="ak_hata_bekle">PC şu an meşgul ya da yer yok; sonra tekrar dene.</string>
+    <string name="ak_hata_sunucu">Gönderim tamamlanamadı. Hata raporunu kopyalayabilirsin.</string>
+    <string name="ak_hata_kutu">Giden kutusu okunamadı. Hata raporunu kopyalayabilirsin.</string>
+
+    <string name="es_baslik">PC ile eşleştir</string>
+    <string name="es_aciklama">PC\'de Kimlik Merkezi uygulamasında "Telefon ekle"yi aç. Gösterilen QR kodu tara ya da kodu buraya yapıştır.</string>
+    <string name="es_qr_tara">QR kodu tara</string>
+    <string name="es_kamera_yok">Kamera izni verilmedi. Kodu yapıştırarak da eşleştirebilirsin.</string>
+    <string name="es_kod_alani">Eşleştirme kodu (km1:…)</string>
+    <string name="es_devam">Devam</string>
+    <string name="es_kod_bozuk">Kod okunamadı ya da bu ağ için geçersiz. PC\'den yeni kod üret.</string>
+    <string name="es_onay_baslik">Eşleştirilsin mi?</string>
+    <string name="es_onay_metin">%1$s adlı bilgisayarla eşleştirilsin mi?</string>
+    <string name="es_onayla">Eşleştir</string>
+    <string name="es_vazgec">Vazgeç</string>
+    <string name="es_calisiyor">Eşleştiriliyor…</string>
+    <string name="es_tamam">Eşleştirildi.</string>
+    <string name="es_kod_gecersiz">Kod yanlış ya da süresi dolmuş. PC\'den yeni kod üret.</string>
+    <string name="es_sertifika">PC\'nin güvenlik sertifikası koddakiyle uyuşmadı. Eşleştirme yapılmadı.</string>
+    <string name="es_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
+    <string name="es_istek_hatali">PC isteği anlamadı. Telefondaki ve PC\'deki uygulamanın sürümü uyuşmuyor olabilir; ikisini de güncelle ve yeni kod üret.</string>
+    <string name="es_beklenmeyen">PC beklenmeyen bir yanıt verdi. Yeni kod üretip tekrar dene.</string>
+    <string name="es_eslesmis">Eşleşti: %1$s</string>
+    <string name="es_adres_alani">PC adresi (ör. 192.168.1.20)</string>
+    <string name="es_adres_kaydet">Adresi kaydet</string>
+    <string name="es_adres_gecersiz">Yalnız yerel ağ adresi girilebilir (192.168.x.x, 10.x.x.x, 172.16-31.x.x).</string>
+    <string name="es_kaldir">Eşleştirmeyi kaldır</string>
+    <string name="es_kaldir_bilgi">Kayıtların silinmez; yalnız PC ile bağlantı kalkar.</string>
+
+    <string name="ay_arka_plan">Arka planda otomatik gönder</string>
+    <string name="ay_arka_plan_bilgi">Wi-Fi gibi sınırsız ağda en iyi çabayla gönderir. Garanti değildir.</string>
+    <string name="ay_eslesme">PC ile eşleştir</string>
+    <string name="ay_pil">Arka planda gönderim çalışmıyorsa</string>
+    <string name="ay_dosyaya_aktar">Dosyaya aktar</string>
+    <string name="ay_dosya_uyari">Bu dosya şifresizdir. İçindeki notlar ve bilgiler okunabilir; güvenli bir yere kaydet.</string>
+    <string name="ay_devam">Devam</string>
+    <string name="ay_dosya_yok">Aktarılacak kapatılmış dosya yok.</string>
+    <string name="ay_dosya_yazildi">Dosya yazıldı (%1$d dosya).</string>
+    <string name="ay_dosya_hata">Dosya yazılamadı.</string>
+    <string name="ay_silme_baslik">PC\'ye aldın mı?</string>
+    <string name="ay_silme_metin">Dosyayı PC\'ye aldıysan telefondan silebilirsin. Silersen bu kayıtlar telefonda kalmaz.</string>
+    <string name="ay_sil">PC\'ye alındı, telefondan sil</string>
+    <string name="ay_silme">Şimdilik silme</string>
+
+    <string name="pil_baslik">Arka planda gönderim çalışmıyorsa</string>
+    <string name="pil_metin">Bazı telefonlar arka planda çalışan uygulamaları kısıtlar; bu yüzden otomatik gönderim gecikebilir ya da hiç çalışmayabilir.</string>
+    <string name="pil_adim">Aşağıdaki düğmeye bas. Açılan ekranda Kimlik Merkezi için pil kısıtlamasını kaldır.</string>
+    <string name="pil_pil_ayari">Pil kısıtlama ayarlarını aç</string>
+    <string name="pil_uygulama_ayari">Uygulama ayrıntılarını aç</string>
+    <string name="pil_garanti">Her zaman çalışan yol: uygulamayı açıp "PC\'ye gönder"e basmak.</string>
+
+</resources>

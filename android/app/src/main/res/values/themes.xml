@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="km_arka">#0F5F66</color>
+    <color name="km_acik_zemin">#FBFCFC</color>
+    <color name="km_koyu_zemin">#101415</color>
+
+    <style name="Theme.KimlikMerkezi" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Açılış ekranı (core-splashscreen) -->
+    <style name="Theme.KimlikMerkezi.Acilis" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/km_arka</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_acilis</item>
+        <item name="postSplashScreenTheme">@style/Theme.KimlikMerkezi</item>
+    </style>
+
+    <!-- Paylaş hedefi: arayüzsüz, saydam -->
+    <style name="Theme.KimlikMerkezi.Paylasim" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
