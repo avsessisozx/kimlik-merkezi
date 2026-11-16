@@ -70,6 +70,9 @@ class HttpsBaglanti(private val adres: String, private val port: Int, parmakIzi:
             c.readTimeout = 30_000
             c.instanceFollowRedirects = false
             c.useCaches = false
+            // Her istek ayrı bağlantı ve açıkça kapatılır: Android'in bağlantı havuzu boşta bağlantıları açık tutar ve PC'nin
+            // IP başına 4 bağlantı sınırına takılır (gerçek PC alıcısına karşı CI'de görüldü).
+            c.setRequestProperty("Connection", "close")
             c.requestMethod = metot
             basliklar.forEach { (k, v) -> c.setRequestProperty(k, v) }
             var yazmaHatasi: IOException? = null
