@@ -299,3 +299,19 @@ def test_elle_aktarim_jsonl_ve_zip_android_giden_olarak_taninir(y, tmp_path):
         d = y.api("ice_aktar_durum", {})
         assert d["durum"] == "bitti", d
         assert f"{beklenen}" in d["sonuc"] and "android_giden" in d["sonuc"]
+
+
+def test_varsayilan_port_47823_web_portuyla_cakisirsa_bos_porta_duser(tmp_path):
+    from kimlikwin import telefon
+    assert telefon.ALICI_PORTU == 47823
+    ayar = {k: v for k, v in TEL.items() if k != "port"}
+    y = Yonetici(Ayarlar(tmp_path / "ayar-p"), Otomatik(_AU()), secici=lambda t: None,
+                 claude_yolu=lambda: None, telefon_ayar=ayar)
+    try:
+        y.api("sihirbaz_tamamla", {"yol": str(tmp_path / "veri"), "otomatik_baslat": False})
+        y.ayarlar.guncelle(port=47823)                  # web arayüzü de 47823 ister: alıcı OS'un verdiği porta düşer
+        d = y.api("telefon_ac", {"acik": True})
+        assert d["calisiyor"] and d["port"] and d["port"] != 47823 and dinliyor(d["port"])
+        assert IO.eslestirme_coz(y.api("telefon_kod_uret", {})["kod"])["p"] == d["port"]
+    finally:
+        y.kapat()

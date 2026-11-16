@@ -432,3 +432,123 @@ def test_klasorler_0700(aktarim):
               aktarim.veri / "aktarim", aktarim.veri / "aktarim" / "gecici",
               aktarim.veri / "aktarim" / "gecici" / aktarim.cihaz):
         assert stat.S_IMODE(p.stat().st_mode) == 0o700, p
+
+
+# ------------------------------------------------- tam boyutlu tamamlanmamış geçici dosya (ölüm benzetimi)
+def _tam_part_birak(d, veri, sha=None):
+    """Son parça yazıldı, tamamlama çalışmadan alıcı öldü: .part boyutu = toplam, .sha yan dosyası var."""
+    dizin = d.veri / "aktarim" / "gecici" / d.cihaz
+    dizin.mkdir(parents=True, exist_ok=True)
+    (dizin / f"{DOSYA}.part").write_bytes(veri)
+    (dizin / f"{DOSYA}.sha").write_text(f"{sha or hashlib.sha256(veri).hexdigest()} {len(veri)}", "ascii")
+    return dizin
+
+
+def _olu_alici_sonrasi(d, veri, giris):
+    """Alıcıyı durdur, tam boyutlu .part bırak; 'baslangic' ise alıcıyı yeniden başlatırken, diğerlerinde
+    başlatıldıktan sonra bırakır (böylece başlangıç kurtarması devre dışı kalır)."""
+    d.alici.durdur()
+    if giris == "baslangic":
+        _tam_part_birak(d, veri)
+        d.yeni_alici()
+    else:
+        d.yeni_alici()
+        _tam_part_birak(d, veri)
+
+
+@pytest.mark.parametrize("giris", ["head", "put", "baslangic"])
+def test_tam_boyutlu_part_gecerliyse_var_olur(tmp_path, giris):
+    d = yeni(tmp_path)
+    try:
+        anahtar = d.eslesmis().anahtar
+        veri = kutu_dosyasi(d.cihaz, DOSYA, 4)
+        _olu_alici_sonrasi(d, veri, giris)
+        if giris == "put":
+            kod, bas, _ = ham_istek(d.alici.port, "PUT", f"/giden/{d.cihaz}/{DOSYA}.jsonl",
+                                    put_basliklari(d.cihaz, anahtar, veri), veri)
+            assert kod == 200 and bas["X-Durum"] == "var"
+        else:
+            assert d.istemci(anahtar=anahtar).durum(DOSYA) == ("var", len(veri))
+        assert (d.veri / "gelen_aktarim" / d.cihaz / f"{DOSYA}.jsonl").read_bytes() == veri
+        assert d.hub.aktarim_dosyasi_var(d.cihaz, DOSYA) is not None
+        assert not d.dosyalar("aktarim/gecici")
+    finally:
+        d.kapat()
+
+
+@pytest.mark.parametrize("giris", ["head", "baslangic"])
+def test_tam_boyutlu_part_bozuksa_yok_olur(tmp_path, giris):
+    d = yeni(tmp_path)
+    try:
+        anahtar = d.eslesmis().anahtar
+        veri = kutu_dosyasi(d.cihaz, DOSYA, 4, kapanis="yok")      # SHA tutar ama doğrulayıcı reddeder
+        _olu_alici_sonrasi(d, veri, giris)
+        assert d.istemci(anahtar=anahtar).durum(DOSYA) == ("yok", 0)
+        assert not d.dosyalar("aktarim/gecici") and not d.dosyalar("gelen_aktarim")
+    finally:
+        d.kapat()
+
+
+# ------------------------------------------------------------------ hata yanıtından önce gövdeyi boşaltma
+def _buyuk_put(d, anahtar, veri, **ek):
+    """1 MiB gövdeyi başlıklarla birlikte yazar, sonra yanıtı okur: (durum, başlıklar)."""
+    b = put_basliklari(d.cihaz, anahtar, veri, **ek)
+    s = tls(d.alici.port)
+    s.settimeout(10)
+    s.sendall((f"PUT /giden/{d.cihaz}/{DOSYA}.jsonl HTTP/1.1\r\nHost: x\r\n"
+               + "".join(f"{k}: {v}\r\n" for k, v in b.items()) + "\r\n").encode())
+    try:
+        s.sendall(veri)
+    except (OSError, ssl.SSLError):     # sunucu gövdeyi okumadan yanıt verip kapattı (401): yanıt yine okunur
+        pass
+    ham = b""
+    while b"\r\n\r\n" not in ham:
+        p = s.recv(4096)
+        if not p:
+            break
+        ham += p
+    s.close()
+    satirlar = ham.decode("latin-1").split("\r\n")
+    basliklar = dict(l.split(": ", 1) for l in satirlar[1:] if ": " in l)
+    return int(satirlar[0].split()[1]), basliklar
+
+
+@pytest.mark.parametrize("durum", [409, 429, 507])
+def test_hata_yanitindan_once_govde_bosaltilir(tmp_path, durum):
+    sinir = {429: {"cihaz_basina_yarim_yukleme": 0}, 507: {"bos_disk_en_az": 1 << 60}}.get(durum, {})
+    d = yeni(tmp_path, **sinir)
+    try:
+        i = d.eslesmis()
+        veri = kutu_dosyasi(d.cihaz, DOSYA, 4000, metin="x" * 200).ljust(6 << 20, b"\n")
+        if durum == 409:      # yanlış ofset: .part boyutu 10, istek ofseti 0
+            _tam = _tam_part_birak  # noqa: F841
+            dizin = d.veri / "aktarim" / "gecici" / d.cihaz
+            dizin.mkdir(parents=True)
+            (dizin / f"{DOSYA}.part").write_bytes(b"0123456789")
+            (dizin / f"{DOSYA}.sha").write_text(f"{hashlib.sha256(veri).hexdigest()} {len(veri)}", "ascii")
+        kod, bas = _buyuk_put(d, i.anahtar, veri)
+        assert kod == durum
+        if durum == 409:
+            assert bas["X-Alinan"] == "10"
+    finally:
+        d.kapat()
+
+
+def test_401de_govde_okunmaz(tmp_path):
+    d = yeni(tmp_path)
+    try:
+        d.eslesmis()
+        okunan = []
+        orijinal = d.alici.__class__.__mro__  # noqa: F841
+        from kimlikserver.aktarim import alici as m
+        eski = m._Isleyici._bosalt
+        m._Isleyici._bosalt = lambda self: okunan.append(self._bosaltilacak) or eski(self)
+        try:
+            veri = b"x" * (6 << 20)
+            kod, _ = _buyuk_put(d, "0" * 64, veri)
+        finally:
+            m._Isleyici._bosalt = eski
+        assert kod == 401
+        assert okunan == [0]       # kimliksizde boşaltılacak bayt kaydı bile yok
+    finally:
+        d.kapat()

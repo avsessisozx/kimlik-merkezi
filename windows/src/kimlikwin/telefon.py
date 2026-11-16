@@ -18,8 +18,7 @@ from typing import Any
 from . import __version__, gunluk
 from .cekirdek import IslemHatasi
 
-ALICI_PORTU = 47821          # docs/AKTARIM.md varsayılanı
-YEDEK_PORT = 47823           # web arayüzü de 47821 kullanıyorsa (ayarlar varsayılanı) çakışmasın
+ALICI_PORTU = 47823          # docs/AKTARIM.md varsayılanı (47821 web arayüzünün yerel portu)
 YENIDEN_DENEME_S = 0.3
 KOD_SURESI_S = 600
 GECERSIZLIK_METINLERI = {
@@ -121,7 +120,9 @@ class TelefonAktarimi:
         ayar = self.y.ayarlar
         tercih = self._port
         if tercih is None:
-            tercih = YEDEK_PORT if int(ayar["port"]) == ALICI_PORTU else ALICI_PORTU
+            tercih = ALICI_PORTU
+        if tercih == int(ayar["port"]):      # web arayüz portuyla aynıysa işletim sistemi boş port versin
+            tercih = 0
         kopru = DogrudanKopru(e.uygulama.hub, lambda yol: e.bekleyen.set())
         son: Exception | None = None
         for port in (tercih, 0) if tercih else (0,):
