@@ -19,6 +19,15 @@ Windows uygulaması.
 - **Yapay zekâ uygulamalarına izinli erişim (MCP):** her uygulama için ayrı anahtar; hangi kategorilerin
   okunabileceğini siz seçersiniz; hassas kategoriler (e-posta, özel mesajlar, konum, yapay zekâ sohbetleri) ayrı onay ister;
   her erişim kaydedilir ve uygulamada görebilirsiniz; erişim salt okunurdur.
+- **Hassas konu izni:** sağlık, hukuk, para, din/siyaset ve cinsellik sözcükleri geçen kayıtlar, kategori izni açık olsa da
+  ayrı konu izni olmadan yapay zekâya verilmez (sözcük listesine dayanır, hata yapabilir). Liste değişince
+  `kimlikmerkezi yeniden-isaretle` mevcut kayıtları yeniden işaretler.
+- **Yönetilen blok (isteğe bağlı, varsayılan kapalı):** onayladığınız persona bilgileri `~/.claude/CLAUDE.md` ve `~/.codex/AGENTS.md` dosyalarına
+  kısa bir bölüm olarak yazılabilir; o dosyaları okuyan her araç bunu görür ([docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md) 2.7).
+- **MCP araçları (9):** `kategorileri_listele`, `ara`, `zaman_cizelgesi`, `say`, `persona_getir`, `kimlik_karti`, `ornekle`,
+  `kayit_getir` (kısa alıntının tam metni), `persona_oner`.
+- **Sohbet kopyalarını temizleme:** `kimlikmerkezi kopya-temizle` rapor verir, `--uygula` ile gizler (silmez); uygulamada
+  Kaynaklar sayfasında "Sohbet kopyalarını denetle" düğmesi aynısını yapar.
 - **Persona önerileri:** yapay zekâ istemcisi sizin hakkınızda bir şey öneriyorsa öneri yalnızca bir kuyruğa
   düşer; siz onaylamadan hiçbir şey değişmez.
 

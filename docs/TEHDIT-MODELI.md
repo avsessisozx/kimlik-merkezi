@@ -118,6 +118,20 @@ Tarayıcınızda açık başka bir sitenin, `127.0.0.1` üzerindeki Kimlik Merke
   yalnızca `mcp`, `pystray` ve `PyInstaller` sabittir; derlemede hangi sürümlerin kullanıldığı SBOM'da yazılıdır.
   Çözüm planı: [IMZA.md](IMZA.md).
 
+### 2.7 Yönetilen blok (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`)
+- **Varsayılan kapalı.** Açılırsa, uygulamanın veri klasörü DIŞINA yazdığı tek yerdir.
+- **Yol sabittir** (kullanıcının ev klasöründeki iki dosya); yerel API'den ya da istemciden yol alınmaz.
+- **Yalnız işaretçiler arası değişir**; dosyanın geri kalanı korunur, her yazmadan önce yedek alınır. İşaretçi bozuksa dosyaya dokunulmaz.
+- **İçerik yalnız onaylı persona bilgisidir**: kayıt metni, çıkarım ve hassas kategori içeriği girmez. Persona metni temizlenerek yazılır (işaretçi/başlık enjeksiyonuna karşı).
+- **Risk:** bu dosyaları okuyan her araç ve yapay zekâ bu bilgiyi alır; bu, anahtar/izin ve erişim kaydının DIŞINDADIR. Açmadan önce bunu bilin.
+- **Çoklu kişide** blok onu açan kişiye aittir.
+
+### 2.8 Hassas konu izni
+- **Kural:** kategori izni açık olsa bile `hassas_konu` işaretli bir kayıt, ilgili konu için (süresi dolmamış) konu izni yoksa yapay zekâya DÖNMEZ. Konu izni ayrı onayla ve tek tek verilir.
+- **Yöntemin sınırı:** yalnız sözcük listesidir ve yalnız kaydın metin alanına bakar; yanlış negatif (kaçırılan) ve yanlış pozitif (gereksiz işaretlenen) olur. Güvenlik sınırı değil, süzgeç ipucudur.
+- **Bilinen yan kanal:** içerik taşımayan sayımlar (tür, ay, saat vb.) işaretli kayıtları da sayar; yalnız sayı sızar, içerik sızmaz.
+- **Ek liste ve yeniden işaretleme:** veri klasöründeki `hassas_konular.json` paket listesine eklenir; liste değişince `yeniden-isaretle` ile mevcut kayıtlar güncellenir. Ayrıntı: [SEMA.md](SEMA.md) §13, [INTERFACES.md](INTERFACES.md) §18.
+
 ## 3. Özet tablo: mevcut önlemler
 
 | Önlem | Yer |
