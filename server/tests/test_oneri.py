@@ -252,7 +252,8 @@ def test_ornekle(world):
     s = svc(world)
     r = s.ornekle("notlar", 5)
     assert [k["veri"] for k in r["kayitlar"]] == ["kahve makinesi notu"]
-    assert all(k["etiket"] == "veri" for k in r["kayitlar"])
+    assert all("etiket" not in k and "kategori" not in k for k in r["kayitlar"]) \
+        and r["kategori"] == "notlar"   # tek kategori: üst düzeyde bir kez
     assert s.ornekle("video", 5, "tarifi")["kayitlar"][0]["veri"] == "kahve tarifi videosu"
     assert s.ornekle("notlar", 5, "olmayan-sozcuk")["kayitlar"] == []
     for kat in ("eposta", "konum", "tarama"):
@@ -296,7 +297,9 @@ def test_persona_getir_zengin_bicim(world, clock):
     assert [x["kategori_basligi"] for x in r] == ["Kimlik", "İlgi alanları"]
     assert r[1]["kaynak"] == "belge" and r[1]["durum"] == "dosyadan_alinan"
     assert r[0]["son_dogrulama"] and len(r[0]["son_dogrulama"]) == 10
-    kart = svc(world).kimlik_karti()["veri"]
+    kisa = svc(world).kimlik_karti()["veri"]    # varsayılan: kısa kart
+    assert kisa.startswith("# Kimlik Kartı") and "Adım Deneme" in kisa and "Python bilir" in kisa
+    kart = svc(world).kimlik_karti(kisa=False)["veri"]
     assert kart.startswith("# Kimlik Kartı") and "## Bu kişi hakkında bilinenler" in kart
     assert "son doğrulama:" in kart and "kaynak: belge" in kart
 

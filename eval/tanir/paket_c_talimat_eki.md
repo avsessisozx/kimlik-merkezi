@@ -12,7 +12,7 @@ python mcp_cagri.py --yapilandirma mcp.json <arac_adi> '{"anahtar": "deger"}'
 Sayılar (ör. `limit`) araç şemasına göre otomatik çevrilir.
 
 ## İzinli yedi araç
-`kategorileri_listele`, `ara`, `zaman_cizelgesi`, `persona_getir`, `kimlik_karti`, `ornekle`, `say`.
+`kategorileri_listele`, `ara`, `zaman_cizelgesi`, `persona_getir`, `kimlik_karti`, `ornekle`, `say`, `kayit_getir`.
 `persona_oner` ve diğer her şey reddedilir; kullanma.
 
 ## Örnek komutlar

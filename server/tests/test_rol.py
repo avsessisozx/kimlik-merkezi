@@ -84,9 +84,9 @@ def test_ornekle_varsayilan_asistani_dislar(d):
 
 def test_say_alan_rol_ve_suzgec(d):
     r = s(d).say("rol", kategori="sohbet")
-    assert {(x["veri"], x["sayi"]) for x in r["satirlar"]} == {("asistan", 30), ("kullanici", 3)}
+    assert {tuple(x) for x in r["satirlar"]} == {("asistan", 30), ("kullanici", 3)}
     r = s(d).say("platform", kategori="sohbet", rol="kullanici")
-    assert r["satirlar"][0]["sayi"] == 3 and r["toplam_kayit"] == 3
+    assert r["satirlar"][0][1] == 3 and r["toplam_kayit"] == 3
 
 
 def test_gecersiz_rol_anlasilir_hata(d):

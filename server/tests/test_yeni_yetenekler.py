@@ -95,7 +95,7 @@ def svc(d, key=None, tz=IST):
 
 # ------------------------------------------------------------------ kimlik kartı
 def test_kart_beyan_etiketleri_eskiyen_ayri_cikarilan_ve_yerinden_edilen_yok(dunya):
-    kart = svc(dunya).kimlik_karti()["veri"]
+    kart = svc(dunya).kimlik_karti(kisa=False)["veri"]
     canli, eski = kart.split("### Süresi doldu - doğrulanmadı")
     eski = eski.split("## Veriden özet")[0]
     assert "Adı Deneme Kişi (beyan, son doğrulama: 2026-01-15)" in canli
@@ -107,7 +107,7 @@ def test_kart_beyan_etiketleri_eskiyen_ayri_cikarilan_ve_yerinden_edilen_yok(dun
 
 
 def test_kart_veri_ozeti_yerel_saat_ve_etiketler(dunya):
-    kart = svc(dunya).kimlik_karti()["veri"]
+    kart = svc(dunya).kimlik_karti(kisa=False)["veri"]
     assert "[çıkarım] En çok dinlenen sanatçılar (dinleme sayısı): Mavi Dalga (240), Gece Vardiyası (60)" in kart
     assert "mahalle-takvimi (" in kart and "Python (1)" in kart
     # UTC 02:30-03:50 commit'ler İstanbul'da (+03:00) 05:30-06:50
@@ -115,7 +115,7 @@ def test_kart_veri_ozeti_yerel_saat_ve_etiketler(dunya):
     assert "fedora (2)" in kart  # arama sözcükleri
     assert "yerel: 2026-11-10T12:00:00+03:00 (Europe/Istanbul)" in kart
     # varsayılan UTC çıktısı farklı saat verir ve bunu açıkça yazar
-    utc = svc(dunya, tz=YerelSaat.cozumle("UTC")).kimlik_karti()["veri"]
+    utc = svc(dunya, tz=YerelSaat.cozumle("UTC")).kimlik_karti(kisa=False)["veri"]
     assert "02:00-03:59" in utc and "(UTC)" in utc
 
 
@@ -174,24 +174,26 @@ def test_kart_ozet_kapali_ve_izin_gerekli(dunya):
 def test_say_tum_kayitlar_uzerinden_sayar_son_200_degil(dunya):
     s = svc(dunya)
     r = s.say("sanatci", en_cok=2)
-    assert [(x["veri"], x["sayi"]) for x in r["satirlar"]] == [("Mavi Dalga", 240), ("Gece Vardiyası", 60)]
-    assert r["alanli_kayit"] == 300 and r["farkli_deger"] == 2 and r["diger_sayi"] == 0
+    assert [tuple(x) for x in r["satirlar"]] == [("Mavi Dalga", 240), ("Gece Vardiyası", 60)]
+    assert r["toplam_kayit"] == 349 and r["alanli_kayit"] == 300 and r["farkli_deger"] == 2
+    assert "diger_sayi" not in r
+    assert "oran" not in json.dumps(r) and "kategoriler" not in r
     # zaman_cizelgesi son 200 kaydı verir: onlardan saymak yanlış olurdu
     son = s.zaman_cizelgesi("muzik", limit=200)["kayitlar"]
     assert len(son) == 200
-    assert r["satirlar"][0]["oran"] == 0.8
+    assert r["satirlar"][0][1] / r["alanli_kayit"] == 0.8   # oran sayıdan hesaplanır
 
 
 def test_say_zaman_araligi_yerel_saat_ve_zamansiz(dunya):
     s = svc(dunya)
     r = s.say("saat", kategori="kod", baslangic="2026-10-01T00:00:00Z", bitis="2026-10-31T23:59:59Z")
-    saat = {x["veri"][:2]: x["sayi"] for x in r["satirlar"]}
-    assert saat["05"] + saat["06"] == 40 and r["saat_dilimi"]["utc_farki"] == "+03:00"
-    assert r["satirlar"][0]["veri"] == "00:00-00:59" and len(r["satirlar"]) == 24
+    saat = {x[0]: x[1] for x in r["satirlar"]}
+    assert saat["05"] + saat["06"] == 40 and r["sd"] == "+03:00" and "saat_dilimi" not in r
+    assert all(v > 0 for v in saat.values()) and len(saat) < 24   # sıfır sayılı saatler yazılmaz
     v = s.say("tur", kategori="video", baslangic="2026-01-01T00:00:00Z")
     assert v["satirlar"] == [] and v["zamansiz_kayit"] == 3 and "zamansız" in " ".join(v["notlar"])
     t = s.say("tur", kategori="video")  # aralıksız: zamansızlar sayılır ama işaretlenir
-    assert [(x["veri"], x["sayi"]) for x in t["satirlar"]] == [("youtube.abonelik", 3)]
+    assert [tuple(x) for x in t["satirlar"]] == [("youtube.abonelik", 3)]
     assert t["zamansiz_kayit"] == 3
     # saatsiz tarih giren yerel saat sayılır: 2026-10-01T03:00 (+03) == 00:00Z
     assert s.say("tur", kategori="kod", baslangic="2026-10-01T03:00:00")["filtre"]["baslangic_utc"] \
@@ -200,12 +202,13 @@ def test_say_zaman_araligi_yerel_saat_ve_zamansiz(dunya):
 
 def test_say_tur_kaynak_ve_gun_ay(dunya):
     s = svc(dunya)
-    assert s.say("tur", tur="github.*")["satirlar"][0] == {
-        "etiket": "veri", "veri": "github.commit", "sayi": 40, "oran": round(40 / 41, 4)}
-    assert s.say("kaynak", kategori="kod")["satirlar"][0]["veri"] == "test"
-    assert len(s.say("gun", kategori="kod")["satirlar"]) == 7
-    assert all(len(x["veri"]) == 7 for x in s.say("ay", kategori="kod")["satirlar"])
-    assert s.say("depo", kategori="kod")["satirlar"][0]["veri"] == "mahalle-takvimi"  # URL son parça
+    assert s.say("tur", tur="github.*")["satirlar"][0] == ["github.commit", 40]
+    assert s.say("kaynak", kategori="kod")["satirlar"][0][0] == "test"
+    assert 1 <= len(s.say("gun", kategori="kod")["satirlar"]) <= 7
+    assert all(len(x[0]) == 7 and x[1] > 0 for x in s.say("ay", kategori="kod")["satirlar"])
+    yil = s.say("yil", kategori="kod")
+    assert yil["satirlar"] == [["2026", 41]] and yil["toplam_kayit"] == 41
+    assert s.say("depo", kategori="kod")["satirlar"][0][0] == "mahalle-takvimi"  # URL son parça
     with pytest.raises(ServiceError, match="Bilinmeyen alan"):
         s.say("parola")
     assert len(s.say("sanatci", en_cok=999)["satirlar"]) <= 50
@@ -219,11 +222,11 @@ def test_say_izne_saygili_ve_hassasta_icerik_yok(dunya):
     assert not any(g in tum for g in GIZLI) and "yer_ziyareti" not in tum
     h = svc(dunya, dunya["key_hepsi"])
     # konum izni açık: tür/kategori/zaman sayılır ama yer adı (içerik alanı) HİÇ hesaplanmaz
-    assert [x["veri"] for x in h.say("tur", kategori="konum")["satirlar"]] == ["google.yer_ziyareti"]
+    assert [x[0] for x in h.say("tur", kategori="konum")["satirlar"]] == ["google.yer_ziyareti"]
     d = h.say("depo", kategori="konum")
     assert d["satirlar"] == [] and "hassas" in " ".join(d.get("notlar", []))
     assert GIZLI[2] not in json.dumps(h.say("depo"), ensure_ascii=False)
-    assert h.say("platform", kategori="sohbet")["satirlar"][0]["veri"] == "chatgpt"
+    assert h.say("platform", kategori="sohbet")["satirlar"][0][0] == "chatgpt"
 
 
 # ------------------------------------------------------------------ yerel saat
@@ -243,10 +246,11 @@ def test_saat_dilimi_cozumleme_ve_uyari(monkeypatch):
 def test_ciktilarda_yerel_zaman_ve_zaman_dilimi_aciklik(dunya):
     r = svc(dunya).ara("fedora", genislet=False)
     k = r["kayitlar"][0]
-    assert k["zaman"].endswith("Z") and k["yerel_zaman"].endswith("+03:00")
-    assert r["saat_dilimi"]["ad"] == "Europe/Istanbul" and "UTC" in r["saat_dilimi"]["aciklama"]
-    assert svc(dunya).kategorileri_listele()["saat_dilimi"]["utc_farki"] == "+03:00"
-    assert svc(dunya).ornekle("tarama", 3)["saat_dilimi"]["ad"] == "Europe/Istanbul"
+    assert k["zaman"].endswith("+03:00") and "yerel_zaman" not in k   # zaman artık YEREL, ofsetli
+    assert r["sd"] == "+03:00" and "saat_dilimi" not in r and "veri_uyarisi" not in r
+    tam = svc(dunya).kategorileri_listele()["saat_dilimi"]   # tam blok yalnız burada
+    assert tam["utc_farki"] == "+03:00" and tam["ad"] == "Europe/Istanbul" and "UTC" in tam["aciklama"]
+    assert svc(dunya).ornekle("tarama", 3)["sd"] == "+03:00"
 
 
 # ------------------------------------------------------------------ zamansız kayıtlar
@@ -259,21 +263,22 @@ def test_zaman_cizelgesi_zamansizi_ayirir(dunya):
     assert tum["kayitlar"][0]["zaman"] >= tum["kayitlar"][-1]["zaman"]
     # zaman aralığında zamansızlar gösterilmez ama sayılır
     a = svc(dunya).zaman_cizelgesi("video", baslangic="2026-01-01T00:00:00Z")
-    assert a["zamansiz_kayitlar"] == [] and a["zamansiz_toplam"] == 3 and "gösterilmedi" in a["zamansiz_notu"]
+    assert a["zamansiz_kayitlar"] == [] and a["zamansiz_toplam"] == 3 and "gösterilmedi" in a["not"]
     # ara: zamansız kayıt işaretlenir
     z = svc(dunya).ara("Kanal 1", genislet=False)["kayitlar"]
-    assert z and z[0]["zaman_gercek"] is False
+    assert z and z[0]["zaman_gercek"] is False and "zaman_notu" not in z[0]
 
 
 # ------------------------------------------------------------------ eşanlamlı arama
 def test_esanlamli_arama_eslesen_terim_gorunur(dunya):
     s = svc(dunya)
     r = s.ara("Linux")
-    dogrudan = [k for k in r["kayitlar"] if k["eslesme"] == "dogrudan"]
-    ilgili = [k for k in r["kayitlar"] if k["eslesme"] == "ilgili"]
+    dogrudan = [k for k in r["kayitlar"] if "eslesme" not in k]
+    ilgili = [k for k in r["kayitlar"] if k.get("eslesme") == "ilgili"]
     assert [k["veri"] for k in dogrudan] == ["Searched for linux nedir"]
     assert {k["eslesen_terim"] for k in ilgili} == {"fedora", "ubuntu"}
-    assert all(k["aranan_terim"] == "Linux" for k in ilgili)
+    assert all("aranan_terim" not in k for k in ilgili)
+    assert all("eslesme" not in k and "eslesen_terim" not in k for k in dogrudan)   # yalnız 'ilgili'de
     assert r["kayitlar"].index(dogrudan[0]) < r["kayitlar"].index(ilgili[0])  # doğrudan önce
     ozet = r["genisletilen_terimler"][0]
     assert ozet["terim"] == "Linux" and {"terim": "fedora", "kayit": 2} in ozet["iliskili"]
@@ -294,7 +299,7 @@ def test_esanlam_turkce_katlama_bozulmaz_ve_izin_asilmaz(dunya):
     assert r["kayitlar"] == []
     assert GIZLI[2] not in json.dumps(r["kayitlar"], ensure_ascii=False)
     h = svc(dunya, dunya["key_hepsi"]).ara("semt")  # izin varsa gelir ve 'ilgili' diye işaretlenir
-    assert {k["eslesme"] for k in h["kayitlar"]} == {"ilgili"}
+    assert {k.get("eslesme") for k in h["kayitlar"]} == {"ilgili"}
 
 
 def test_sozluk_dosyasi_yapisi_ve_genisletilebilirlik(tmp_path):
@@ -352,7 +357,7 @@ def test_izinsiz_kategori_hicbir_aractan_sizmaz(dunya):
     for r in _tum_araclar(s):
         for k in r.get("kayitlar", []) + r.get("zamansiz_kayitlar", []):
             if "id" in k:  # (persona_getir kayıtlarındaki 'kategori' persona bilgi kategorisidir)
-                assert k["kategori"] in ACIK
+                assert k.get("kategori", r.get("kategori")) in ACIK   # ornekle: üst düzey kategori
 
 
 def test_say_ve_kart_sifreli_klasorde_calisir(tmp_path, monkeypatch):
@@ -373,7 +378,7 @@ def test_say_ve_kart_sifreli_klasorde_calisir(tmp_path, monkeypatch):
         Persona(hub, clock=FakeClock(SIMDI)).add_fact("Adı Deneme", "kimlik")
     assert sif.db_durumu(veri / "kimlik.db") == "sifreli"
     s = QueryService(veri, k, clock=FakeClock(SIMDI), saat_dilimi=IST)
-    assert s.say("sanatci", en_cok=1)["satirlar"][0]["sayi"] == 240
-    kart = s.kimlik_karti()["veri"]
+    assert s.say("sanatci", en_cok=1)["satirlar"][0][1] == 240
+    kart = s.kimlik_karti(kisa=False)["veri"]
     assert "Mavi Dalga (240)" in kart and not any(g in kart for g in GIZLI)
     assert s.ara("linux")["kayitlar"]

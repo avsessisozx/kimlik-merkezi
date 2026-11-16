@@ -39,7 +39,7 @@ claude_cfg.write_text(json.dumps(onceki), encoding="utf-8")
 # Sunucunun beklenen MCP araç kümesi. Sunucudaki gerçek listeyle eşleştiği server/tests/test_mcp_stdio.py::
 # test_kurulu_dene_arac_listesi_senkron ile denetlenir: araç eklenince/çıkarılınca BURASI da güncellenmeli.
 BEKLENEN_ARACLAR = {"kategorileri_listele", "ara", "zaman_cizelgesi", "say", "persona_getir", "kimlik_karti",
-                    "ornekle", "persona_oner"}
+                    "ornekle", "persona_oner", "kayit_getir"}
 
 
 def adim(m):

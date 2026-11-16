@@ -31,6 +31,9 @@ from .yerelsaat import UTC, YerelSaat
 if TYPE_CHECKING:  # döngüsel içe aktarma olmasın
     from .persona import Fact, PersonaReader
 
+KISA_KART_UST_SINIR = 3000     # karakter; ~1000 jeton (kimlik_karti kisa=true, MCP varsayılanı)
+KISA_OZET_SATIR = 5
+KISA_CUMLE = 160
 KART_UST_SINIR = 7000          # karakter; ~2000 jeton. Aşılırsa düşük öncelikli özetler çıkarılır.
 MAX_BEYAN = 40
 MAX_ESKI = 12
@@ -180,10 +183,14 @@ def _eski_bolum(reader: "PersonaReader", cats: list[str]) -> list[str]:
     return out
 
 
+def _bilinmeyen_konular(canli_metin: str) -> list[str]:
+    ft = fold(canli_metin)
+    return [ad for ad, desen in _BILINMEYEN_KONULAR if not re.search(desen, ft)]
+
+
 def _bilinmeyenler(canli_metin: str, bos_kategoriler: list[str], bos_beyan: list[str],
                    izinli: list[str]) -> list[str]:
-    ft = fold(canli_metin)
-    yok = [ad for ad, desen in _BILINMEYEN_KONULAR if not re.search(desen, ft)]
+    yok = _bilinmeyen_konular(canli_metin)
     out = ["## Bilinmeyenler / veride bulunamayanlar", ""]
     if yok:
         out.append("- Beyanlarda yer almıyor ve bu kartta özetlenmedi: " + "; ".join(yok) +
@@ -246,8 +253,10 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
         kl = [c for c in kl if c in cats]
         if not kl:
             continue
-        r = tg.say("saat", kategoriler=kl)["satirlar"]
-        p = _pencere([x["sayi"] for x in r])
+        saatler = [0] * 24
+        for saat, sayi in tg.say("saat", kategoriler=kl)["satirlar"]:   # [["05", 12], ...]
+            saatler[int(saat[:2])] += sayi
+        p = _pencere(saatler)
         if p:
             bas, genis, n, tum = p
             s.append(f"- {L}{ad} en çok {bas:02d}:00-{(bas + genis - 1) % 24:02d}:59 arasında "
@@ -397,3 +406,73 @@ def uret(reader: "PersonaReader", categories: Iterable[str] | None = None, *,
             ozet_satir.append(f"(Boyut sınırı nedeniyle çıkarılan özetler: {', '.join(atlanan)}.)")
         ozet_satir.append("")
     return "\n".join(ust + govde + ozet_satir + sabit_son).rstrip() + "\n"
+
+
+def _kes(s: str, n: int) -> str:
+    s = _satir(s)
+    return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+
+
+def uret_kisa(reader: "PersonaReader", categories: Iterable[str] | None = None, *,
+              veri_kategorileri: Iterable[str] | None = None, saat_dilimi: YerelSaat | None = None,
+              ust_sinir: int = KISA_KART_UST_SINIR) -> str:
+    """Kısa kimlik kartı (MCP varsayılanı): toplam en çok `ust_sinir` karakter. Başlık tek satır;
+    beyanlar en yeni/geçerli olandan başlayarak sığdığı kadar (kırpıldıysa sayısı yazılır); en
+    çok KISA_OZET_SATIR satır veriden özet; "Süresi doldu" ve "Bilinmeyenler" yalnız birer sayı
+    satırı. Tam kart için `uret` (kisa=false)."""
+    from .persona import CATEGORY_TITLES, FACT_CATEGORIES, son_dogrulama
+    tz = saat_dilimi or UTC
+    cats = list(FACT_CATEGORIES) if categories is None else list(categories)
+    simdi = reader._clock()
+    if simdi.tzinfo is None:
+        simdi = simdi.replace(tzinfo=timezone.utc)
+    ozet_kat = [c for c in OZET_KATEGORILERI
+                if veri_kategorileri is not None and c in set(veri_kategorileri)
+                and c not in Category.SENSITIVE]
+    facts = reader.list_facts(cats)                       # kategori sırası; içte yeniden eskiye
+    eski_n = len(_eskiyenler(reader, cats))
+    yok = _bilinmeyen_konular(" ".join(f.statement for f in facts))
+
+    baslik = (f"# Kimlik Kartı (kısa; tam kart: kisa=false) - {tz.yerel(reader._now())[:10]}, "
+              f"saat: {tz.ad}")
+    ozet: list[str] = []
+    if ozet_kat:
+        tg = Toplulastirici(reader.hub, tz)
+        for _, satirlar in _ozetler(tg, tz, ozet_kat, simdi):
+            for x in satirlar:
+                if x.startswith("- ") and not x.rstrip().endswith("içinde:") \
+                        and "son dönem özeti çıkarılmadı" not in x and len(ozet) < KISA_OZET_SATIR:
+                    ozet.append(_kes(x, 220))
+    alt = []
+    if eski_n:
+        alt.append(f"- Süresi dolan beyan: {eski_n} (doğrulanmadı; tam kart: kisa=false)")
+    if yok:
+        alt.append(f"- Bilinmeyen konu: {len(yok)} (beyanlarda yok, tahmin yürütmeyin; "
+                   "tam kart: kisa=false)")
+    sabit = [baslik, "", "Beyanlar ([beyan] kullanıcının sözü, [dosyadan] kaynağa bağlı):"]
+    sonda: list[str] = []
+    if ozet:
+        sonda += ["", "Veriden özet ([çıkarım], yalnız sayım):"] + ozet
+    if alt:
+        sonda += [""] + alt
+    ayrilan = len("\n".join(sabit + sonda)) + 90          # +kırpma satırı payı
+    sira = sorted(facts, key=lambda f: (f.date or "", f.fact_id), reverse=True)  # en yeni önce
+    secilen: list = []
+    kullanilan = 0
+    for f in sira:
+        et = "dosyadan" if f.status == "dosyadan_alinan" else "beyan"
+        satir = f"- [{CATEGORY_TITLES[f.category]}] {_kes(f.statement, KISA_CUMLE)} " \
+                f"({et}, {son_dogrulama(f)})"
+        if ayrilan + kullanilan + len(satir) + 1 > ust_sinir:
+            break
+        secilen.append((f, satir))
+        kullanilan += len(satir) + 1
+    kirpilan = len(facts) - len(secilen)
+    order = {k: i for i, k in enumerate(FACT_CATEGORIES)}
+    secilen.sort(key=lambda x: order[x[0].category])        # gösterimde kategori sırası
+    govde = [satir for _, satir in secilen]
+    if not facts:
+        govde = ["(seçilen kategorilerde beyan yok)"]
+    if kirpilan > 0:
+        govde.append(f"... ve {kirpilan} beyan daha (tam kart: kisa=false)")
+    return "\n".join(sabit + govde + sonda).rstrip() + "\n"
