@@ -5,7 +5,7 @@ tek bir yerde toplayan, aramanıza ve zaman çizelgesinde görmenize izin veren,
 uygulamalarına **yalnızca sizin seçtiğiniz kategorilerden ve salt okunur** erişim veren açık kaynaklı bir
 Windows uygulaması.
 
-> **Durum: v0.1.3 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
+> **Durum: v0.2.0 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
 > "Kısıtlar"). Önemli verilerinizin tek kopyasıyla denemeyin; kaynak dosyalarınıza zaten dokunulmaz,
 > ama yine de yedeğiniz olsun.
 
@@ -107,7 +107,7 @@ Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md).
 
 1. GitHub'daki "Releases" bölümünden `KimlikMerkezi-Kurulum-v….exe` ve `SHA256SUMS.txt` dosyalarını indirin.
 2. Bütünlüğü doğrulayın (PowerShell). Çıkan değer `SHA256SUMS.txt` içindeki satırla aynı olmalıdır:
-   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.3.exe -Algorithm SHA256`
+   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.2.0.exe -Algorithm SHA256`
 3. Çalıştırın. (Uygulama içinden güncelliyorsanız bu adımlar kendiliğinden yapılır: aşağıdaki "Uygulama içi güncelleme".) Paket **imzasız** olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı
    gösterebilir; yalnızca özeti doğruladıysanız "Ek bilgi > Yine de çalıştır" deyin.
 4. Yayınlarda ayrıca yazılım malzeme listesi (SBOM, CycloneDX JSON) bulunur; hangi bileşenlerin ve
@@ -132,9 +132,26 @@ python -m kimlikwin
 Yapay zekâ uygulaması bağlama adımları: [docs/BAGLANTI.md](docs/BAGLANTI.md) (hangi istemcilerin
 doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmıştır).
 
+## Telefon (Android)
+
+Android uygulaması (`KimlikMerkezi-v0.2.0.apk`, Android 11 ve üstü, Play dışı) telefondaki bazı kayıtları
+kendi bilgisayarınızdaki Kimlik Merkezi'ne gönderir.
+
+- **Toplar:** hızlı not, başka uygulamadan paylaşılan link/metin. İsteğe bağlı: fotoğraf-video bilgisi
+  (içerik değil), fotoğraf konumu (ayrı izin), seçtiğiniz indirilenler klasörü, uygulama kullanım süreleri.
+- **Toplamaz:** mesaj, e-posta, arama, kişi, ekran içeriği, fotoğraf/video içeriği. Gerisi için hiçbir şey yapmaz.
+- **İsteğe bağlı toplayıcıların hepsi varsayılan olarak kapalıdır;** her birini siz açarsınız.
+- **Eşleştirme:** Windows uygulamasında "Telefon" sayfası (varsayılan kapalı) > "Telefon ekle"; QR ya da kodla bir kez.
+- **Yalnız yerel ağ:** bilgisayar yalnız uygulama açıkken, yalnız yerel adreslerden ve yalnız eşleştirilmiş telefondan kabul eder.
+- **Elle aktarım (yedek):** telefonda "Dosyaya aktar", bilgisayarda "Telefon dosyası al".
+- **Bilinen sınırlar:** arka plan gönderimi garanti değildir (uygulamayı açıp "PC'ye gönder"e basın); gerçek telefon ve
+  ev ağıyla doğrulanmadı; kaldırılırsa gönderilmemiş kayıtlar kaybolur.
+
+Ayrıntı: [docs/AKTARIM.md](docs/AKTARIM.md) ve [android/README.md](android/README.md).
+
 ## Kısıtlar (dürüst durum)
 
-- **v0.1.3 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
+- **v0.2.0 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
 - **İçe aktarıcılar gerçek veriyle doğrulanmadı.** Her biri, resmî/yaygın biçime göre hazırlanmış sahte
   ama gerçeğe yakın dosyalarla test edildi; gerçek dışa aktarmalarla doğrulama beklemede. Hangi kaynağın
   hangi varsayımlarla yazıldığı: [importers/DOGRULAMA-DURUMU.md](importers/DOGRULAMA-DURUMU.md).
@@ -144,7 +161,7 @@ doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmış
   ve sayılar içerir; hiçbir şey kaydedilmez. Uyumsuzluk bildirimi için bunu kullanın (önce okuyup içinde kişisel
   şey kalmadığından emin olun).
 - **Kod imzası yok.** Araştırma ve plan: [docs/IMZA.md](docs/IMZA.md).
-- **Şifreleme kısmi ve Windows'ta gerçek DPAPI ile denenmedi** (yukarıdaki "Şifreleme" bölümü), yalnızca Windows, yalnızca Türkçe arayüz. Android uygulaması yok.
+- **Şifreleme kısmi ve Windows'ta gerçek DPAPI ile denenmedi** (yukarıdaki "Şifreleme" bölümü), yalnızca Windows, yalnızca Türkçe arayüz.
 - **Test kapsamı:** otomatik testler Linux'ta ve Windows paket CI'sında çalışır; gerçek bir Windows
   masaüstünde elle uçtan uca deneme yapılan bir "doğrulandı" kaydı henüz yoktur.
 
