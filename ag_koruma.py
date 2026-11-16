@@ -25,6 +25,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import sys
 import threading
 
 import pytest
@@ -194,6 +195,9 @@ def sifreleme_saglayici_yalitimi(monkeypatch):
         gizli = os.environ.get(sif.ENV_SAHTE)
         return sif.SahteSaglayici(gizli) if gizli else None
     monkeypatch.setattr(sif, "varsayilan_saglayici", varsayilan)
+    if sys.platform == "win32" and sif.ENV_SAHTE not in os.environ:
+        # Alt süreçler (CLI) Windows'ta gerçek DPAPI'ye düşmesin; test süreci ile aynı sahte sağlayıcıyı görsün.
+        monkeypatch.setenv(sif.ENV_SAHTE, "test-yalitimi")
     yield
 
 
