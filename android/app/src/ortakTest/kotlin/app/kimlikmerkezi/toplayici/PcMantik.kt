@@ -22,6 +22,8 @@ class PcMantik(val anahtar: String = "ab".repeat(32), val eslesmeKodu: String = 
     @Volatile var zorla422 = false
     /** Sonraki bu kadar PUT için bağlantı kesilir (yanıt yok; parça kaydedilmez). */
     val kesilecekPut = AtomicInteger(0)
+    /** putSayisi bunu aşınca (her PUT) bağlantı kesilir. */
+    @Volatile var izinVerilenPut = Int.MAX_VALUE
     val istekSayisi = AtomicInteger()
     val putSayisi = AtomicInteger()
     val putBoyutlari = java.util.Collections.synchronizedList(ArrayList<Int>())
@@ -64,6 +66,7 @@ class PcMantik(val anahtar: String = "ab".repeat(32), val eslesmeKodu: String = 
     private fun put(i: Istek, dosya: String, alinan: Long): Cevap? {
         putSayisi.incrementAndGet()
         if (tamamlanan.containsKey(dosya)) return Cevap(200, mapOf("X-Durum" to "var"))
+        if (putSayisi.get() > izinVerilenPut) return null
         if (kesilecekPut.get() > 0) {
             kesilecekPut.decrementAndGet()
             return null

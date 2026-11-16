@@ -184,7 +184,11 @@ class Gonderici(
                 val parca = kutu_ac(id).use { s ->
                     var atla = alinan
                     while (atla > 0) { val k = s.skip(atla); if (k <= 0) throw Dur("kutu"); atla -= k }
-                    s.readNBytes(minOf(parcaBayt.toLong(), toplam - alinan).toInt())
+                    val boy = minOf(parcaBayt.toLong(), toplam - alinan).toInt()
+                    val t = ByteArray(boy)
+                    var o = 0
+                    while (o < boy) { val k = s.read(t, o, boy - o); if (k < 0) throw Dur("kutu"); o += k }
+                    t
                 }
                 _durum.value = AktarimDurumu.Gonderiliyor(no, n, alinan, toplam)
                 val y = b.put(cihaz, id, anahtar, alinan, toplam, sha, parca)
