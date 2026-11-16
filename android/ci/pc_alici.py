@@ -45,6 +45,9 @@ def calis(calisma: Path, port: int) -> int:
     from kimlikcore import Hub
     from kimlikserver.aktarim import AktarimAlici, DogrudanKopru, gelenleri_ice_al
 
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stdout)
     y = yollar(calisma)
     y["veri"].mkdir(parents=True, exist_ok=True)
     hub = Hub.open(y["veri"], write=True)
