@@ -204,8 +204,10 @@ private fun NotEkrani(depo: Depo, duzenlenenId: String?, geri: () -> Unit) {
                                     false
                                 }
                             }
-                            Toast.makeText(ctx, if (ok) R.string.not_kaydedildi else R.string.not_kaydedilemedi, Toast.LENGTH_SHORT).show()
-                            if (ok) geri()
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(ctx, if (ok) R.string.not_kaydedildi else R.string.not_kaydedilemedi, Toast.LENGTH_SHORT).show()
+                                if (ok) geri()
+                            }
                         }
                     }
                 },
