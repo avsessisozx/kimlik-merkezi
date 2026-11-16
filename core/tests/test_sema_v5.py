@@ -186,7 +186,7 @@ def test_salt_okunur_v5_okur(root):
         sid = h.add_source("deneme", "1", None)
         h.add_events(sid, [_ev(1, "kanser tedavisi")])
     with Hub.open(root, write=False) as r:
-        assert r.schema_version == 5
+        assert r.schema_version == 6
         assert r.timeline()[0].hassas_konu == ("saglik",)
 
 
@@ -272,7 +272,7 @@ def test_goc_v4ten_v5e_eski_veri_isaretlenir(root):
     with pytest.raises(SchemaTooOld):
         Hub.open(root, write=False)
     with Hub.open(root, write=True) as h:
-        assert h.schema_version == 5
+        assert h.schema_version == 6
         assert h.query("SELECT 1 FROM sqlite_master WHERE name='konu_izinleri'")
         e1, e2, e3 = (h.get_event(i) for i in ("id1", "id2", "id3"))
         assert (e1.onem, e1.hassas_konu) == (0, ("hukuk", "saglik"))
@@ -285,7 +285,7 @@ def test_goc_adimi_idempotent(tmp_path):
     c = sqlite3.connect(tmp_path / "x.db", isolation_level=None)
     schema.migrate(c)
     schema._v5(c)    # ikinci kez çalışırsa bozulmaz
-    assert schema.current_version(c) == 5
+    assert schema.current_version(c) == 6
 
 
 def test_basarisiz_v5_gocu_geri_alinir(root):
@@ -304,7 +304,7 @@ def test_basarisiz_v5_gocu_geri_alinir(root):
     assert "onem" not in kolonlar and "hassas_konu" not in kolonlar
     assert c.execute("SELECT 1 FROM sqlite_master WHERE name='konu_izinleri'").fetchone() is None
     schema.migrate(c)
-    assert schema.current_version(c) == 5
+    assert schema.current_version(c) == 6
 
 
 def test_goc_20000_olay_performans(tmp_path, capsys):
@@ -488,7 +488,7 @@ def _v4_sifreli(root):
 def test_sifreli_hub_v4ten_v5e_goc(root, sahte_saglayici):
     _v4_sifreli(root)
     with Hub.open(root, write=True) as h:
-        assert h.schema_version == 5
+        assert h.schema_version == 6
         e = h.get_event("e1")
         assert (e.onem, e.hassas_konu) == (2, ("saglik",))
     assert sif.db_durumu(root / "kimlik.db") == "sifreli"
@@ -514,4 +514,4 @@ def test_sifreli_hub_v5_gocu_yarida_hata_eski_dosya_kalir(root, monkeypatch, sah
     with pytest.raises(SchemaTooOld):
         Hub.open(root, write=False)                          # hâlâ sürüm 4
     with Hub.open(root, write=True) as h:                    # sonra düzgün göç eder
-        assert h.schema_version == 5
+        assert h.schema_version == 6

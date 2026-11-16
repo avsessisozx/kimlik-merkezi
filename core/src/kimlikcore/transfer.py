@@ -29,7 +29,7 @@ if TYPE_CHECKING:  # pragma: no cover
 FORMAT = "kimlikmerkezi-jsonl"
 FORMAT_VERSION = 1
 _MOD = 1 << 256
-_SONRADAN_EKLENEN = "konu_izni"   # v5'te eklendi; eski dışa aktarımlarda yok
+_SONRADAN_EKLENEN = ("konu_izni", "aktarim_dosyasi")   # v5/v6'da eklendi; eski dışa aktarımlarda yok
 
 # (kayıt türü, tablo) — sıra dış anahtar bağımlılığına uygundur.
 TYPES: list[tuple[str, str]] = [
@@ -41,6 +41,7 @@ TYPES: list[tuple[str, str]] = [
     ("app_key", "app_keys"),
     ("permission", "permissions"),
     ("konu_izni", "konu_izinleri"),
+    ("aktarim_dosyasi", "aktarim_dosyalari"),
     ("fact", "facts"),
     ("contradiction", "contradictions"),
     ("event", "events"),
@@ -213,7 +214,7 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
         if header is None or footer is None:
             raise FormatError("Dosya eksik ya da kesik (header/footer yok).")
         got = acc.result()
-        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni` türü için (0 kayıt ve footer'da yok);
+        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni`/`aktarim_dosyasi` türleri için (0 kayıt ve footer'da yok);
         # başka bir türün özeti eksikse ya da farklıysa dosya reddedilir.
         fc, fd = footer.get("counts"), footer.get("digests")
         if not isinstance(fc, dict) or not isinstance(fd, dict):
@@ -222,7 +223,7 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
                 or any(
                     (fc.get(t) != got["counts"][t] or fd.get(t) != got["digests"][t])
                     for t in got["counts"]
-                    if not (t == _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
+                    if not (t in _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
             if summarize(c) != got:
