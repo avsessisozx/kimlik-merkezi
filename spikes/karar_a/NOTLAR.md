@@ -63,3 +63,13 @@ Sayım ayrıntısı şefin raporunda (CI test_e çıktısı + aşağıdaki liste
   varsayılan sendreceive gelir: CI test_e ölçer), (6) telefonda pil muafiyeti/otomatik başlat, (7) güvenlik duvarı izni.
 - Elle: her aktarımda kullanıcı (1) uygulamada "dışa aktar", (2) PC'ye kopyala (USB/paylaş), (3) PC'de "klasörü tara ve al".
   Kurulum yok; her seferinde 3 adım.
+
+## 7. CI'de ölçülen ek bulgular (karar-a-olcum, koşu 43801008257: ubuntu ve windows 41/41 geçti)
+- Syncthing v1.30.0, SHA256 yayımlanan `sha256sum.txt.asc` ile eşleşti (linux a2edc833..., windows c8e2713d...). İmza (GPG) doğrulanmadı.
+- Syncthing'i öldürme: `serve` varsayılan olarak izleyici + çocuk süreç başlatır; yalnız üst süreci öldürmek çocuğu hayatta bırakır
+  (ilk iki CI turunda "kill" bu yüzden etkisizdi). Ölçüm `STMONITORED=1` ile tek süreç çalıştırdı. Gerçek uygulama kullanımında
+  PC kapanması = tüm süreç ağacı gider; bu yalnız test düzeneğiyle ilgili.
+- Doğrudan HTTPS'te istemci bağlantı kopmasını tek çağrı içinde şeffaf yeniden bağlanmayla atlatabildi (windows b senaryosu); bu iki biçimde de sınandı.
+- Sertifika üretimi stdlib ile yapılamadı; testler openssl komut satırını kullandı (Windows runner'da Git for Windows ile geldi). PC uygulamasında
+  sertifika üretimi ayrıca çözülmeli (bağımlılık ya da gömülü araç).
+- Syncthing satır UUID'sini bilmez: aynı içerikli iki dosya iki kopya olarak gelir (10240 yinelenen satır UUID'si); tekilleştirme içe aktarıcıda yapılmalı.
