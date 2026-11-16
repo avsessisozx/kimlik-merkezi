@@ -3,6 +3,7 @@ Arayüz katmanından (web/tepsi) bağımsızdır ve doğrudan test edilir."""
 from __future__ import annotations
 
 import json
+import os
 import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -13,11 +14,12 @@ from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, f
 from kimlikcore import sifreleme as sif
 from kimlikimport import ImportFormatError, registry
 from kimlikimport.run import run as ice_aktar_calistir
-from kimlikserver.access import KeyManager
+from kimlikserver.access import KeyManager, hash_key
 from kimlikserver.oneri import OneriYonetici
 from kimlikserver.persona import CATEGORY_TITLES, FACT_CATEGORIES, Persona
 
 from . import claude_ayar, gunluk, harita_kopru
+from .kopya_is import KopyaIsi
 from .yollar import ayar_dizini
 
 MCP_PAROLA_NOTU = (
@@ -107,6 +109,7 @@ class Uygulama:
         self.anahtarlar = KeyManager(self.hub)
         self.oneriler = OneriYonetici(self.hub, self.veri, persona=self.persona)
         self.is_: IceAktarmaIsi | None = None
+        self.kopya_is: KopyaIsi | None = None
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Lock()
@@ -211,6 +214,7 @@ class Uygulama:
     def ice_aktar_baslat(self, yol: str = "", tur: str | None = None, yine_de: bool = False,
                          yollar: list[str] | None = None) -> dict:
         yol = (yol or "").strip().strip('"')
+        ag_yolu_reddet(yol, *(yollar or []))
         if yollar:
             yollar = [str(y).strip().strip('"') for y in yollar if str(y).strip()]
             if len(yollar) > 1 and tur not in ("computer_files", "dosyalar"):
@@ -225,6 +229,8 @@ class Uygulama:
         with self._is_kilit:
             if self.is_ and self.is_.durum == "calisiyor":
                 raise IslemHatasi("Başka bir içe aktarma sürüyor.", "mesgul")
+            if self.kopya_is is not None and self.kopya_is.canli:
+                raise IslemHatasi("Bir kopya denetimi sürüyor; bitince içe aktarabilirsiniz.", "mesgul")
             is_ = IceAktarmaIsi(yol, tur or None, bool(yine_de), yollar)
             self.is_ = is_
         self._is_dosyasi({"yol": yol, "yollar": yollar, "tur": tur, "durum": "calisiyor"})
@@ -361,16 +367,44 @@ class Uygulama:
     def kimlik_karti(self, kategoriler: list[str] | None = None) -> dict:
         return {"markdown": self.persona.export_identity_card(kategoriler or None)}
 
+    # ------------------------------------------------------------------ sohbet kopyaları
+    def kopya_baslat(self, uygula: bool = False, paket: str = "") -> dict:
+        """Kopya denetimi (uygula=False: salt okur) ya da gizleme (uygula=True) arka planda. `paket`: isteğe bağlı
+        ChatGPT dışa aktarma dosyası/klasörü; yalnız verilirse yeniden üretilmiş cevaplar bulunur."""
+        paket = (paket or "").strip().strip('"') if isinstance(paket, str) else ""
+        ag_yolu_reddet(paket)
+        if paket and not os.path.exists(paket):
+            raise IslemHatasi("Seçilen dışa aktarma dosyası bulunamadı.")
+        with self._is_kilit:
+            if self.is_ and self.is_.durum == "calisiyor":
+                raise IslemHatasi("Bir içe aktarma sürüyor; bitince kopyaları denetleyebilirsiniz.", "mesgul")
+            if self.kopya_is is not None and self.kopya_is.canli:
+                raise IslemHatasi("Bir kopya denetimi sürüyor; bitmesini bekleyin.", "mesgul")
+            self.kopya_is = KopyaIsi(self.hub, bool(uygula), paket or None)
+            self.kopya_is.baslat()
+        gunluk.log().info("kopya %s başladı", "gizleme" if uygula else "denetimi")
+        return self.kopya_is.to_dict()
+
+    def kopya_durum(self) -> dict:
+        return self.kopya_is.to_dict() if self.kopya_is else {"durum": "yok"}
+
     # ------------------------------------------------------------------ erişim
     def erisim(self) -> dict:
         izinler = self.anahtarlar.list_grants()
+        konu_izinleri = self.anahtarlar.list_topic_grants()
         uygulamalar = []
         for app_id, ad, olusturma, iptal in self.anahtarlar.list_keys():
             uygulamalar.append({
                 "id": app_id, "ad": ad, "olusturma": olusturma, "iptal": iptal,
                 "izinler": [{"kategori": g.category, "bitis": g.expires_at, "hassas_onay": g.confirmed_sensitive}
                             for g in izinler if g.app_id == app_id]})
-        return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler()}
+            simdi_ = simdi()
+            uygulamalar[-1]["izinsiz"] = not iptal and not any(   # "Hiç izni yok": yalnız SÜRESİ DOLMAMIŞ izinler sayılır
+                i["bitis"] is None or i["bitis"] > simdi_ for i in uygulamalar[-1]["izinler"])
+            uygulamalar[-1]["konular"] = [   # hassas KONU izinleri (kategori izinlerinden ayrı); süresi dolmamış olanlar
+                {"konu": k[1], "bitis": k[3]} for k in konu_izinleri if k[0] == app_id and (k[3] is None or k[3] > simdi_)]
+        return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler(),
+                "tum_konular": [{"kimlik": k, "ad": KONU_ADLARI.get(k, k)} for k in self.anahtarlar.list_topics()]}
 
     def anahtar_uret(self, ad: str) -> dict:
         app_id, duz = self.anahtarlar.create_key(ad)
@@ -382,6 +416,15 @@ class Uygulama:
 
     def izin_ver(self, app_id: str, kategori: str, bitis: str | None = None, hassas_onay: bool = False) -> dict:
         self.anahtarlar.grant(app_id, kategori, expires_at=bitis or None, confirmed_sensitive=bool(hassas_onay))
+        return {"ok": True}
+
+    def konu_izin_ver(self, app_id: str, konu: str, bitis: str | None = None, hassas_onay: bool = False) -> dict:
+        """Hassas KONU izni: her konu AYRI onayla (`hassas_onay=True`); hiçbir toplu işlem konu izni vermez."""
+        self.anahtarlar.grant_topic(app_id, konu, expires_at=bitis or None, confirmed=hassas_onay is True)
+        return {"ok": True}
+
+    def konu_izin_kaldir(self, app_id: str, konu: str) -> dict:
+        self.anahtarlar.revoke_topic(app_id, konu)
         return {"ok": True}
 
     def izin_kaldir(self, app_id: str, kategori: str) -> dict:
@@ -411,6 +454,18 @@ class Uygulama:
                 "metin": claude_ayar.ayar_metni(giris),
                 "parola_uyari": MCP_PAROLA_NOTU if self.parola_var_mi() else None}
 
+    def _eski_claude_anahtarlari(self, yol) -> list[str]:
+        """Ayar dosyasındaki ESKİ `kimlik-merkezi` girişindeki anahtarın özetiyle eşleşen (iptal edilmemiş) uygulamalar.
+        Ada bakılmaz: kullanıcının elle "Claude Desktop" adını verdiği başka anahtar etkilenmez."""
+        if yol is None or not Path(yol).is_file():
+            return []
+        try:
+            duz = claude_ayar._oku(Path(yol))["mcpServers"][claude_ayar.GIRIS_AD]["env"]["KIMLIK_ANAHTAR"]
+            ozet = hash_key(duz)
+        except (ValueError, KeyError, TypeError, OSError, UnicodeDecodeError):
+            return []
+        return [r[0] for r in self.hub.query("SELECT app_id FROM app_keys WHERE key_hash = ? AND revoked = 0", (ozet,))]
+
     def claude_ekle(self) -> dict:
         if self.parola_var_mi():
             # Karar (docs/SIFRELEME.md §6): parolayı Claude ayar dosyasına koymayız; sessizce bozuk giriş de yazmayız.
@@ -418,15 +473,49 @@ class Uygulama:
         yol = self._claude_yolu()
 
         def uret() -> tuple[str, str]:
-            app_id, duz = self.anahtarlar.create_key("Claude Desktop")
-            self.anahtarlar.grant_all_non_sensitive(app_id)  # hassaslar kapalı kalır
+            app_id, duz = self.anahtarlar.create_key(CLAUDE_ANAHTAR_AD)
+            try:
+                self.anahtarlar.grant_all_non_sensitive(app_id)  # hassaslar kapalı kalır
+            except Exception as e:   # yarım izinli anahtar kalmasın: ya birlikte oluşur ya hiç
+                try:
+                    self.anahtarlar.revoke_key(app_id)
+                except Exception:
+                    gunluk.log().exception("yarım izinli anahtar iptal edilemedi")
+                gunluk.log().error("claude'a ekle: izinler verilemedi (%s); anahtar iptal edildi", type(e).__name__)
+                raise IslemHatasi("Anahtarın izinleri verilemedi; anahtar iptal edildi, hiçbir şey eklenmedi. "
+                                  "Lütfen yeniden deneyin.", "izin_hatasi") from e
             return app_id, duz
 
+        onceki = self._eski_claude_anahtarlari(yol)
         s = claude_ayar.ekle(yol, uret, self.veri)
+        if s.durum in ("eklendi", "guncellendi"):
+            # yenisi ayar dosyasına yazıldıktan SONRA eskileri iptal et (yazılamadıysa eskisi çalışmaya devam eder)
+            for eski in onceki:
+                if eski != s.app_id:
+                    try:
+                        self.anahtarlar.revoke_key(eski)
+                    except Exception:
+                        gunluk.log().exception("eski Claude anahtarı iptal edilemedi")
         if s.durum not in ("eklendi", "guncellendi"):
             s.aranan = claude_ayar.arama_yerleri()
         gunluk.log().info("claude'a ekle: %s", s.durum)
         return s.to_dict()
+
+
+CLAUDE_ANAHTAR_AD = "Claude Desktop"
+KONU_ADLARI = {"saglik": "Sağlık", "hukuk": "Hukuk", "finans": "Para ve finans", "din_siyaset": "Din ve siyaset",
+               "cinsellik": "Cinsellik"}   # bilinmeyen (kullanıcı ek dosyası) kimlik olduğu gibi gösterilir
+
+
+def ag_yolu_mu(yol: str) -> bool:
+    y = (yol or "").strip().strip('"')
+    return y.startswith("\\\\") or y.startswith("//")
+
+
+def ag_yolu_reddet(*yollar: str | None) -> None:
+    if any(ag_yolu_mu(y) for y in yollar if isinstance(y, str)):
+        raise IslemHatasi("Ağ yolları (\\\\sunucu\\klasör ya da //sunucu/klasör) desteklenmez. Dosyayı bu bilgisayara "
+                          "kopyalayıp oradan seçin.", "ag_yolu")
 
 
 def simdi() -> str:

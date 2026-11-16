@@ -5,7 +5,7 @@ tek bir yerde toplayan, aramanıza ve zaman çizelgesinde görmenize izin veren,
 uygulamalarına **yalnızca sizin seçtiğiniz kategorilerden ve salt okunur** erişim veren açık kaynaklı bir
 Windows uygulaması.
 
-> **Durum: v0.1.1 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
+> **Durum: v0.1.3 ön sürüm.** Henüz gerçek kullanıcı verisiyle doğrulanmamış parçalar var (aşağıda
 > "Kısıtlar"). Önemli verilerinizin tek kopyasıyla denemeyin; kaynak dosyalarınıza zaten dokunulmaz,
 > ama yine de yedeğiniz olsun.
 
@@ -19,6 +19,15 @@ Windows uygulaması.
 - **Yapay zekâ uygulamalarına izinli erişim (MCP):** her uygulama için ayrı anahtar; hangi kategorilerin
   okunabileceğini siz seçersiniz; hassas kategoriler (e-posta, özel mesajlar, konum, yapay zekâ sohbetleri) ayrı onay ister;
   her erişim kaydedilir ve uygulamada görebilirsiniz; erişim salt okunurdur.
+- **Hassas konu izni:** sağlık, hukuk, para, din/siyaset ve cinsellik sözcükleri geçen kayıtlar, kategori izni açık olsa da
+  ayrı konu izni olmadan yapay zekâya verilmez (sözcük listesine dayanır, hata yapabilir). Liste değişince
+  `kimlikmerkezi yeniden-isaretle` mevcut kayıtları yeniden işaretler.
+- **Yönetilen blok (isteğe bağlı, varsayılan kapalı):** onayladığınız persona bilgileri `~/.claude/CLAUDE.md` ve `~/.codex/AGENTS.md` dosyalarına
+  kısa bir bölüm olarak yazılabilir; o dosyaları okuyan her araç bunu görür ([docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md) 2.7).
+- **MCP araçları (9):** `kategorileri_listele`, `ara`, `zaman_cizelgesi`, `say`, `persona_getir`, `kimlik_karti`, `ornekle`,
+  `kayit_getir` (kısa alıntının tam metni), `persona_oner`.
+- **Sohbet kopyalarını temizleme:** `kimlikmerkezi kopya-temizle` rapor verir, `--uygula` ile gizler (silmez); uygulamada
+  Kaynaklar sayfasında "Sohbet kopyalarını denetle" düğmesi aynısını yapar.
 - **Persona önerileri:** yapay zekâ istemcisi sizin hakkınızda bir şey öneriyorsa öneri yalnızca bir kuyruğa
   düşer; siz onaylamadan hiçbir şey değişmez.
 
@@ -98,7 +107,7 @@ Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md).
 
 1. GitHub'daki "Releases" bölümünden `KimlikMerkezi-Kurulum-v….exe` ve `SHA256SUMS.txt` dosyalarını indirin.
 2. Bütünlüğü doğrulayın (PowerShell). Çıkan değer `SHA256SUMS.txt` içindeki satırla aynı olmalıdır:
-   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.1.exe -Algorithm SHA256`
+   `Get-FileHash .\KimlikMerkezi-Kurulum-v0.1.3.exe -Algorithm SHA256`
 3. Çalıştırın. (Uygulama içinden güncelliyorsanız bu adımlar kendiliğinden yapılır: aşağıdaki "Uygulama içi güncelleme".) Paket **imzasız** olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" uyarısı
    gösterebilir; yalnızca özeti doğruladıysanız "Ek bilgi > Yine de çalıştır" deyin.
 4. Yayınlarda ayrıca yazılım malzeme listesi (SBOM, CycloneDX JSON) bulunur; hangi bileşenlerin ve
@@ -125,7 +134,7 @@ doğrulandığı orada işaretlidir; doğrulanmamış adımlar öyle yazılmış
 
 ## Kısıtlar (dürüst durum)
 
-- **v0.1.1 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
+- **v0.1.3 ön sürüm.** Arayüz ve veri biçimleri değişebilir.
 - **İçe aktarıcılar gerçek veriyle doğrulanmadı.** Her biri, resmî/yaygın biçime göre hazırlanmış sahte
   ama gerçeğe yakın dosyalarla test edildi; gerçek dışa aktarmalarla doğrulama beklemede. Hangi kaynağın
   hangi varsayımlarla yazıldığı: [importers/DOGRULAMA-DURUMU.md](importers/DOGRULAMA-DURUMU.md).

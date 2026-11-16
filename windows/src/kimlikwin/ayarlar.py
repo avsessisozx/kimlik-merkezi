@@ -18,6 +18,8 @@ VARSAYILAN: dict[str, Any] = {
     "guncelleme_otomatik": True,        # açılışta GitHub'da yeni sürüm denetle (VARSAYILAN AÇIK; kapatılabilir)
     "guncelleme_onsurum": True,         # ön sürümleri de dikkate al (proje ön sürüm aşamasında)
     "guncelleme_bilgi_goruldu": False,  # kullanıcı denetim bilgisini gördü mü (görmeden otomatik denetim yapılmaz)
+    "yonetilen_blok": False,     # CLAUDE.md / AGENTS.md içinde onaylı persona özeti (VARSAYILAN KAPALI; yonetilen_blok.py)
+    "yonetilen_blok_kisi": None, # bloğu açan kişinin id'si; blok yalnız o kişi etkinken güncellenir
     "port": 47821,               # tercih edilen yerel port; doluysa boş bir port seçilir
 }
 TEMALAR = ("sistem", "acik", "koyu")

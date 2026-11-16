@@ -61,3 +61,6 @@ jobs:
         run: python -m pytest windows/tests/test_tarayici.py -rs -v 2>&1 | tee "$RUNNER_TEMP/tarayici.log"; ! grep -q SKIPPED "$RUNNER_TEMP/tarayici.log"
       - name: entegrasyon testleri
         run: python -m pytest entegrasyon -m "not buyuk"
+      - name: eval testleri (yalnız 3.13)
+        if: matrix.python == '3.13'
+        run: python -m pip install pyyaml && python -m pytest eval

@@ -1,6 +1,6 @@
 # AKTARIM — Giden kutusu biçimi ve telefon → PC protokolü (sahibi: müdür)
 
-Sürüm 1 (v0.2.0). Karar A sonucu: telefon uygulaması PC'ye yerel ağda doğrudan HTTPS gönderir; yedek yol elle aktarımdır. Bu belge `docs/INTERFACES.md` §10 "Bekleyenler"deki giden kutusu ve aktarım maddesini kapatır. Değişiklik yalnız müdür tarafından, sürüm artırılarak yapılır.
+Sürüm 1.2 (v0.2.0; 1.1: §7 kesinleştirmeler; 1.2: `medya_id` alanı, §8 telefon istemcisi kuralları. Protokol değişmedi). Karar A sonucu: telefon uygulaması PC'ye yerel ağda doğrudan HTTPS gönderir; yedek yol elle aktarımdır. Bu belge `docs/INTERFACES.md` §10 "Bekleyenler"deki giden kutusu ve aktarım maddesini kapatır. Değişiklik yalnız müdür tarafından, sürüm artırılarak yapılır.
 
 ## 1. Giden kutusu dosyası (telefon)
 - Telefonda uygulamaya özel alanda, Android Keystore anahtarıyla (AES-256-GCM) şifreli durur. Aşağıdaki biçim ÇÖZÜLMÜŞ içeriktir; PC'ye bu içerik TLS içinde gider.
@@ -50,3 +50,26 @@ Telefon "Dosyaya aktar": kapatılmış dosyaları tek `.zip` olarak kullanıcın
 
 ## 6. Android yapı sabitleri
 Kotlin + Jetpack Compose. `minSdk 30`, `targetSdk 35`, `compileSdk 35`. Birincil hedef API 31 (Realme 7 Pro, Mi 10T Pro). minSdk 30 seçildi çünkü Redmi Note 10 Pro ve Galaxy Tab A9 Plus'ın sürümü bilinmiyor; Redmi Note 10 Pro Android 11 ile çıktı. Paket adı `app.kimlikmerkezi.toplayici`. Arayüz Türkçe, koyu/açık tema.
+
+## 7. Kesinleştirmeler (sürüm 1.1; PC alıcısı yazılırken netleşenler, bağlayıcı)
+- `km1:` metnindeki base64url DOLGUSUZDUR (`=` yazılmaz); çözücüler dolgulu ve dolgusuz iki biçimi de kabul eder.
+- `cihaz_anahtari` 64 karakterlik küçük harf hex metindir. `Authorization: Bearer <bu metin>`. PC'de saklanan özet, bu metnin UTF-8 baytlarının SHA-256'sıdır.
+- Yeniden eşleştirme: aynı `cihaz_id` geçerli bir tek kullanımlık kodla yeniden eşleşirse anahtar yenilenir, eski anahtar geçersiz olur, iptal kalkar. Kod olmadan yeniden eşleştirme yoktur.
+- Telefondan yalnız şu kategoriler kabul edilir: `notlar`, `medya_meta`, `konum`, `dosyalar`, `uygulama`. Başka kategori taşıyan dosya reddedilir (telefon `persona`, `eposta`, `mesaj`, `sohbet` kaydı yazamaz).
+- Alıcı tamamlanan dosyada her satırın JSON nesnesi olduğunu da doğrular; değilse 422. Kategori ve alan denetimi içe aktarıcıdadır.
+- Yanıt kodları: tamamlanma `201 X-Durum: var`; zaten alınmış dosyaya PUT `200 X-Durum: var`; yanlış ofset ya da aynı dosyaya eşzamanlı ikinci PUT `409 + X-Alinan`; doğrulama hatası `422`; kimlik `401`; başka cihazın yolu `403`; geçersiz yol `400`; boyut `413`; başlık `431`; `Content-Length` yok `411`.
+- Daha önce alınmış ama içe alınıp klasörden kaldırılmış dosya için `HEAD` yanıtı `X-Durum: var`, `X-Alinan: 0` olabilir; telefon `var` gördüğünde bayt sayısına bakmaz.
+- Devam, son TAMAMLANAN parça sınırından olur (yarım kalan parça diske yazılmaz). Telefon parça boyutunu en fazla 1 MiB tutar.
+- `GET /durum` kimliksizdir ve YALNIZ `{"protokol": 1}` döner (PC adı ve sürüm yerel ağa gösterilmez; §3'teki `surum`/`pc_adi` alanları kaldırıldı, PC adı eşleştirme kodundadır). `/giden/` altında kimliksiz her istek aynı 401'i alır.
+- Sınırlar: başlıklar için toplam 10 sn; aynı adresten en çok 4, toplam 32 eşzamanlı bağlantı; cihaz başına en çok 8 yarım yükleme ve 1 GiB geçici alan; 7 günden eski yarım yüklemeler silinir. Aynı ağdaki bir cihaz 5 yanlış denemeyle bekleyen eşleştirme kodunu geçersiz kılabilir (yenisi üretilir; güvenlik kaybı yok).
+- PC sertifikası yenilenirse (açılamayan anahtar) parmak izi değişir; PC kullanıcıyı uyarır ve telefonlar yeniden eşleştirilir.
+- `medya.foto` ve `medya.video` yükünde ayrıca `medya_id` bulunur: SHA-256(`tür|MediaStore _id|date_added|boyut`) ilk 32 hex (aynı kurulumda kararlı). `medya.konum` kaydının `yuk.medya_id` değeri ilgili fotoğraf kaydının `medya_id`'sidir.
+- Tekrarsızlık kayıt `id`'si üzerindendir. Uygulama kaldırılıp yeniden kurulursa `cihaz_id` ve tarama imleçleri sıfırlanır; aynı fotoğraf/indirilen dosya/kullanım günü yeniden kayıt üretir ve PC bunları ayrı kayıt sayar. Bilinen sınır.
+
+## 8. Telefon istemcisi kuralları (sürüm 1.2)
+- Ağ: yalnız eşleştirilen PC ile konuşur. Düz HTTP yoktur. TLS'te yalnız eşleştirmede sabitlenen sertifika parmak izi (SHA-256, DER) kabul edilir; sistem sertifika deposuna ve ana makine adına güvenilmez. Parmak izi tutmazsa hiçbir istek gönderilmez ve kullanıcıya "PC'nin güvenlik sertifikası değişmiş; yeniden eşleştir" denir.
+- Sıra: `HEAD` → `yok/kismi` ise `X-Alinan`'dan itibaren en fazla 1 MiB'lik `PUT` parçaları → `var` görülünce dosya telefondan silinir. `409` gelirse `X-Alinan`'a göre devam. `401` gelirse gönderim durur, "eşleştirme iptal edilmiş" denir, dosyalar SİLİNMEZ. `422` gelirse o dosya "PC reddetti" olarak işaretlenir, silinmez, hata raporunda sayılır. `507/429` gelirse beklenir.
+- Aktarım başlarken açık giden kutusu dosyası kapatılır (§1). Dosyalar eskiden yeniye gönderilir.
+- Ne zaman: kullanıcı "PC'ye gönder"e basınca her zaman; ayrıca uygulama açılışında ve arka planda en iyi çabayla (sınırsız/Wi-Fi ağda, periyodik). Arka plan gönderimi garanti DEĞİLDİR (üretici pil kısıtlamaları); ekranda "son başarılı gönderim" zamanı gösterilir.
+- Adres: eşleştirmedeki adresler sırayla denenir; hiçbiri yanıt vermezse UDP bulma (§3), o da olmazsa kullanıcı adresi elle girebilir. Yalnız yerel ağ adreslerine (RFC1918, link-local) bağlanılır.
+
