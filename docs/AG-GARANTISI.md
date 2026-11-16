@@ -117,3 +117,26 @@ listesine eklenir; sessizce geçmez. Güncelleme istisnası da böyle eklenmişt
 1. Python düzeyi: `python -m pytest entegrasyon` ve paket klasörleri (`core`, `server`, `importers`, `windows`) ayrı ayrı.
 2. Yan denetim (isteğe bağlı): Windows'ta `Kaynak İzleyicisi > Ağ` ya da güvenlik duvarında
    `KimlikMerkezi.exe` ve `kimlikmerkezi-mcp.exe` için giden bağlantıyı engelleyip uygulamanın yine de çalıştığına bakın.
+
+## Telefon aktarımı alıcısı (`server/src/kimlikserver/aktarim/`)
+
+Güncelleme denetiminden ayrı ve ona benzemeyen İKİNCİ ağ yüzeyi: dışarıya bağlanmaz, yalnız kullanıcı Windows
+uygulamasında "Telefon aktarımı"nı açınca **yerel ağdan gelen** bağlantıları dinler (docs/AKTARIM.md). Yukarıdaki
+"internete bağlanmaz" garantisini değiştirmez; "dışarı giden bağlantı yok" ile "kimse yerel ağdan bağlanamaz"
+aynı şey değildir, bu yüzden açıkça yazılır.
+
+| Konu | Kural | Nerede kilitli |
+|---|---|---|
+| Giden bağlantı | yok: modüllerde `connect`, `create_connection`, `urlopen`, HTTP istemcisi, URL yok | `test_aktarim_alicisi_istisnasi_dar` (statik) |
+| Dinleme | yalnız Windows uygulaması açıkken ve "Telefon aktarımı" açıkken (`baslat()`/`durdur()`); varsayılan TCP 47821 (TLS 1.2+), UDP 47822 bulma | `test_yasam_dongusu_durum`, `test_tls12_alti_reddedilir_ve_yalniz_tls` |
+| Kaynak adres | yalnız RFC1918 + link-local + loopback (`::ffff:` eşlemeli dahil); diğerleri bağlantı düzeyinde, el sıkışmadan kapatılır. İnternete yönlendirme/UPnP yapılmaz | `test_adres_suzgeci_*`, `test_acik_internet_adresi_baglanti_duzeyinde_reddedilir` |
+| Kimlik | eşleştirmede tek kullanımlık kod (10 dk, 5 yanlış denemede iptal) → 32 baytlık cihaz anahtarı (yalnız SHA-256 özeti saklanır); her istekte `Bearer` + `X-Cihaz`; iptal PC'den; kimliksiz istekte hiçbir bayt okunmaz/yazılmaz | `test_aktarim_eslestirme.py`, `test_aktarim_kimlik.py` |
+| Sertifika | kendinden imzalı (EC P-256, 10 yıl); telefon parmak izini sabitler. Özel anahtar veri klasöründe `aktarim/` altındadır; Windows'ta DPAPI ile sarılan bir parolayla şifrelenir, sağlayıcı yoksa (ör. Linux) **düz durur** | `test_sertifika_*` |
+| Sınırlar | tek dosya 512 MB, parça 8 MB, başlıklar 16 KB, yavaş istemci zaman aşımı, 32 eşzamanlı bağlantı, yol gezinmesi imkânsız (yalnız UUID adlar) | `test_aktarim_kimlik.py` |
+| Günlük | yalnız kimlikler, bayt ve kayıt sayısı; kayıt içeriği ve anahtar yazılmaz | `test_gunlukte_kayit_metni_yok` |
+| Statik denetim | `alici.py` (`ssl`, `socket`), `bulma.py` (`socket`), `eslestirme.py` (`socket`) `IZINLI_ISTISNALAR`'da gerekçeyle yazılıdır; başka modül ağ açarsa test kırmızı olur | `test_kaynakta_yasak_ag_modulu_yok` |
+
+**Sınırlar (sınanmadı / dışında):** aktarım kanalı TLS ile şifrelidir ama telefon dosyası PC'ye düz metin olarak iner
+(`gelen_aktarim/` altında, içe alınana dek; bu dosyalar veritabanı şifrelemesinin kapsamında DEĞİLDİR ve bu davranış ayrıca sınanmadı). Aynı yerel
+ağdaki başka bir cihaz kodu tahmin edemez (5 yanlışta kod ölür) ama alıcının açık olduğunu ve PC adını görebilir
+(`GET /durum` kimliksizdir). Ağ koruması (`ag_koruma.py`) testlerde GEVŞETİLMEDİ: alıcı testleri yalnız 127.0.0.1 kullanır.
