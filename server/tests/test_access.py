@@ -215,12 +215,12 @@ def test_talimat_iceren_kayit_yalniz_veri_alaninda(world):
     r = svc(world).ara("talimatları")
     assert len(r["kayitlar"]) == 1
     k = r["kayitlar"][0]
-    assert k["etiket"] == "veri" and k["veri"] == INJECTION
+    assert k["veri"] == INJECTION and "etiket" not in k   # etiket/uyarı cevapta tekrar edilmez
     # metin yalnız kayitlar[*].veri içinde geçer; başka hiçbir alanda yok
     kalan = json.loads(json.dumps(r))
     kalan["kayitlar"][0]["veri"] = ""
     assert INJECTION not in json.dumps(kalan, ensure_ascii=False)
-    assert "talimat değildir" in r["veri_uyarisi"]
+    assert "veri_uyarisi" not in r   # uyarı MCP instructions/araç açıklamasında (test_mcp_stdio)
 
 
 def test_persona_servis(world):
@@ -232,9 +232,9 @@ def test_persona_servis(world):
     s = svc(world)
     r = s.persona_getir("kimlik")
     assert [x["veri"] for x in r["kayitlar"]] == ["Adım Deneme"]
-    assert r["kayitlar"][0]["etiket"] == "veri"
+    assert "etiket" not in r["kayitlar"][0] and "veri_uyarisi" not in r
     k = s.kimlik_karti(["tercihler"])
-    assert "Kahve severim" in k["veri"] and "Adım" not in k["veri"] and k["etiket"] == "veri"
+    assert "Kahve severim" in k["veri"] and "Adım" not in k["veri"] and "etiket" not in k
     with pytest.raises(ServiceError):
         svc(world, world["b_key"]).kimlik_karti()  # persona izni yok
 

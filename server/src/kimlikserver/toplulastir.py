@@ -54,7 +54,7 @@ ALANLAR: dict[str, tuple[str, str, bool]] = {
     "uzanti": (_UZ, "1", True),
     "uygulama": (_URUN, "1", True),
 }
-ZAMAN_ALANLARI = ("ay", "saat", "gun")
+ZAMAN_ALANLARI = ("ay", "saat", "gun", "yil")
 TUM_ALANLAR = tuple(ALANLAR) + ZAMAN_ALANLARI
 _KUCUK_HARF = ("terim", "site")  # SQL tarafında zaten küçük harf
 
@@ -143,13 +143,14 @@ class Toplulastirici:
             if zamansiz:
                 notlar.append(f"{zamansiz} kayıt zamansız (dosya tarihi); sayıma dahil, zamana göre "
                               "yorumlamayın.")
-        out: dict[str, Any] = {"alan": alan, "toplam_kayit": toplam, "zamansiz_kayit": zamansiz}
+        out: dict[str, Any] = {"alan": alan, "toplam_kayit": toplam}
+        if zamansiz:
+            out["zamansiz_kayit"] = zamansiz
         if zaman_alani:
             satirlar, alansiz = self._zaman(alan, w, a)
-            out["sira"] = "deger"
             farkli = len(satirlar)
             diger = 0
-            sayilan_toplam = sum(s["sayi"] for s in satirlar)
+            sayilan_toplam = sum(s[1] for s in satirlar)
         else:
             ifade, kosul, _ = ALANLAR[alan]
             ek = f"({kosul}) AND {ifade} IS NOT NULL AND {ifade} <> ''"
@@ -164,16 +165,21 @@ class Toplulastirici:
             alansiz = self.hub.query(
                 f"SELECT COUNT(*) FROM events WHERE {w} AND ({kosul}) AND "
                 f"({ifade} IS NULL OR {ifade} = '')", a)[0][0]
-            satirlar = [{"etiket": "veri", "veri": self._kes(v), "sayi": c} for v, c in rows]
-            diger = sayilan_toplam - sum(s["sayi"] for s in satirlar)
-            out["sira"] = "sayiya_gore_azalan"
+            satirlar = [[self._kes(v), c] for v, c in rows]
+            diger = sayilan_toplam - sum(s[1] for s in satirlar)
             if not sayilan_toplam:
                 notlar.append(f"Bu süzgeçle '{alan}' alanı olan kayıt yok (alan yalnız belirli "
                               "kayıt türlerinde bulunur).")
-        for s in satirlar:
-            s["oran"] = round(s["sayi"] / sayilan_toplam, 4) if sayilan_toplam else 0.0
-        out.update({"alanli_kayit": sayilan_toplam, "alansiz_kayit": alansiz,
-                    "farkli_deger": farkli, "satirlar": satirlar, "diger_sayi": diger})
+        # Satır biçimi [deger, sayi]; oran `toplam_kayit`tan hesaplanır. Sıfır sayılı zaman
+        # dilimleri yazılmaz. Sıra: sayıya göre azalan (ay/yil kronolojik, saat 00-23, gün Pzt-Paz).
+        out["farkli_deger"] = farkli
+        if sayilan_toplam != toplam:
+            out["alanli_kayit"] = sayilan_toplam   # oran paydası (alanı olmayan kayıtlar hariç)
+        if alansiz:
+            out["alansiz_kayit"] = alansiz
+        if diger:
+            out["diger_sayi"] = diger
+        out["satirlar"] = satirlar
         if notlar:
             out["notlar"] = notlar
         return out
@@ -195,8 +201,8 @@ class Toplulastirici:
         return [(self._kes(v), c) for v, c in rows]
 
     # ------------------------------------------------------------------ zaman alanları
-    def _zaman(self, alan: str, w: str, a: list[Any]) -> tuple[list[dict[str, Any]], int]:
-        """ay/saat/gun: yerel saat diliminde. UTC saat (ya da dakika) gruplarını yerel zamana
+    def _zaman(self, alan: str, w: str, a: list[Any]) -> tuple[list[list[Any]], int]:
+        """ay/yil/saat/gun: yerel saat diliminde. UTC saat (ya da dakika) gruplarını yerel zamana
         çevirip toplar (yaz saati değişimlerini doğru yakalar)."""
         simdi = datetime.now(timezone.utc)
         tam_saat = self.tz.farki(simdi).total_seconds() % 3600 == 0
@@ -211,17 +217,19 @@ class Toplulastirici:
                 sayac[f"{yerel.hour:02d}"] += c
             elif alan == "gun":
                 sayac[str(yerel.weekday())] += c
+            elif alan == "yil":
+                sayac[f"{yerel.year:04d}"] += c
             else:
                 sayac[f"{yerel.year:04d}-{yerel.month:02d}"] += c
         if alan == "saat":
-            satirlar = [{"etiket": "veri", "veri": f"{h:02d}:00-{h:02d}:59", "sayi": sayac.get(f"{h:02d}", 0)}
-                        for h in range(24)]
+            satirlar = [[f"{h:02d}", sayac[f"{h:02d}"]] for h in range(24) if sayac.get(f"{h:02d}")]
         elif alan == "gun":
-            satirlar = [{"etiket": "veri", "veri": GUNLER[g], "sayi": sayac.get(str(g), 0)}
-                        for g in range(7)]
+            satirlar = [[GUNLER[g], sayac[str(g)]] for g in range(7) if sayac.get(str(g))]
         else:
-            ay_listesi = sorted(sayac)[-MAX_AY:]
-            satirlar = [{"etiket": "veri", "veri": ay, "sayi": sayac[ay]} for ay in ay_listesi]
+            anahtarlar = sorted(k for k in sayac if sayac[k])
+            if alan == "ay":
+                anahtarlar = anahtarlar[-MAX_AY:]
+            satirlar = [[k, sayac[k]] for k in anahtarlar]
         return satirlar, 0
 
 

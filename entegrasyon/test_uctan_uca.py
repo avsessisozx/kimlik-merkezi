@@ -101,13 +101,13 @@ def test_icealdan_kimlik_kartina(dunya):
 
     araclar, kat, ok, video, eposta, kart, b_ara = _run(go())
 
-    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle", "say"}
+    assert {t.name for t in araclar} == {"kategorileri_listele", "ara", "zaman_cizelgesi", "persona_getir", "kimlik_karti", "persona_oner", "ornekle", "say", "kayit_getir"}
     assert [k["kategori"] for k in kat.structured_content["kategoriler"]] == ["notlar", "persona"]
 
     # yalnız izinli kategori döner; kayıt metni yalnız `veri` alanında, etiketli
     kayitlar = ok.structured_content["kayitlar"]
     assert [r["veri"] for r in kayitlar] == ["Şişli'de kahve toplantısı notu"]
-    assert all(r["etiket"] == "veri" for r in kayitlar)
+    assert all("etiket" not in r for r in kayitlar)   # etiket/uyarı artık MCP instructions'ta
 
     # izinsiz kategori reddedilir ve içerik sızmaz
     for r in (video, eposta):
@@ -188,5 +188,5 @@ def test_importers_zip_cli_mcp_zinciri(tmp_path):
             return await c.call_tool("zaman_cizelgesi", {"kategori": hedef, "limit": 5})
     r = _run(go())
     assert not r.is_error and r.structured_content["kayitlar"]
-    assert all(k["etiket"] == "veri" and k["kategori"] == hedef for k in r.structured_content["kayitlar"])
+    assert all("etiket" not in k and k["kategori"] == hedef for k in r.structured_content["kayitlar"])
     assert [s[5] for s in AccessLog(root).read_all()] == ["ok"]

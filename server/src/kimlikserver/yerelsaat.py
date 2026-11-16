@@ -128,12 +128,21 @@ class YerelSaat:
             dt = dt.replace(tzinfo=self.tz)
         return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def kisa(self, an: datetime | None = None) -> dict:
+        """Her cevapta tekrar eden kısa biçim: `{"sd": "+03:00"}` (çözümlenemediyse `sd_uyari`).
+        Tam açıklama yalnız `kategorileri_listele` cevabındaki `bilgi()` bloğundadır."""
+        an = an or datetime.now(timezone.utc)
+        d = {"sd": _fark_metni(self.farki(an))}
+        if self.uyari:
+            d["sd_uyari"] = "saat dilimi çözülemedi; sunucunun yerel saati kullanıldı"
+        return d
+
     def bilgi(self, an: datetime | None = None) -> dict:
         an = an or datetime.now(timezone.utc)
         d = {"ad": self.ad, "utc_farki": _fark_metni(self.farki(an)), "kaynak": self.kaynak,
-             "aciklama": ("'yerel_zaman' ve saat/gün dağılımları bu dilimdedir; 'zaman' alanları "
-                          "UTC'dir (sonu Z). Saat içeren her cevapta hangisini kastettiğinizi "
-                          "belirtin.")}
+             "aciklama": ("kayıtlardaki 'zaman' ve saat/gün/ay/yıl dağılımları bu dilimdedir (yerel "
+                          "saat, +hh:mm ofsetli); diğer cevaplarda yalnız 'sd' (UTC farkı) yazar. "
+                          "'bitis' alanları UTC'dir.")}
         if self.uyari:
             d["uyari"] = self.uyari
         return d
