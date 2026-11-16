@@ -13,8 +13,9 @@ gizli = (collect_submodules("mcp", filter=lambda n: not n.startswith("mcp.cli"))
          + collect_submodules("pypdf") + collect_submodules("docx")   # dosya içe aktarıcı + tanila (tembel içe aktarılır)
          + ["cryptography.hazmat.primitives.ciphers.aead"]   # şifreleme (docs/SIFRELEME.md)
          + collect_submodules("kimlikcore") + collect_submodules("kimlikserver")
-         + collect_submodules("kimlikimport") + collect_submodules("kimlikwin"))
-veri = collect_data_files("mcp") + collect_data_files("kimlikwin") + collect_data_files("kimlikserver") + collect_data_files("kimlikcore") + collect_data_files("docx")  # kimlikserver: veri/esanlamlilar.json (ara sözlüğü); kimlikcore: veri/hassas_konular.json; docx: python-docx şablonları
+         + collect_submodules("kimlikimport") + collect_submodules("kimlikwin")
+         + ["tzdata"] + collect_submodules("tzdata"))   # zoneinfo IANA verisi (Windows'ta sistem veritabanı yok)
+veri = collect_data_files("mcp") + collect_data_files("kimlikwin") + collect_data_files("kimlikserver") + collect_data_files("kimlikcore") + collect_data_files("docx") + collect_data_files("tzdata")  # kimlikserver: veri/esanlamlilar.json (ara sözlüğü); kimlikcore: veri/hassas_konular.json; docx: python-docx şablonları
 # Lisans metinleri kurulu pakete girer (_internal/lisanslar/...): MIT/LGPL vb. ikili dağıtımda metin ister.
 kok = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 lisans_dosyalari = [(os.path.join(kok, "LICENSE"), "lisanslar"),
