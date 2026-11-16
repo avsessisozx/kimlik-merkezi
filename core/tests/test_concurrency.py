@@ -13,12 +13,13 @@ from conftest import run_child
 READER = r"""
 import json, sys, time
 from kimlikcore import Hub
-root, secs = sys.argv[1], float(sys.argv[2])
+root, secs, ilerleme, dur = sys.argv[1], float(sys.argv[2]), sys.argv[3], sys.argv[4]
+import os
 out = {"iter": 0, "errors": [], "max_count": 0, "monotonic": True, "snapshot_stable": True,
        "write_blocked": False, "search_ok": True, "lock_file_created": False}
 deadline = time.time() + secs
 last = 0
-while time.time() < deadline:
+while time.time() < deadline and not os.path.exists(dur):
     try:
         h = Hub.open(root, write=False)
         c = h._conn
@@ -41,6 +42,8 @@ while time.time() < deadline:
             out["write_blocked"] = "readonly" in str(e).lower() or "read-only" in str(e).lower()
         h.close()
         out["iter"] += 1
+        with open(ilerleme, "w") as f:           # hazır/ilerleme işareti: tamamlanan yineleme sayısı
+            f.write(str(out["iter"]))
     except Exception as e:
         out["errors"].append(repr(e)[:200])
         time.sleep(0.05)
@@ -48,34 +51,63 @@ print(json.dumps(out))
 """
 
 
-def test_wal_mode_ro_ikinci_surec_yazani_bozmaz(root, child_env):
+def _toplu(i, n=40):
+    return [EventIn(event_key=f"w{i}-{j}", ts="2026-02-01T00:00:00Z", kind="x", category="notlar",
+                    text=f"sentetik yazı {i} {j}") for j in range(n)]
+
+
+def _ilerleme(path):
+    try:
+        return int(path.read_text() or 0)
+    except (OSError, ValueError):
+        return 0
+
+
+def test_wal_mode_ro_ikinci_surec_yazani_bozmaz(root, child_env, tmp_path):
+    # Zamanlamadan bağımsız: okuyucu hazır olunca yazılır, okuyucu yeterince yineleyene dek sürer;
+    # "bekletmedi" savı okuyucusuz ölçülen taban süreye göredir.
+    ilerleme, dur = tmp_path / "ilerleme", tmp_path / "dur"
     with Hub.open(root, write=True) as hub:
         sid = hub.add_source("sentetik", "1", None)
         hub.add_events(sid, [EventIn(event_key="seed", ts="2026-01-01T00:00:00Z", kind="x",
                                      category="notlar", text="sentetik tohum")])
         assert hub._conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
-        p = subprocess.Popen([sys.executable, "-c", READER, str(root), "4"], env=child_env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
         written = 1
-        slowest = 0.0
-        t_end = time.time() + 4.5
         i = 0
-        while time.time() < t_end:
-            batch = [EventIn(event_key=f"w{i}-{j}", ts="2026-02-01T00:00:00Z", kind="x", category="notlar",
-                             text=f"sentetik yazı {i} {j}") for j in range(40)]
+        taban = 0.0
+        for _ in range(8):  # okuyucu YOKKEN taban
             t0 = time.time()
-            written += hub.add_events(sid, batch).added
-            slowest = max(slowest, time.time() - t0)
+            written += hub.add_events(sid, _toplu(i)).added
+            taban = max(taban, time.time() - t0)
             i += 1
+        p = subprocess.Popen([sys.executable, "-c", READER, str(root), "120", str(ilerleme), str(dur)],
+                             env=child_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+        try:
+            t_hazir = time.time() + 60
+            while _ilerleme(ilerleme) < 1:  # okuyucu hazır (ilk yineleme tamam)
+                assert p.poll() is None, p.communicate()[1]
+                assert time.time() < t_hazir, "okuyucu hazır olmadı"
+                time.sleep(0.05)
+            slowest = 0.0
+            toplu = 0
+            t_son = time.time() + 60
+            while (_ilerleme(ilerleme) < 6 or toplu < 5) and time.time() < t_son:
+                t0 = time.time()
+                written += hub.add_events(sid, _toplu(i)).added
+                slowest = max(slowest, time.time() - t0)
+                i += 1
+                toplu += 1
+        finally:
+            dur.write_text("1")
         stdout, stderr = p.communicate(timeout=60)
         assert p.returncode == 0, stderr
         res = json.loads(stdout)
-        print("OKUYUCU", res, "yazilan", written, "en yavas toplu yazim", round(slowest, 3))
+        print("OKUYUCU", res, "yazilan", written, "taban", round(taban, 3), "en yavas toplu yazim", round(slowest, 3))
         assert res["errors"] == [], res
-        assert res["iter"] > 5
+        assert res["iter"] >= 6, res
         assert res["monotonic"] and res["snapshot_stable"] and res["search_ok"] and res["write_blocked"], res
         assert 0 < res["max_count"] <= written
-        assert slowest < 3.0  # okuyucu yazanı bekletmedi
+        assert slowest < taban * 5 + 2.0  # okuyucu yazanı bekletmedi (göreli)
         assert hub._conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert hub._conn.execute("SELECT count(*) FROM events").fetchone()[0] == written
         assert not (root / "hub.lock").read_text() == ""  # kilit yazanın elinde duruyor
