@@ -158,7 +158,7 @@ function kategoriKutulari(secili,hassasDahil=true){const kutular=[];
 const SAYFALAR=[['harita','Harita'],['ana','Ana sayfa'],['ice','İçe aktar'],['ara','Arama'],['zaman','Zaman çizelgesi'],['persona','Persona'],['erisim','Erişim'],['kaynak','Kaynaklar'],['telefon','Telefon'],['guvenlik','Güvenlik'],['ayar','Ayarlar'],['hakkinda','Hakkında']];
 let sayfa='harita',AYAR_TEMA='sistem',yoklama=null,yoklamaT=null;
 function menu(){const n=$('#nav');n.textContent='';SAYFALAR.forEach(([id,ad])=>n.append(h('button',{class:id===sayfa?'secili':'',onclick:()=>git(id)},ad)));}
-function git(id){sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}if(yoklamaT){clearInterval(yoklamaT);yoklamaT=null;}
+function git(id){if(sayfa==='telefon'&&typeof TEL!=='undefined'){TEL.kod=null;TEL.bitis=0;}sayfa=id;menu();if(yoklama){clearInterval(yoklama);yoklama=null;}if(yoklamaT){clearInterval(yoklamaT);yoklamaT=null;}
   const a=$('#ana');a.textContent='';SF[id](a).catch(hataGoster);}
 function temaUygula(t){document.documentElement.dataset.tema=t;AYAR_TEMA=t;}
 

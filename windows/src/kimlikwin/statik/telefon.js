@@ -2,7 +2,7 @@
 /* Telefon aktarımı sayfası (docs/AKTARIM.md). Yalnız yerel /api/telefon_* uçlarını çağırır; ağa HİÇ bağlanmaz.
    QR kodu yerelde üretilir (qrcode.js, MIT; CDN yok). Eşleştirme kodu yalnız ekranda tutulur, günlüğe yazılmaz.
    Metinler textContent ile eklenir (h()). */
-const TEL_ACIKLAMA='Bilgisayar yalnız ev ağından, yalnız eşleştirdiğin telefondan dosya kabul eder. Windows ilk seferde Güvenlik Duvarı izni sorabilir; \'Özel ağlar\' için izin ver. Ağ \'Ortak\' olarak ayarlıysa telefon bağlanamaz.';
+const TEL_ACIKLAMA='Bu ayar açıkken ve Kimlik Merkezi çalışırken bilgisayar ev ağından bağlantı kabul eder. Ağındaki diğer cihazlar bağlantı açabilir, ama eşleştirme kodu olmadan dosya gönderemez; kodu kimseyle paylaşma. Windows ilk seferde Güvenlik Duvarı izni sorabilir; \'Özel ağlar\' için izin ver. Ağ \'Ortak\' ayarlıysa telefon bağlanamaz.';
 const TEL = { kod: null, bitis: 0 };
 
 /* QR matrisi: satırlar '0'/'1' metni (test ve çizim için). 'M' düzeyi; sürüm metne göre otomatik. */

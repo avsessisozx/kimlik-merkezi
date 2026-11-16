@@ -73,7 +73,7 @@ def test_hata_yok(sonuc):
 
 def test_ilk_acista_aciklama_ve_ac_kapat(sonuc):
     assert sonuc["baslangic_durum"] == "Kapalı." and sonuc["ekle_pasif"] is True
-    assert "yalnız ev ağından, yalnız eşleştirdiğin telefondan dosya kabul eder" in sonuc["aciklama"]
+    assert "eşleştirme kodu olmadan dosya gönderemez" in sonuc["aciklama"]
     assert "Özel ağlar" in sonuc["aciklama"] and "Ortak" in sonuc["aciklama"]
     assert sonuc["acik_durum"].startswith("Çalışıyor") and "127.0.0.1:" in sonuc["acik_durum"] and sonuc["acik_isaret"]
     assert sonuc["kapali_durum"] == "Kapalı." and sonuc["ekle_pasif_sonra"] is True

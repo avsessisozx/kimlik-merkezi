@@ -194,3 +194,13 @@ def test_yavas_istemci_zaman_asimi(tmp_path):
         assert i.durum(DOSYA) == ("yok", 0)
     finally:
         d.kapat()
+
+
+def test_yeni_eslestirme_kodu_oncekini_gecersiz_kilar():
+    from kimlikserver.aktarim.eslestirme import EslestirmeKodlari
+    k = EslestirmeKodlari()
+    eski = k.uret()
+    yeni = k.uret()
+    assert eski != yeni
+    assert k.tuket(eski) is False
+    assert k.tuket(yeni) is True

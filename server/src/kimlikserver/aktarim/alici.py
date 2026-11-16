@@ -54,6 +54,7 @@ SINIRLAR = {
     "parca_en_fazla": 8 * 1024 * 1024,     # tek PUT gövdesi
     "baslik_en_fazla": 16 * 1024,          # tüm başlıkların toplam boyutu
     "eslestir_govde_en_fazla": 4096,
+    "eslestir_govde_zaman_asimi_s": 10.0,   # kimliksiz POST /eslestir gövdesinin toplam süresi
     "soket_zaman_asimi_s": 30.0,           # her okuma/yazma (tek işlem)
     "el_sikisma_zaman_asimi_s": 10.0,      # TLS el sıkışmasının TOPLAMI
     "baslik_toplam_zaman_asimi_s": 10.0,   # istek satırı + tüm başlıkların TOPLAMI (slowloris)
@@ -97,8 +98,13 @@ class DogrudanKopru:
         return self._hub.aktarim_dosyasi_var(device_id, dosya_id)
 
     def dosya_kaydet(self, device_id, dosya_id, sha256, kayit_sayisi):
-        self._hub.aktarim_dosyasi_kaydet(device_id, dosya_id, sha256, kayit_sayisi)
-        self._hub.cihaz_goruldu(device_id)
+        try:
+            self._hub.aktarim_dosyasi_kaydet(device_id, dosya_id, sha256, kayit_sayisi)
+            self._hub.cihaz_goruldu(device_id)
+        except Exception as e:  # noqa: BLE001 - ör. kişi değişiminde Hub kapandı: dosya gelen_aktarim'da kalır
+            _log.error("aktarım kaydı Hub'a yazılamadı (%s); dosya %s/ altında kalır, sonra içe alınır",
+                       type(e).__name__, GELEN_KLASOR)
+            raise
 
     def tamamlandi(self, yol):
         if self._tamamlandi is not None:
@@ -158,6 +164,8 @@ class _Sunucu(ThreadingHTTPServer):
         self.a = a
         self.bag = bag
         self._toplam = 0
+        self._kimlikli: set = set()     # kimliği doğrulanmış bağlantılar (nazik kapatma süresi, tahliye sırası)
+        self._bosaltan = 0              # şu an nazik kapatma okuması yapan bağlantı sayısı (en çok 8)
         self._acik: dict[socket.socket, str] = {}
         self._ip_sayac: dict[str, int] = {}
         self._bosta: dict[socket.socket, float] = {}   # yanıtı bitmiş, yeni istek bekleyen bağlantılar (zaman damgası)
@@ -181,12 +189,15 @@ class _Sunucu(ThreadingHTTPServer):
             toplam_dolu = self._toplam >= self.a.sinirlar["eszamanli_baglanti"]
             kabul = not (ip_dolu or toplam_dolu)
             if not kabul:
-                # Sınır dolu: EN ESKİ BOŞTA bağlantı (IP doluysa o IP'ninki) kapatılır; aktif istek/yükleme ve
-                # el sıkışan bağlantılar etkilenmez. Yeni bağlantı kabul edilir (sayaç eskisi bitince düşer).
-                aday = [(t, k) for k, t in self._bosta.items() if not ip_dolu or self._acik.get(k) == ip]
+                # Sınır dolu: boşta (yanıtı bitmiş, yeni istek bekleyen) bağlantılardan, önce KİMLİKSİZLER arasından
+                # EN ESKİSİ (IP doluysa o IP'ninki) tahliye edilir; kimlikli boşta bağlantı ancak kimliksiz yoksa.
+                # Aktif istek/yükleme ve el sıkışanlar etkilenmez. Tahliye edilenin sayacı HEMEN düşer ve _acik'tan
+                # çıkar (Windows'ta başka iş parçacığından shutdown engelli okumayı uyandırmayabilir).
+                aday = [(k in self._kimlikli, t, k) for k, t in self._bosta.items()
+                        if not ip_dolu or self._acik.get(k) == ip]
                 if aday:
-                    _, eski = min(aday, key=lambda x: x[0])
-                    self._bosta.pop(eski, None)
+                    eski = min(aday, key=lambda x: (x[0], x[1]))[2]
+                    self._birak_kilitli(eski)
                     _kes(eski)
                     kabul = True
             if kabul:
@@ -202,45 +213,59 @@ class _Sunucu(ThreadingHTTPServer):
             self._biraktir(request)
             raise
 
+    def _birak_kilitli(self, request) -> None:
+        self._bosta.pop(request, None)
+        self._kimlikli.discard(request)
+        ip = self._acik.pop(request, None)
+        if ip is None:
+            return
+        self._toplam -= 1
+        n = self._ip_sayac.get(ip, 1) - 1
+        if n <= 0:
+            self._ip_sayac.pop(ip, None)
+        else:
+            self._ip_sayac[ip] = n
+
     def _biraktir(self, request) -> None:
         with self._acik_kilit:
-            self._bosta.pop(request, None)
-            ip = self._acik.pop(request, None)
-            if ip is None:
-                return
-            self._toplam -= 1
-            n = self._ip_sayac.get(ip, 1) - 1
-            if n <= 0:
-                self._ip_sayac.pop(ip, None)
-            else:
-                self._ip_sayac[ip] = n
+            self._birak_kilitli(request)
 
     def process_request_thread(self, request, client_address):
-        # Sayaçlar soket kapanmadan ÖNCE düşer: istemci kapanmayı görüp hemen yeniden bağlandığında eski
-        # bağlantı hâlâ sayılmasın (Windows/Linux zamanlama farkı). Yanıt gövdesi okunmadan kapatılan
-        # bağlantıda (401 vb.) Windows okunmamış veriyle close'ta RST üretip yanıtı siler: kısa süre atılarak boşaltılır.
+        # Nazik kapatma (yanıt gövdesi okunmadan close'ta Windows RST üretip yanıtı siler) SAYAÇ İÇİNDE yapılır:
+        # bu süre bağlantı sınırlarına dahildir; sayaç en sonda (_biraktir) düşer.
         try:
             self.finish_request(request, client_address)
         except Exception:
             self.handle_error(request, client_address)
         finally:
-            self._biraktir(request)
-            self._nazik_kapat(request)
+            try:
+                self._nazik_kapat(request)
+            finally:
+                self._biraktir(request)
 
     def _nazik_kapat(self, request) -> None:
+        with self._acik_kilit:
+            sure = 2.0 if request in self._kimlikli else 0.5
+            oku = self._bosaltan < 8
+            if oku:
+                self._bosaltan += 1
         try:
-            socket.socket.shutdown(request, socket.SHUT_WR)     # SSL katmanına dokunmadan: yanıt iletildi
-            bitis = time.monotonic() + 2.0
-            while True:
-                kalan = bitis - time.monotonic()
-                if kalan <= 0:
-                    break
-                request.settimeout(kalan)
-                if not socket.socket.recv(request, 65536):
-                    break
+            if oku:
+                socket.socket.shutdown(request, socket.SHUT_WR)     # SSL katmanına dokunmadan: yanıt iletildi
+                bitis = time.monotonic() + sure
+                while True:
+                    kalan = bitis - time.monotonic()
+                    if kalan <= 0:
+                        break
+                    request.settimeout(kalan)
+                    if not socket.socket.recv(request, 65536):
+                        break
         except (OSError, ValueError):
             pass
         finally:
+            if oku:
+                with self._acik_kilit:
+                    self._bosaltan -= 1
             self.shutdown_request(request)
 
     def handle_error(self, request, client_address):
@@ -359,7 +384,11 @@ class _Isleyici(BaseHTTPRequestHandler):
         if not UUID_RE.fullmatch(cihaz) or not ver.startswith("Bearer ") or not (8 <= len(ver) - 7 <= 200):
             return None
         try:
-            return cihaz if a.hub.cihaz_dogrula(cihaz, eslestirme.anahtar_ozeti(ver[7:].strip())) else None
+            if a.hub.cihaz_dogrula(cihaz, eslestirme.anahtar_ozeti(ver[7:].strip())):
+                with self.server._acik_kilit:
+                    self.server._kimlikli.add(self.request)
+                return cihaz
+            return None
         except Exception as e:  # noqa: BLE001
             _log.error("kimlik doğrulama hatası (%s)", type(e).__name__)
             raise _Hub503() from None
@@ -423,7 +452,7 @@ class _Isleyici(BaseHTTPRequestHandler):
         n = self._sayi("Content-Length")
         if n < 0 or n > a.sinirlar["eslestir_govde_en_fazla"]:
             return self._hata(413 if n > 0 else 411, "gövde boyutu geçersiz")
-        ham = self._govde_oku(n)
+        ham = self._govde_oku(n, self.server.a.sinirlar["eslestir_govde_zaman_asimi_s"])   # kimliksiz uç: kısa toplam süre
         if ham is None:
             return
         try:
@@ -441,11 +470,11 @@ class _Isleyici(BaseHTTPRequestHandler):
         self._cevap(kod, yanit, kapat=(kod == 401))
 
     # --- /giden
-    def _govde_oku(self, n: int) -> bytes | None:
+    def _govde_oku(self, n: int, toplam_sure: float | None = None) -> bytes | None:
         """Tam n bayt ya da None (kopma/zaman aşımı: bağlantı kapatılır, hiçbir şey yazılmaz).
         Gövdenin TOPLAM süresi sınırlıdır (bekçi): damla damla gönderen istemci de kesilir."""
         self._bosaltilacak = 0
-        bekci = _bekci(self.request, self.server.a.sinirlar["govde_toplam_zaman_asimi_s"])
+        bekci = _bekci(self.request, toplam_sure or self.server.a.sinirlar["govde_toplam_zaman_asimi_s"])
         parcalar, kalan = [], n
         try:
             while kalan > 0:
@@ -776,10 +805,13 @@ class AktarimAlici:
             self.eski_gecicileri_temizle()
         except Exception as e:  # noqa: BLE001
             _log.warning("geçici temizliği hata verdi (%s)", type(e).__name__)
-        try:
-            self.baslangic_kurtarma()
-        except Exception as e:  # noqa: BLE001
-            _log.warning("başlangıç kurtarması hata verdi (%s)", type(e).__name__)
+        def _kurtar():     # büyük .part dosyalarında SHA: çağıranı (arayüz API'si, kilit) tutmasın
+            try:
+                self.baslangic_kurtarma()
+            except Exception as e:  # noqa: BLE001
+                _log.warning("başlangıç kurtarması hata verdi (%s)", type(e).__name__)
+        self._kurtarma = threading.Thread(target=_kurtar, name="aktarim-kurtarma", daemon=True)
+        self._kurtarma.start()
         self._dur.clear()
         self._temizlik = threading.Thread(target=self._temizlik_dongusu, name="aktarim-temizlik", daemon=True)
         self._temizlik.start()
@@ -805,6 +837,12 @@ class AktarimAlici:
         srv.shutdown()
         srv.server_close()
         srv.baglantilari_kes()
+        bitis = time.monotonic() + 5.0     # uçuştaki işleyiciler (tamamlama/SHA/doğrulama) kısa süre beklenir
+        while time.monotonic() < bitis:
+            with srv._acik_kilit:
+                if srv._toplam <= 0:
+                    break
+            time.sleep(0.02)
         if self._iplik is not None:
             self._iplik.join(timeout=5)
         self._iplik = None
