@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -24,6 +26,8 @@ _KURAL_BASLIK = "### Kurallar ve tercihler"
 _DIPNOT = "Daha fazlası için (izin verilen ölçüde) `kimlik-merkezi` MCP araçlarını kullan."
 _TARIH_RE = re.compile(r"Güncelleme tarihi: \d{4}-\d{2}-\d{2}")
 YEDEK_SAYISI = 3
+DOSYA_UST_SINIR = 1024 * 1024        # bundan büyük dosyaya dokunulmaz
+_KILIT = threading.Lock()
 _BOM = b"\xef\xbb\xbf"
 
 
@@ -46,8 +50,16 @@ def hedefler(ev: Path) -> list[Hedef]:
 
 # ------------------------------------------------------------------ içerik
 def _satir(s: str, sinir: int = 300) -> str:
-    s = re.sub(r"\s*[\r\n]+\s*", " ", s or "").strip()
-    s = s.replace("<!--", "").replace("-->", "")      # işaretçiyi bozamasın
+    """Persona beyanını TEK güvenli satıra indirir: satır sonları boşluk olur; işaretçi ve HTML yorum parçaları
+    (iç içe kaçışlar dahil, sabit noktaya kadar) ile `KIMLIK-MERKEZI` dizgisi tümden silinir; baştaki # etkisizleşir."""
+    s = re.sub(r"\s+", " ", s or "").strip()
+    onceki = None
+    while s != onceki:
+        onceki = s
+        s = re.sub(r"KIMLIK-MERKEZI", "", s, flags=re.I)
+        s = s.replace("<!", "").replace("-->", "")
+        s = re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"^[#\s]+", "", s)
     return s if len(s) <= sinir else s[:sinir - 1].rstrip() + "…"
 
 
@@ -93,9 +105,29 @@ def _normal(b: bytes) -> bytes:
     return _TARIH_RE.sub("Güncelleme tarihi: -", b.decode("utf-8", "replace")).encode("utf-8")
 
 
+def _isaretci_satirlari(ham: bytes) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """(BASLA konumları, BITIR konumları): YALNIZ tam satır olan işaretçiler (baş/son boşluk hariç); ``` / ~~~ ile
+    çevrili kod bloklarının içindekiler yok sayılır. Konum = (işaretçi metninin başı, sonu) bayt."""
+    basla, bitir, ic, konum = [], [], False, 0
+    for satir in ham.splitlines(keepends=True):
+        govde = satir.rstrip(b"\r\n")
+        kes = govde.strip().removeprefix(_BOM).strip()
+        if kes.startswith((b"```", b"~~~")):
+            ic = not ic
+        elif not ic and kes:
+            ilk = konum + govde.index(kes)
+            if kes == BITIR.encode():
+                bitir.append((ilk, ilk + len(kes)))
+            elif kes.startswith(_BASLA_ONEK.encode()) and kes.endswith(b"-->"):
+                basla.append((ilk, ilk + len(kes)))
+        konum += len(satir)
+    return basla, bitir
+
+
 def _isaretciler(ham: bytes) -> tuple[int, int] | str:
-    """(başlangıç, bitiş) bayt konumları (bitiş = BITIR işaretçisinin sonu) ya da hata iletisi."""
-    a, b = ham.count(_BASLA_ONEK.encode()), ham.count(BITIR.encode())
+    """(başlangıç, bitiş) bayt konumları (bitiş = BITIR işaretçisinin sonu), (-1,-1)=blok yok, ya da hata iletisi."""
+    basla, bitir = _isaretci_satirlari(ham)
+    a, b = len(basla), len(bitir)
     if a == 0 and b == 0:
         return (-1, -1)
     if a > 1 or b > 1:
@@ -104,11 +136,9 @@ def _isaretciler(ham: bytes) -> tuple[int, int] | str:
         return "Başlangıç işaretçisi var, bitiş işaretçisi yok."
     if a == 0:
         return "Bitiş işaretçisi var, başlangıç işaretçisi yok."
-    i = ham.index(_BASLA_ONEK.encode())
-    j = ham.index(BITIR.encode())
-    if j < i:
+    if bitir[0][0] < basla[0][0]:
         return "İşaretçilerin sırası bozuk."
-    return i, j + len(BITIR.encode())
+    return basla[0][0], bitir[0][1]
 
 
 def _blok_baytlari(icerik: str, nl: str) -> bytes:
@@ -167,9 +197,11 @@ def _yedek_al(yol: Path, simdi: Callable[[], datetime]) -> Path:
 
 def _atomik_yaz(yol: Path, veri: bytes) -> None:
     yol.parent.mkdir(parents=True, exist_ok=True)
-    gecici = yol.with_name(yol.name + ".kimlik-tmp")
+    fd, ad = tempfile.mkstemp(prefix=yol.name + ".", suffix=".kimlik-tmp", dir=yol.parent)
+    gecici = Path(ad)
     try:
-        gecici.write_bytes(veri)
+        with os.fdopen(fd, "wb") as f:
+            f.write(veri)
         os.replace(gecici, yol)
     except OSError:
         try:
@@ -188,6 +220,18 @@ _MESAJ = {"yazildi": "Bölüm yazıldı.", "guncellendi": "Bölüm güncellendi.
 
 def _hedef_isle(h: Hedef, icerik: str | None, yaz: bool, simdi: Callable[[], datetime]) -> dict[str, Any]:
     o = {"ad": h.ad, "durum": "", "mesaj": "", "yedek": False}
+    yol = h.yol
+    try:
+        if yol.is_symlink():                       # bağlantıyı koparma: gerçek dosyaya yaz, yedek de orada
+            yol = yol.resolve()
+    except OSError:
+        pass
+    h = Hedef(h.ad, yol, h.klasor_sart)
+    try:
+        if yol.is_file() and yol.stat().st_size > DOSYA_UST_SINIR:
+            return {**o, "durum": "buyuk", "mesaj": "Dosya çok büyük, dokunulmadı."}
+    except OSError:
+        pass
     if h.klasor_sart is not None and not h.klasor_sart.is_dir():
         return {**o, "durum": "bulunamadi", "mesaj": _MESAJ["bulunamadi"]}
     try:
@@ -217,7 +261,8 @@ def _hedef_isle(h: Hedef, icerik: str | None, yaz: bool, simdi: Callable[[], dat
 
 def uygula(ev: Path, icerik: str | None, simdi: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> list[dict[str, Any]]:
     """`icerik` yazılır (None: bölüm kaldırılır). Her hedef için {ad, durum, mesaj, yedek}."""
-    return [_hedef_isle(h, icerik, True, simdi) for h in hedefler(ev)]
+    with _KILIT:
+        return [_hedef_isle(h, icerik, True, simdi) for h in hedefler(ev)]
 
 
 def onizle(ev: Path, icerik: str | None) -> list[dict[str, Any]]:

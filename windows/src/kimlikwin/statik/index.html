@@ -524,17 +524,25 @@ SF.kaynak=async a=>{
   a.append(kopyaKarti());
 };
 // ------------------------------------------------------------------ ayarlar, hakkında
-const BLOK_DURUM_AD={yazildi:'yazıldı',guncellendi:'güncellendi',degismedi:'güncel (değişiklik yok)',kaldirildi:'bölüm kaldırıldı',bulunamadi:'atlandı (bulunamadı)',bozuk:'DOKUNULMADI (işaretçiler bozuk)',hata:'HATA',yok:'bölüm yok'};
+const BLOK_DURUM_AD={yazildi:'yazıldı',guncellendi:'güncellendi',degismedi:'güncel (değişiklik yok)',kaldirildi:'bölüm kaldırıldı',bulunamadi:'atlandı (bulunamadı)',bozuk:'DOKUNULMADI (işaretçiler bozuk)',buyuk:'DOKUNULMADI (dosya çok büyük)',hata:'HATA',yok:'bölüm yok'};
 function yonetilenBlokKarti(s){
   const liste=h('ul',{class:'ozet-liste',id:'blok-dosyalar'});
   const ciz=(dosyalar,onizleme)=>{liste.textContent='';(dosyalar||[]).forEach(d=>liste.append(h('li',{class:d.durum==='hata'||d.durum==='bozuk'?'kotu':''},h('b',{},d.ad+': '),(onizleme?d.mesaj:(BLOK_DURUM_AD[d.durum]||d.durum)+(d.durum==='bozuk'||d.durum==='hata'||d.durum==='bulunamadi'?' — '+d.mesaj:'')))));};
   api('yonetilen_blok_durum').then(d=>ciz(d.dosyalar,!d.yazildi_mi)).catch(()=>{});
   const kutu=h('input',{type:'checkbox',id:'ayar-blok',checked:s.yonetilen_blok,onchange:async e=>{
-    const r=await api('ayar_yaz',{yonetilen_blok:e.target.checked}).catch(x=>{hataGoster(x);e.target.checked=!e.target.checked;});
-    if(r){ciz(r.yonetilen_blok_sonuc,false);bildir(e.target.checked?'Bölüm yazıldı.':'Bölüm kaldırıldı.');}}});
+    const ac=e.target.checked;
+    const dene=async devral=>api('ayar_yaz',{yonetilen_blok:ac,devral});
+    let r;
+    try{r=await dene(false);}
+    catch(x){
+      if(x&&x.kod==='blok_baska_kisi'&&confirm(x.mesaj)){try{r=await dene(true);}catch(y2){hataGoster(y2);}}
+      else if(!(x&&x.kod==='blok_baska_kisi'))hataGoster(x);
+      if(!r){e.target.checked=!ac;return;}}
+    ciz(r.yonetilen_blok_sonuc,false);bildir(ac?'Bölüm yazıldı.':'Bölüm kaldırıldı.');git('ayar');}});
   return h('div',{class:'kart',id:'ayar-yonetilen-blok'},h('h3',{},'Yapay zekâ dosyalarına kısa bölüm yaz'),
     h('div',{class:'satir'},h('label',{},kutu,' Onayladığım bilgileri Claude Code ve Codex dosyalarına yaz')),
     h('p',{class:'soluk'},'Onayladığın bilgiler Claude Code ve Codex\'in her oturumda okuduğu dosyalara kısa bir bölüm olarak yazılır. Kendi yazdıklarına dokunulmaz, önce yedek alınır.'),
+    s.yonetilen_blok_baska_kisi?h('div',{class:'uyari',id:'blok-baska-kisi'},'Bu bölüm şu an '+s.yonetilen_blok_baska_kisi+' kişisinin bilgilerini taşıyor. Kendin için açarsan senin bilgilerinle değiştirilir (önce sorulur). ',h('button',{class:'i',id:'blok-kaldir',onclick:async()=>{await api('ayar_yaz',{yonetilen_blok:false}).catch(hataGoster);bildir('Bölüm kaldırıldı.');git('ayar');}},'Bölümü kaldır')):null,
     h('div',{class:'soluk'},'Yazılan dosyalar (Codex yalnız kuruluysa):'),liste,
     h('div',{class:'satir'},h('button',{class:'i',id:'blok-onizle',onclick:async()=>{
       const r=await api('yonetilen_blok_onizle').catch(hataGoster);if(!r)return;

@@ -281,3 +281,125 @@ def test_yazilamazsa_hata_donerken_dosya_degismez(y, ev, monkeypatch):
     r = ac(y)["yonetilen_blok_sonuc"][0]
     assert r["durum"] == "hata" and dosya.read_bytes() == b"kullanici\n"
     assert not list(dosya.parent.glob("*.kimlik-tmp"))
+
+
+# ---------------------------------------------------------------- inceleme düzeltmeleri
+@pytest.mark.parametrize("kotu", [
+    "a <!<!---- KIMLIK-MERKEZI:BITIR ---->>",
+    "x <!-<!-- KIMLIK-MERKEZI:BASLA -->- KIMLIK-MERKEZI:BITIR -->",
+    "kimlik-merkezi:bitir <!-- ve KİMLİK kimlik-merkezi:basla",
+    "ilk satır\n<!-- KIMLIK-MERKEZI:BITIR -->\n## Sahte başlık",
+    "# Başlık gibi\n### Alt",
+])
+def test_isaretci_enjeksiyonu_olmaz(y, ev, kotu):
+    s = yb._satir(kotu)
+    assert "\n" not in s and "<!" not in s and "-->" not in s and "kimlik-merkezi" not in s.lower() and not s.startswith("#")
+    bilgi(y, kotu)
+    ac(y)
+    m = CLAUDE(ev).read_bytes()
+    assert m.count(yb.BASLA.encode()) == 1 and m.count(yb.BITIR.encode()) == 1
+    assert m.count(b"KIMLIK-MERKEZI") == 2
+
+
+def test_cok_satirli_beyan_baslik_uretemez(y, ev):
+    bilgi(y, "birinci\n## Sahte başlık\n- sahte madde")
+    ac(y)
+    m = CLAUDE(ev).read_text(encoding="utf-8")
+    assert "\n## Sahte" not in m and m.count("\n## ") == 1 and m.count("\n- sahte") == 0 and m.count("## Kullanıcı hakkında") == 1
+
+
+def test_kullanici_kod_blogundaki_isaretci_ornegi_yok_sayilir(y, ev):
+    bilgi(y, "Adım Deneme")
+    dosya = CLAUDE(ev)
+    dosya.parent.mkdir()
+    once = ("Örnek:\n```\n" + yb.BASLA + "\nelle\n" + yb.BITIR + "\n```\nson\n").encode()
+    dosya.write_bytes(once)
+    r = ac(y)["yonetilen_blok_sonuc"][0]
+    assert r["durum"] == "yazildi"
+    ham = dosya.read_bytes()
+    assert ham.startswith(once) and ham.index("Adım Deneme".encode()) > len(once)
+    bilgi(y, "Yeni")
+    yeni = dosya.read_bytes()
+    assert yeni.startswith(once) and b"Yeni" in yeni[len(once):]
+    y.api("ayar_yaz", {"yonetilen_blok": False})
+    assert dosya.read_bytes() == once
+
+
+def test_satir_ici_isaretci_metni_blok_sayilmaz(y, ev):
+    bilgi(y, "Adım Deneme")
+    dosya = CLAUDE(ev)
+    dosya.parent.mkdir()
+    once = ("Notum: " + yb.BASLA + " ve " + yb.BITIR + " yazarsan olur\n").encode()
+    dosya.write_bytes(once)
+    assert ac(y)["yonetilen_blok_sonuc"][0]["durum"] == "yazildi" and dosya.read_bytes().startswith(once)
+
+
+def test_sembolik_baglanti_korunur(y, ev, tmp_path):
+    bilgi(y, "Adım Deneme")
+    gercek = tmp_path / "dotfiles" / "CLAUDE.md"
+    gercek.parent.mkdir()
+    gercek.write_bytes(b"benim\n")
+    (ev / ".claude").mkdir()
+    try:
+        CLAUDE(ev).symlink_to(gercek)
+    except (OSError, NotImplementedError):
+        pytest.skip("sembolik bağlantı oluşturulamadı")
+    ac(y)
+    assert CLAUDE(ev).is_symlink() and gercek.read_bytes().startswith(b"benim\n") and "Adım Deneme".encode() in gercek.read_bytes()
+    bilgi(y, "İkinci")
+    assert CLAUDE(ev).is_symlink() and len(yedekler(gercek)) >= 1 and not yedekler(CLAUDE(ev).parent / "CLAUDE.md.x")
+
+
+def test_eszamanli_cagrilar_tek_blok(y, ev):
+    import threading
+    bilgi(y, "Adım Deneme")
+    ac(y)
+    hatalar = []
+
+    def is_():
+        try:
+            for _ in range(3):
+                yb.uygula(ev, yb.icerik_uret(y.uygulama.persona))
+        except Exception as e:  # pragma: no cover
+            hatalar.append(e)
+    ts = [threading.Thread(target=is_) for _ in range(20)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not hatalar
+    m = CLAUDE(ev).read_bytes()
+    assert m.count(yb.BASLA.encode()) == 1 and m.count(yb.BITIR.encode()) == 1 and not list(CLAUDE(ev).parent.glob("*.kimlik-tmp"))
+
+
+def test_buyuk_dosyaya_dokunulmaz(y, ev):
+    bilgi(y, "Adım Deneme")
+    dosya = CLAUDE(ev)
+    dosya.parent.mkdir()
+    dosya.write_bytes(b"x" * (yb.DOSYA_UST_SINIR + 1))
+    r = ac(y)["yonetilen_blok_sonuc"][0]
+    assert r["durum"] == "buyuk" and "çok büyük, dokunulmadı" in r["mesaj"]
+    assert dosya.stat().st_size == yb.DOSYA_UST_SINIR + 1 and yedekler(dosya) == []
+
+
+def test_coklu_kisi_blok_yalniz_sahip_etkinken_guncellenir(y, ev, tmp_path):
+    bilgi(y, "Birinci kişinin bilgisi")
+    ac(y)
+    ilk = y.ayarlar["secili_kisi"]
+    assert y.ayarlar["yonetilen_blok_kisi"] == ilk
+    y.api("kisi_ekle", {"ad": "Ayşe", "yol": str(tmp_path / "veri2")})
+    bilgi(y, "Ayşe'nin bilgisi")
+    m = CLAUDE(ev).read_text(encoding="utf-8")
+    assert "Birinci kişinin bilgisi" in m and "Ayşe'nin bilgisi" not in m     # blok sahibinin bilgisiyle kaldı
+    a = y.api("ayarlar", {})
+    assert a["yonetilen_blok"] is False and a["yonetilen_blok_baska_kisi"] == "Ben"
+    with pytest.raises(IslemHatasi) as e:
+        y.api("ayar_yaz", {"yonetilen_blok": True})
+    assert e.value.kod == "blok_baska_kisi" and "Bu bölüm şu an Ben kişisinin bilgilerini taşıyor. Senin bilgilerinle değiştirilsin mi?" in str(e.value)
+    assert "Ayşe'nin bilgisi" not in CLAUDE(ev).read_text(encoding="utf-8")
+    y.api("ayar_yaz", {"yonetilen_blok": True, "devral": True})
+    assert "Ayşe'nin bilgisi" in CLAUDE(ev).read_text(encoding="utf-8") and "Birinci" not in CLAUDE(ev).read_text(encoding="utf-8")
+    assert y.ayarlar["yonetilen_blok_kisi"] == y.ayarlar["secili_kisi"]
+    y.api("kisi_sec", {"kisi_id": ilk})                       # sahip değişti: eski kişiye dönünce dokunulmaz
+    bilgi(y, "Ben yeni")
+    assert "Ben yeni" not in CLAUDE(ev).read_text(encoding="utf-8")
+    y.api("ayar_yaz", {"yonetilen_blok": False})              # kapatma herkes için kaldırır
+    assert "KIMLIK-MERKEZI" not in CLAUDE(ev).read_text(encoding="utf-8")

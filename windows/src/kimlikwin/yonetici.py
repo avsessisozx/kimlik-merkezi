@@ -149,7 +149,7 @@ class Yonetici:
 
     def blok_guncelle(self, neden: str = "") -> list[dict] | None:
         """Ayar açıksa bloğu yeniden üretir (içerik aynıysa dosyaya dokunmaz). Hata asıl işlemi bozmaz."""
-        if not self.ayarlar["yonetilen_blok"] or self.uygulama is None:
+        if not self._blok_benim() or self.uygulama is None:
             return None
         try:
             self._blok_son = yonetilen_blok.uygula(self.ev_klasoru(), self._blok_icerik())
@@ -158,12 +158,31 @@ class Yonetici:
             gunluk.log().error("yönetilen blok güncellenemedi: %s", type(e).__name__)
         return self._blok_son
 
+    def _blok_sahibi(self) -> dict | None:
+        """Bloğu açan kişi (ayarlarda kayıtlı kişi); yoksa None."""
+        kid = self.ayarlar["yonetilen_blok_kisi"]
+        return next((k for k in self.ayarlar["kisiler"] if k["id"] == kid), None) if kid else None
+
+    def _blok_benim(self) -> bool:
+        """Ayar açık VE sahip etkin kişi (sahip kaydı yoksa eski kurulum: etkin kişi sayılır)."""
+        if not self.ayarlar["yonetilen_blok"]:
+            return False
+        kid = self.ayarlar["yonetilen_blok_kisi"]
+        return not kid or kid == self.ayarlar["secili_kisi"]
+
+    def _blok_baska_kisi(self) -> str | None:
+        if self.ayarlar["yonetilen_blok"] and not self._blok_benim():
+            s = self._blok_sahibi()
+            return s["ad"] if s else "başka bir kişi"
+        return None
+
     def api_yonetilen_blok_durum(self) -> dict:
-        acik = bool(self.ayarlar["yonetilen_blok"])
+        acik = self._blok_benim()
         dosyalar = self._blok_son
         if dosyalar is None:
             dosyalar = yonetilen_blok.onizle(self.ev_klasoru(), self._blok_icerik() if (acik and self.uygulama) else None)
-        return {"acik": acik, "dosyalar": dosyalar, "yazildi_mi": self._blok_son is not None}
+        return {"acik": acik, "dosyalar": dosyalar, "yazildi_mi": self._blok_son is not None,
+                "baska_kisi": self._blok_baska_kisi()}
 
     def api_yonetilen_blok_onizle(self) -> dict:
         """Yazılacak metni ve her dosyada ne olacağını gösterir; HİÇBİR ŞEY yazmaz."""
@@ -357,22 +376,26 @@ class Yonetici:
                 "otomatik_destek": self.otomatik.desteklenir, "veri_klasoru": self.ayarlar["veri_klasoru"],
                 "port": self.ayarlar["port"], "guncelleme_otomatik": self.ayarlar["guncelleme_otomatik"],
                 "guncelleme_onsurum": self.ayarlar["guncelleme_onsurum"], "surum": __version__,
-                "yonetilen_blok": bool(self.ayarlar["yonetilen_blok"])}
+                "yonetilen_blok": self._blok_benim(), "yonetilen_blok_baska_kisi": self._blok_baska_kisi()}
 
     def api_ayar_yaz(self, tema: str | None = None, otomatik_baslat: bool | None = None,
                      guncelleme_otomatik: bool | None = None, guncelleme_onsurum: bool | None = None,
-                     yonetilen_blok: bool | None = None) -> dict:
+                     yonetilen_blok: bool | None = None, devral: bool = False) -> dict:
         uyari = None
         blok = None
         if yonetilen_blok is not None:        # açınca hemen yazar, kapatınca bloğu kaldırır (yedekli); yol parametresi YOK
             from . import yonetilen_blok as _yb
             yonetilen_blok = bool(yonetilen_blok)
             if yonetilen_blok:
+                sahip = self._blok_baska_kisi()
+                if sahip and devral is not True:
+                    raise IslemHatasi(f"Bu bölüm şu an {sahip} kişisinin bilgilerini taşıyor. Senin bilgilerinle değiştirilsin mi?",
+                                      "blok_baska_kisi", sahip)
                 icerik = self._blok_icerik()
-                self.ayarlar.guncelle(yonetilen_blok=True)
+                self.ayarlar.guncelle(yonetilen_blok=True, yonetilen_blok_kisi=self.ayarlar["secili_kisi"])
                 self._blok_son = blok = _yb.uygula(self.ev_klasoru(), icerik)
             else:
-                self.ayarlar.guncelle(yonetilen_blok=False)
+                self.ayarlar.guncelle(yonetilen_blok=False, yonetilen_blok_kisi=None)   # kapatma herkes için kaldırır
                 self._blok_son = blok = _yb.uygula(self.ev_klasoru(), None)
             gunluk.log().info("yönetilen blok %s: %s", "açıldı" if yonetilen_blok else "kapatıldı", ", ".join(d["durum"] for d in blok))
         if guncelleme_otomatik is not None:   # kullanıcı Ayarlar'da seçimi gördü: ayrıca bilgilendirme gerekmez
