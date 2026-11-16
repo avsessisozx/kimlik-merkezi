@@ -95,7 +95,7 @@ class Istemci:
         sha = h.hexdigest()
         durum, ofset = self.durum(cihaz, ad)
         if durum == "var":
-            return {"sonuc": "var", "baslangic_ofset": ofset, "gonderilen_bayt": 0}
+            return {"sonuc": "var", "baslangic_ofset": ofset, "gonderilen_bayt": 0, "ilk_durum": durum}
         bas0, gonderilen = ofset, 0
         with open(yol, "rb") as f:
             while True:
@@ -109,16 +109,16 @@ class Istemci:
                 if y.status in (200, 201):
                     gonderilen += len(parca)
                     if y.getheader("X-Durum") == "var":
-                        return {"sonuc": "var", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen}
+                        return {"sonuc": "var", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen, "ilk_durum": durum}
                     ofset += len(parca)
                     if y.status == 201:
-                        return {"sonuc": "tamam", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen}
+                        return {"sonuc": "tamam", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen, "ilk_durum": durum}
                     if self.parca_arasi_s:
                         time.sleep(self.parca_arasi_s)
                 elif y.status == 409:
                     ofset = int(y.getheader("X-Alinan"))
                 elif y.status == 422:
-                    return {"sonuc": "sha_hatasi", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen}
+                    return {"sonuc": "sha_hatasi", "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen, "ilk_durum": durum}
                 else:
                     raise RuntimeError(f"beklenmeyen durum {y.status}")
 

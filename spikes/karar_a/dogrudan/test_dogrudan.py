@@ -147,13 +147,14 @@ def test_b_alici_kill_devam(tmp_path, sert):
         assert 0 < olu < boyut
         time.sleep(0.8)
         sur.baslat()
+        yeniden_head = f"yeniden_basladi_part_boyut={part_boyut(kok)}"
         it.join(90)
         assert not it.is_alive()
     finally:
         sur.bitir()
     son = kayit[-1]
     assert isinstance(son, dict) and son["sonuc"] == "tamam", kayit
-    assert son["baslangic_ofset"] >= olu > 0, (son, olu)
+    assert son["baslangic_ofset"] >= olu > 0, (son, olu, kayit, yeniden_head)
     assert son["baslangic_ofset"] + son["gonderilen_bayt"] == boyut
     assert sha256_dosya(kok / "gelen" / CIHAZ / yol.name) == sha256_dosya(yol)
     assert not list((kok / "gecici").rglob("*.part"))

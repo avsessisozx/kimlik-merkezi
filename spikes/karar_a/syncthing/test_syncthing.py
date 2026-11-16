@@ -43,10 +43,11 @@ def test_a_pc_kapaliyken_birikir(cift_fabrikasi):
     c = cift_fabrikasi()
     c.bagla()
     c.pc.oldur()  # PC kapandı
-    g = uret_giden_kutusu(tel_yol(c) / CIHAZ, CIHAZ, 200, 50, doldur=800)
+    g = uret_giden_kutusu(tel_yol(c), CIHAZ, 200, 50, doldur=800)
     toplam = sum(p.stat().st_size for p in (tel_yol(c) / CIHAZ).glob("*.jsonl"))
     c.tel.tara(c.kid)
     time.sleep(3)
+    assert not c.pc.calisiyor() and not c.pc.ping(), "pc süreci öldürülemedi"
     assert not list((c.pc.klasor).rglob("*.jsonl"))  # kapalıyken hiçbir şey gelmedi
     t0 = time.perf_counter()
     c.pc.baslat()
@@ -66,11 +67,12 @@ def test_b_buyuk_dosya_pc_kill(cift_fabrikasi):
     boyut = yol.stat().st_size
     c.tel.tara(c.kid)
     assert bekle(lambda: c.pc.gelen_bayt() >= 25 * 1024 * 1024, 120), "aktarım hızlanmadı/başlamadı"
-    tmp = list(c.pc.klasor.rglob(".syncthing.*.tmp"))
+    tmp = list(c.pc.klasor.rglob("*syncthing*.tmp"))
     gelen_kill = c.pc.gelen_bayt()
     c.pc.oldur()
+    assert not c.pc.ping(), "pc süreci öldürülemedi"
     assert not (c.pc.klasor / CIHAZ / yol.name).exists()  # yarım dosya asıl adıyla görünmemeli
-    tmp_kalan = len(list(c.pc.klasor.rglob(".syncthing.*.tmp")))
+    tmp_kalan = len(list(c.pc.klasor.rglob("*syncthing*.tmp")))
     c.pc.xml_duzenle({"maxRecvKbps": 0, "limitBandwidthInLan": "false"})
     t0 = time.perf_counter()
     c.pc.baslat()
@@ -79,7 +81,7 @@ def test_b_buyuk_dosya_pc_kill(cift_fabrikasi):
     hedef = c.pc.klasor / CIHAZ / yol.name
     assert sha256_dosya(hedef) == sha256_dosya(yol)
     devam_bayt = c.pc.gelen_bayt()
-    assert not list(c.pc.klasor.rglob(".syncthing.*.tmp"))
+    assert not list(c.pc.klasor.rglob("*syncthing*.tmp"))
     dogrula(kim, satir_uuidleri(c.pc.klasor))
     olc(ADAY, "b_pc_kill_devam", boyut_bayt=boyut, kill_aninda_alinan_bayt=gelen_kill, kill_oncesi_tmp_dosya=len(tmp),
         kill_sonrasi_tmp_dosya=tmp_kalan, yeniden_baslayinca_alinan_bayt=devam_bayt,
@@ -119,7 +121,7 @@ def test_c_ayni_icerik_iki_kez(cift_fabrikasi):
 def test_d1_telefonda_silme_yayilimi(cift_fabrikasi, ignore_delete):
     c = cift_fabrikasi(pc_klasor_ek={"ignoreDelete": ignore_delete})
     c.bagla()
-    g = uret_giden_kutusu(tel_yol(c) / CIHAZ, CIHAZ, 5, 100)
+    g = uret_giden_kutusu(tel_yol(c), CIHAZ, 5, 100)
     c.tel.tara(c.kid)
     assert esitlendi(c.pc, c.kid, 5, 120)
     silinen = sorted(g)[0]
@@ -146,7 +148,7 @@ def test_d1_telefonda_silme_yayilimi(cift_fabrikasi, ignore_delete):
 def test_d2_pc_dosyayi_disari_tasir(cift_fabrikasi, tmp_path):
     c = cift_fabrikasi()
     c.bagla()
-    g = uret_giden_kutusu(tel_yol(c) / CIHAZ, CIHAZ, 5, 100)
+    g = uret_giden_kutusu(tel_yol(c), CIHAZ, 5, 100)
     c.tel.tara(c.kid)
     assert esitlendi(c.pc, c.kid, 5, 120)
     tasinan = sorted(g)[0]

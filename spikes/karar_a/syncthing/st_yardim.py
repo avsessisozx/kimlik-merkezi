@@ -104,10 +104,20 @@ class Ornek:
         except OSError:
             return ""
 
+    def ping(self) -> bool:
+        try:
+            self.rest("GET", "/rest/system/ping")
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
     def oldur(self):
         if self.p and self.p.poll() is None:
+            if os.name == "nt":  # süreç ağacı: izleyici/çocuk süreç hayatta kalmasın
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.p.pid)], capture_output=True)
             self.p.kill()
             self.p.wait()
+            bekle(lambda: not self.ping(), 15, 0.2)
         if self.log:
             self.log.close()
             self.log = None
