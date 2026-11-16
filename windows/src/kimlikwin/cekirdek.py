@@ -113,6 +113,7 @@ class Uygulama:
         self._harita_kilit = threading.RLock()   # web iş parçacıkları aynı SQLite bağlantısını eşzamanlı kullanmasın
         self.hassas_acik: set[str] = set()      # yalnız bu oturum ve bu kişi için; kalıcı değil
         self._is_kilit = threading.Lock()
+        self._telefon_ice = False                # telefondan gelen dosyalar içe alınıyor (yazma sırası: _is_kilit)
         self.eskiyen = self.persona.check_expiry()   # açılışta süre kontrolü
         gunluk.log().info("hub açıldı; süresi dolan bilgi: %d", self.eskiyen)
 
@@ -231,6 +232,8 @@ class Uygulama:
                 raise IslemHatasi("Başka bir içe aktarma sürüyor.", "mesgul")
             if self.kopya_is is not None and self.kopya_is.canli:
                 raise IslemHatasi("Bir kopya denetimi sürüyor; bitince içe aktarabilirsiniz.", "mesgul")
+            if self._telefon_ice:
+                raise IslemHatasi("Telefondan gelen dosyalar alınıyor; birazdan yeniden deneyin.", "mesgul")
             is_ = IceAktarmaIsi(yol, tur or None, bool(yine_de), yollar)
             self.is_ = is_
         self._is_dosyasi({"yol": yol, "yollar": yollar, "tur": tur, "durum": "calisiyor"})
@@ -380,6 +383,8 @@ class Uygulama:
                 raise IslemHatasi("Bir içe aktarma sürüyor; bitince kopyaları denetleyebilirsiniz.", "mesgul")
             if self.kopya_is is not None and self.kopya_is.canli:
                 raise IslemHatasi("Bir kopya denetimi sürüyor; bitmesini bekleyin.", "mesgul")
+            if self._telefon_ice:
+                raise IslemHatasi("Telefondan gelen dosyalar alınıyor; birazdan yeniden deneyin.", "mesgul")
             self.kopya_is = KopyaIsi(self.hub, bool(uygula), paket or None)
             self.kopya_is.baslat()
         gunluk.log().info("kopya %s başladı", "gizleme" if uygula else "denetimi")
@@ -387,6 +392,23 @@ class Uygulama:
 
     def kopya_durum(self) -> dict:
         return self.kopya_is.to_dict() if self.kopya_is else {"durum": "yok"}
+
+    # ------------------------------------------------------------------ telefon aktarımı (gelen dosyaları içe alma)
+    def telefon_ice_al(self) -> dict | None:
+        """`gelen_aktarim/` altındaki tamamlanmış telefon dosyalarını içe alır. İçe aktarma ya da kopya işi
+        sürüyorsa (ya da başka bir telefon alımı) HİÇBİR ŞEY yapmaz ve None döner: çağıran sonra yeniden dener.
+        Alım sürerken yeni içe aktarma/kopya işi 'meşgul' yanıtı alır (tek yazma sırası)."""
+        from kimlikserver.aktarim import gelenleri_ice_al
+        with self._is_kilit:
+            if (self.is_ and self.is_.durum == "calisiyor") or (self.kopya_is is not None and self.kopya_is.canli) \
+                    or self._telefon_ice:
+                return None
+            self._telefon_ice = True
+        try:
+            return gelenleri_ice_al(self.hub)
+        finally:
+            with self._is_kilit:
+                self._telefon_ice = False
 
     # ------------------------------------------------------------------ erişim
     def erisim(self) -> dict:

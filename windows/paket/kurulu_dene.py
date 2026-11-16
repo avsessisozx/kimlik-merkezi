@@ -63,6 +63,7 @@ kontrol("pypdf: var" in r.stdout and "docx: var" in r.stdout, "pakette pypdf ve 
 
 _m = re.search(r"hassas konu listesi: var \((\d+) konu\)", r.stdout)
 kontrol(bool(_m) and int(_m.group(1)) >= 5, "pakette çekirdek verisi (kimlikcore/veri/hassas_konular.json) okunuyor, en az 5 konu")
+kontrol("telefon aktarımı: hazır" in r.stdout, "pakette telefon aktarımı modülleri (kimlikserver.aktarim, android_giden) içe aktarılabiliyor (alıcı dinletilmedi)")
 
 # ---- konsol exe: `tanila <yol>` (dosya denetimi). Sahte örnekte özel işaretli dizgiler (sentinel) rapora SIZMAMALI.
 import tanila_dene as TD

@@ -120,7 +120,9 @@ def calistir(arka_plan: bool) -> int:
     try:
         from .tepsi import Tepsi
         tepsi = Tepsi(lambda: webbrowser.open(sunucu.url), cikis.set,
-                      yonetici.otomatik.etkin_mi, lambda a: yonetici.api("ayar_yaz", {"otomatik_baslat": a}))
+                      yonetici.otomatik.etkin_mi, lambda a: yonetici.api("ayar_yaz", {"otomatik_baslat": a}),
+                      lambda: bool(yonetici.ayarlar["telefon_aktarimi"]),
+                      lambda a: yonetici.api("telefon_ac", {"acik": bool(a)}))
     except Exception as e:  # pystray/Pillow yok ya da tepsi desteklenmiyor: tepsisiz sürer
         gunluk.log().warning("tepsi yok: %s", type(e).__name__)
 
@@ -188,6 +190,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"hassas konu listesi: var ({len(list_topics())} konu)")
         except Exception as e:
             print(f"hassas konu listesi: YOK ({type(e).__name__})")
+        try:                                         # telefon aktarımı modülleri pakette olmalı (alıcı BAŞLATILMAZ, soket açılmaz)
+            from kimlikserver.aktarim import AktarimAlici, gelenleri_ice_al, eslestirme_coz  # noqa: F401
+            from kimlikimport import registry
+            if "android_giden" not in registry.names():
+                raise ImportError("android_giden içe aktarıcısı yok")
+            print("telefon aktarımı: hazır")
+        except Exception as e:
+            print(f"telefon aktarımı: YOK ({type(e).__name__})")
         return 0
     if a.komut == "tanila":
         return tanila_komutu(a.yol, a.adlari_goster, a.ayrinti)

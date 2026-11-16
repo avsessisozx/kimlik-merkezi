@@ -19,6 +19,7 @@ from .guncelleme import Guncelleme, GuncellemeHatasi
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
 from .tanila_is import TanilaIsi
+from .telefon import TelefonAktarimi
 from .guvenlik import DEGERLENDIRICILER, GUVENLIK_API, KILITLI_IZINLI, MESGUL_IZINLI, Guvenlik
 
 # Uygulama'nın dışarıya açılan yöntemleri (ad -> yöntem). Başka hiçbir şey çağrılamaz.
@@ -61,7 +62,8 @@ class Yonetici:
                  secici: Callable[[str], str | None] = sec_dialog,
                  claude_yolu: Callable[[], Path | None] = claude_ayar.bul,
                  guncelleme: Guncelleme | None = None,
-                 ev_klasoru: Callable[[], Path] = yonetilen_blok.ev_klasoru):
+                 ev_klasoru: Callable[[], Path] = yonetilen_blok.ev_klasoru,
+                 telefon_ayar: dict | None = None):
         self.ev_klasoru = ev_klasoru          # yönetilen blok hedefleri (~/.claude, ~/.codex); testte geçici klasör
         self._blok_son: list[dict] | None = None
         self.ayarlar = ayarlar or Ayarlar()
@@ -70,7 +72,8 @@ class Yonetici:
         self.otomatik = otomatik or Otomatik()
         self.secici = secici
         self.claude_yolu = claude_yolu
-        self.uygulama: Uygulama | None = None
+        self.telefon = TelefonAktarimi(self, **(telefon_ayar or {}))   # alıcı yalnız ayar açık VE uygulama açıkken dinler
+        self._uygulama: Uygulama | None = None
         self.son_dogrulama: str | None = None
         self.baslangic_hatasi: str | None = None
         self.cikis_istegi = False
@@ -79,6 +82,21 @@ class Yonetici:
         self.tanila: TanilaIsi | None = None  # 'Dosyayı denetle' işi (salt okunur, veritabanına dokunmaz)
         self.guvenlik = Guvenlik(self)
         self._api_kilit = threading.RLock()   # kişi değişimi ve sorgular aynı SQLite bağlantısında çakışmasın
+
+    @property
+    def uygulama(self) -> Uygulama | None:
+        return self._uygulama
+
+    @uygulama.setter
+    def uygulama(self, u: Uygulama | None) -> None:
+        """Hub değişince (açılış, kişi değişimi, kilit açma, kapanış) telefon alıcısı da uyumlanır."""
+        self._uygulama = u
+        tel = self.__dict__.get("telefon")
+        if tel is not None:
+            try:
+                tel.uyumlandir()
+            except Exception as e:   # noqa: BLE001 - alıcı hatası asıl işlemi bozmaz
+                gunluk.log().error("telefon aktarımı uyumlanamadı: %s", type(e).__name__)
 
     # ------------------------------------------------------------------ yaşam döngüsü
     def baslat(self) -> None:
@@ -267,6 +285,7 @@ class Yonetici:
         return {"ok": True}
 
     def kapat(self) -> None:
+        self.telefon.durdur()                 # alıcı Hub kapanmadan ÖNCE durur
         if self.uygulama:
             self.uygulama.kapat()
             self.uygulama = None
@@ -376,6 +395,7 @@ class Yonetici:
                 "otomatik_destek": self.otomatik.desteklenir, "veri_klasoru": self.ayarlar["veri_klasoru"],
                 "port": self.ayarlar["port"], "guncelleme_otomatik": self.ayarlar["guncelleme_otomatik"],
                 "guncelleme_onsurum": self.ayarlar["guncelleme_onsurum"], "surum": __version__,
+                "telefon_aktarimi": bool(self.ayarlar["telefon_aktarimi"]),
                 "yonetilen_blok": self._blok_benim(), "yonetilen_blok_baska_kisi": self._blok_baska_kisi()}
 
     def api_ayar_yaz(self, tema: str | None = None, otomatik_baslat: bool | None = None,
@@ -470,6 +490,20 @@ class Yonetici:
             self.acilista_guncelleme()
         return self._gunc_durum()
 
+    # ------------------------------------------------------------------ telefon aktarımı (telefon.py)
+    # Hiçbir uç dosya yolu, dinleme adresi ya da port almaz; adres/port sabittir (yalnız test için kurucuya enjekte).
+    def api_telefon_durum(self) -> dict:
+        return self.telefon.durum()
+
+    def api_telefon_ac(self, acik: bool = False) -> dict:
+        return self.telefon.ayarla(acik is True)
+
+    def api_telefon_kod_uret(self) -> dict:
+        return self.telefon.kod_uret()
+
+    def api_telefon_cihaz_kaldir(self, device_id: str = "") -> dict:
+        return self.telefon.cihaz_kaldir(device_id)
+
     def api_saglik(self) -> dict:
         veri = self.ayarlar["veri_klasoru"]
         if not veri:
@@ -480,6 +514,7 @@ class Yonetici:
 
     def api_hata_raporu(self, adim: str = "", mesaj: str = "", ek: str = "") -> dict:
         h = RuntimeError(mesaj) if mesaj else None
+        ek = "\n".join(x for x in (ek, self.telefon.rapor_satiri()) if x)   # yalnız sayılar; kod/anahtar/adres yok
         return {"metin": hata_raporu.olustur(adim, h, self.son_dogrulama, ek or None, self.ayarlar.dizin)}
 
     def api_hakkinda(self) -> dict:

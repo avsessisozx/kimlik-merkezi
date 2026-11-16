@@ -20,6 +20,7 @@ VARSAYILAN: dict[str, Any] = {
     "guncelleme_bilgi_goruldu": False,  # kullanıcı denetim bilgisini gördü mü (görmeden otomatik denetim yapılmaz)
     "yonetilen_blok": False,     # CLAUDE.md / AGENTS.md içinde onaylı persona özeti (VARSAYILAN KAPALI; yonetilen_blok.py)
     "yonetilen_blok_kisi": None, # bloğu açan kişinin id'si; blok yalnız o kişi etkinken güncellenir
+    "telefon_aktarimi": False,   # telefondan yerel ağ aktarımı (VARSAYILAN KAPALI; telefon.py): yalnız açıkken ve uygulama açıkken dinler
     "port": 47821,               # tercih edilen yerel port; doluysa boş bir port seçilir
 }
 TEMALAR = ("sistem", "acik", "koyu")
