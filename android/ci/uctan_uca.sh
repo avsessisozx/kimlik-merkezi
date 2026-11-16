@@ -25,6 +25,7 @@ temizle() {
   if [ "$kod" -ne 0 ]; then
     echo "=== BASARISIZ (cikis $kod): tanilama ==="
     for f in alici.log ice_alma.log; do echo "--- $f"; tail -n 40 "$C/$f" 2>/dev/null || true; done
+    echo "--- ana makine baglantilari (47923)"; ss -tan 2>/dev/null | grep 47923 | awk '{print $1}' | sort | uniq -c || true
     echo "--- telefon gunlugu (icerik yazmaz)"; adb exec-out run-as "$PAKET" tail -n 40 files/gunluk.txt 2>/dev/null || true
     echo "--- telefon son_hata"; adb exec-out run-as "$PAKET" cat files/son_hata.txt 2>/dev/null | head -n 30 || true
     echo "--- logcat (UCTANUCA, AndroidRuntime)"; adb logcat -d -s UCTANUCA:I AndroidRuntime:E 2>/dev/null | tail -n 40 || true

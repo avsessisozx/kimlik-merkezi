@@ -37,6 +37,8 @@ annotation class GercekPc
  * Aşamalar arasında uygulama verisi silinmez; giden kutusu, eşleşme ve beklenen-kayıt dosyası kalıcıdır.
  * Her aşama `olcum=` satırı yayımlar (`am instrument -r` çıktısında INSTRUMENTATION_STATUS).
  */
+private val HATALAR = java.util.Collections.synchronizedList(ArrayList<String>())
+
 @GercekPc
 @RunWith(AndroidJUnit4::class)
 class GercekPcTest {
@@ -94,12 +96,16 @@ class GercekPcTest {
 
     /** Test için ölçen/yavaşlatan bağlantı sarmalayıcısı. */
     private class Olcumlu(private val ic: PcBaglanti, private val bekleMs: Long, private val kayit: MutableList<LongArray>) : PcBaglanti {
-        override fun durum() = ic.durum()
-        override fun eslestir(govde: ByteArray) = ic.eslestir(govde)
-        override fun head(cihazId: String, dosyaId: String, anahtar: String) = ic.head(cihazId, dosyaId, anahtar)
+        private fun <T> izle(ad: String, f: () -> T): T = try { f() } catch (e: Exception) {
+            HATALAR += "$ad ${System.currentTimeMillis() % 100000}: ${e.javaClass.name}: ${e.message} <- ${e.cause?.javaClass?.name}: ${e.cause?.message}"
+            throw e
+        }
+        override fun durum() = izle("durum") { ic.durum() }
+        override fun eslestir(govde: ByteArray) = izle("eslestir") { ic.eslestir(govde) }
+        override fun head(cihazId: String, dosyaId: String, anahtar: String) = izle("head") { ic.head(cihazId, dosyaId, anahtar) }
         override fun put(cihazId: String, dosyaId: String, anahtar: String, bas: Long, toplam: Long, sha: String, parca: ByteArray): Yanit {
             if (bekleMs > 0) Thread.sleep(bekleMs)
-            val y = ic.put(cihazId, dosyaId, anahtar, bas, toplam, sha, parca) // hata atarsa kayıt yazılmaz
+            val y = izle("put") { ic.put(cihazId, dosyaId, anahtar, bas, toplam, sha, parca) } // hata atarsa kayıt yazılmaz
             kayit += longArrayOf(bas, parca.size.toLong(), toplam, y.kod.toLong())
             return y
         }
@@ -152,9 +158,9 @@ class GercekPcTest {
         assertTrue(d.eslesme.eslesmis())
         val t1 = System.currentTimeMillis()
         val bayt = d.kutu.kapatilmisDosyalar().sumOf { it.boyutBayt }
-        val sonuc = d.gonderici.gonder()
+        val sonuc = olcumluGonderici(0, ArrayList()).gonder()
         val sure = System.currentTimeMillis() - t1
-        assertEquals(AktarimDurumu.Tamam(3, 120), sonuc)
+        assertEquals("ag hatalari: ${HATALAR.joinToString(" | ")}", AktarimDurumu.Tamam(3, 120), sonuc)
         assertEquals(0, d.kutu.bekleyenKayitSayisi())
         assertEquals(0, d.kutu.bekleyenDosyaSayisi())
         olcum("a2_esles_gonder eslestirme_ms=${t1 - t0} dosya=3 kayit=120 bayt~=$bayt gonder_ms=$sure bekleyen=0")
