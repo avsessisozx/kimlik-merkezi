@@ -57,14 +57,15 @@ class Ornek:
         r = subprocess.run([self.bin, "generate", "--home", str(self.home)], capture_output=True, text=True,
                            timeout=120)
         assert r.returncode == 0, r.stdout + r.stderr
-        self.xml_duzenle(secenekler)
+        self.xml_duzenle(secenekler, klasorleri_sil=True)
 
-    def xml_duzenle(self, secenekler: dict | None = None):
+    def xml_duzenle(self, secenekler: dict | None = None, klasorleri_sil: bool = False):
         yol = self.home / "config.xml"
         agac = ET.parse(yol)
         kok = agac.getroot()
-        for f in kok.findall("folder"):
-            kok.remove(f)
+        if klasorleri_sil:
+            for f in kok.findall("folder"):
+                kok.remove(f)
         gui = kok.find("gui")
         for ad, deger in (("address", f"127.0.0.1:{self.gui_port}"), ("apikey", self.apikey)):
             e = gui.find(ad)
@@ -89,7 +90,7 @@ class Ornek:
 
     # --- süreç
     def baslat(self):
-        env = dict(os.environ, STNORESTART="1", STNOUPGRADE="1", STNODEFAULTFOLDER="1", STHASHING="standard")
+        env = dict(os.environ, STMONITORED="1", STNORESTART="1", STNOUPGRADE="1", STNODEFAULTFOLDER="1", STHASHING="standard")
         self.log = open(self.kok / f"{self.ad}.log", "ab")
         self.p = subprocess.Popen([self.bin, "serve", "--home", str(self.home), "--no-browser", "--no-upgrade"],
                                   stdout=self.log, stderr=subprocess.STDOUT, env=env)

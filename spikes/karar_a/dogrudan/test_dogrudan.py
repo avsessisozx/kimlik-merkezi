@@ -154,13 +154,21 @@ def test_b_alici_kill_devam(tmp_path, sert):
         sur.bitir()
     son = kayit[-1]
     assert isinstance(son, dict) and son["sonuc"] == "tamam", kayit
-    assert son["baslangic_ofset"] >= olu > 0, (son, olu, kayit, yeniden_head)
-    assert son["baslangic_ofset"] + son["gonderilen_bayt"] == boyut
+    # İstemci, tek dosya_gonder çağrısı içinde bağlantı kopmasını şeffaf yeniden bağlanmayla atlatmış olabilir
+    # (Windows'ta böyle oldu); bu durumda çağrı başındaki ofset 0'dır. İki biçimde de devam kanıtı aranır.
+    tek_cagri = son["baslangic_ofset"] == 0
+    assert yeniden_head == f"yeniden_basladi_part_boyut={olu}"  # geçici dosya yeniden başlatmadan sağ çıktı
+    if tek_cagri:
+        assert boyut - son["gonderilen_bayt"] <= c.parca_bayt, (son, olu, kayit)  # en çok kaybolan bir ack
+    else:
+        assert son["baslangic_ofset"] >= olu > 0, (son, olu, kayit)
+        assert son["baslangic_ofset"] + son["gonderilen_bayt"] == boyut
     assert sha256_dosya(kok / "gelen" / CIHAZ / yol.name) == sha256_dosya(yol)
     assert not list((kok / "gecici").rglob("*.part"))
     dogrula(kimlikler, satir_uuidleri(kok / "gelen"))
     olc(ADAY, "b_alici_kill", boyut_bayt=boyut, kill_aninda_alinan=olu, devam_ofseti=son["baslangic_ofset"],
-        devamda_gonderilen=son["gonderilen_bayt"], hatalar=len(kayit) - 1, sha_esit=True)
+        devamda_gonderilen=son["gonderilen_bayt"], hatalar=len(kayit) - 1, tek_cagri_icinde_surdu=tek_cagri,
+        sha_esit=True)
 
 
 # (c) istemci ortada öldürülür, yeniden başlar
