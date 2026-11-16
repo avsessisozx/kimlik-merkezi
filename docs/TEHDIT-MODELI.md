@@ -156,6 +156,27 @@ kullanıcı hesabındaki bir programın sorunudur (2.5, kapsam dışı). **Bu s�
 v0.2 önerisi: hassas izin verme işlemini, yalnızca insanın görebileceği bir kanaldan (ör. ayrı bir
 sistem iletişim penceresi ya da tek kullanımlık, ekranda gösterilen bir onay kodu) doğrulatmak.
 
+## Telefon aktarımı (v0.2.0)
+
+Ayrıntılı protokol: `docs/AKTARIM.md`.
+
+**Saldırganlar:** (a) aynı yerel ağdaki başka bir cihaz, (b) ele geçirilmiş telefon.
+
+**Önlemler:**
+- Bilgisayar yalnız Kimlik Merkezi açıkken ve Telefon ayarı açıkken dinler; kapalıyken port yoktur.
+- Yerel adres süzgeci: yerel olmayan kaynaklardan gelen bağlantı reddedilir.
+- Tek kullanımlık eşleştirme kodu; bilgisayar cihaz anahtarının yalnız özetini saklar.
+- Sertifika sabitleme: telefon, eşleştirmede öğrendiği sertifikadan başkasına güvenmez.
+- Bağlantı sayısı, süre ve kota sınırları.
+- Telefon yalnız `notlar`, `medya_meta`, `konum`, `dosyalar`, `uygulama` kategorilerine yazabilir.
+- Telefon mevcut kayıtların üzerine yazamaz.
+
+**Kalan riskler:**
+- Aynı ağdaki bir cihaz, eşleştirme kodunu tüketerek/geçersiz kılarak eşleştirmeyi aksatabilir (hizmet engelleme).
+- `gelen_aktarim/` içe alınana kadar düz (şifresiz) durur.
+- Ele geçirilmiş telefon, izinli kategorilerde sahte kayıt gönderebilir.
+- Android imza anahtarı GitHub Secrets'ta durur; depo/hesap ele geçirilirse imza güvenilmez olur.
+
 ## 4. Kapsam dışı olanlar
 
 - Aynı Windows kullanıcısı ya da yönetici olarak çalışan saldırgan; fiziksel erişim, bellek dökümü,

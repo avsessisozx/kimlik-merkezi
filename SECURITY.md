@@ -25,7 +25,7 @@ düzeltme notunda adınızla anılırsınız.
 
 ## Desteklenen sürümler
 
-Yalnızca en son yayımlanan sürüm (şu an v0.1 ön sürüm serisi) için düzeltme yapılır.
+Yalnızca en son yayımlanan sürüm (şu an v0.2 ön sürüm serisi) için düzeltme yapılır.
 
 ## Kapsam
 
@@ -60,3 +60,8 @@ depolaması); dosya adı katı kalıba uymalı (yol geçişi yok); dosya yalnız
 indirme ve kurulum her biri ayrı kullanıcı onayı ister; kurulum öncesi dosya yeniden doğrulanır. Denetimi
 Ayarlar'dan kapatabilirsiniz; kapalıyken uygulama internete bağlanmaz. Bkz. [docs/AG-GARANTISI.md](docs/AG-GARANTISI.md)
 ve [docs/TEHDIT-MODELI.md](docs/TEHDIT-MODELI.md) 2.6.
+
+## Telefon aktarımı
+
+Android toplayıcı ve Windows alıcısı (v0.2.0) için güvenlik varsayımları ve kalan riskler `docs/TEHDIT-MODELI.md` "Telefon aktarımı" bölümündedir.
+Eşleştirme koduna, cihaz anahtarına ya da sertifika sabitlemeye dair açıkları da yukarıdaki özel bildirim yoluyla bildirin.

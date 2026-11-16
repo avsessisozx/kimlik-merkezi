@@ -111,12 +111,12 @@ Ortak: ortam değişkeni `KIMLIK_ANAHTAR` zorunlu, `KIMLIK_VERI` (veri klasörü
 Ortak hata sınıfları `kimlikcore.errors`: `HubLockedError`, `PermissionDenied`, `FormatError`, `SchemaTooNew`. Uygulamalarda "Hata raporunu kopyala" metni: sürüm, Python/OS, adım, hata türü + iletisi, son 50 günlük satırı (kayıt metni yok), doğrulama durumu. Günlük satırları kayıt içeriği taşımaz.
 
 ## 9. docs/ sahipleri
-`INTERFACES.md` müdür · `SEMA.md` İ1 · `BAGLANTI.md` İ2 · `ANDROID.md` İ4 (v0.2.0).
+`INTERFACES.md` müdür · `SEMA.md` İ1 · `BAGLANTI.md` İ2 · `AKTARIM.md` müdür · `android/BICIM.md`, `android/README.md` Android (İ4, v0.2.0).
 
 ## 10. Bekleyenler
 - MCP başlatma komutu ve kabuk: Karar B sonrası.
 - MCP kütüphanesi ve sürümü: Karar C sonrası.
-- Giden kutusu biçimi ve PC aktarım protokolü: Karar A sonrası (v0.2.0).
+- ~~Giden kutusu biçimi ve PC aktarım protokolü~~: kapandı, bkz. docs/AKTARIM.md.
 
 ## 11. Ek 1.1 (İ1 Aşama 1 sonrası, bağlayıcı)
 - `facts`: ek sütunlar `fact_key` (çelişki eşleşmesi için anahtar), `hidden`, `updated`. `app_keys.revoked` 0/1 tamsayıdır.
