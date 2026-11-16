@@ -197,3 +197,52 @@ def test_buyuk_dosya_akisla(hub, tmp_path):
     _, tepe = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     assert r.added == n and tepe < boyut
+
+
+# --- tek doğrulayıcı: dosya_dogrula ---------------------------------------------------------------
+from kimlikimport.android_giden import MAX_SATIR, dosya_dogrula  # noqa: E402
+
+
+@pytest.mark.parametrize("ad,kod", [
+    (KAPANISSIZ, "kapanis_yok"), (SAYI, "sayi_tutmuyor"), (YARIM, "satir_yarim"), (BOZUK, "satir_bozuk"),
+    (BICIM2, "bicim_desteklenmiyor"),
+])
+def test_dosya_dogrula_neden_kodlari(ad, kod):
+    assert dosya_dogrula(dosya(ad)) == (False, 0, kod)
+
+
+def test_dosya_dogrula_saglam_ve_kimlik():
+    assert dosya_dogrula(dosya(SAGLAM)) == (True, 10, "")
+    assert dosya_dogrula(dosya(SAGLAM), CIHAZ, SAGLAM) == (True, 10, "")
+    assert dosya_dogrula(dosya(SAGLAM), CIHAZ, KAPANISSIZ) == (False, 0, "kimlik_uyusmuyor")
+    assert dosya_dogrula(dosya("yok-boyle")) == (False, 0, "okunamadi")
+
+
+def _sat(tmp_path, degis):
+    s = dosya(SAGLAM).read_text(encoding="utf-8").splitlines()
+    degis(s)
+    p = tmp_path / "x.jsonl"
+    p.write_text("\n".join(s) + "\n", encoding="utf-8")
+    return p
+
+
+def test_dosya_dogrula_alan_ts_kategori_bos_satir_uzun(tmp_path):
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.__setitem__(1, s[1].replace('"ts": "', '"ts": "bozuk')))) == (False, 0, "ts_gecersiz")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.__setitem__(1, s[1].replace('"kategori": "notlar"', '"kategori": "persona"')))) == (False, 0, "kategori_gecersiz")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.__setitem__(1, s[1].replace('"yuk": {', '"yuk": [1], "x": {')))) == (False, 0, "alan_gecersiz")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.insert(2, ""))) == (False, 0, "bos_satir")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.append(s[1]))) == (False, 0, "kapanis_sonrasi")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.__setitem__(1, '{"id":"a","tur":"x","kategori":"notlar","ts":"2026-01-01T00:00:00Z","metin":"' + "a" * MAX_SATIR + '"}'))) == (False, 0, "satir_uzun")
+    assert dosya_dogrula(_sat(tmp_path, lambda s: s.__setitem__(0, '{"baslik": false}'))) == (False, 0, "baslik_yok")
+
+
+def test_derin_json_yalniz_o_dosyayi_reddeder(hub, tmp_path):
+    kl = tmp_path / "k"
+    kl.mkdir()
+    shutil.copy(dosya(SAGLAM), kl / f"{SAGLAM}.jsonl")
+    s = dosya(KAPANISSIZ).read_text(encoding="utf-8").splitlines()
+    s[1] = "[" * 200000
+    (kl / f"{KAPANISSIZ}.jsonl").write_text("\n".join(s) + "\n", encoding="utf-8")
+    assert dosya_dogrula(kl / f"{KAPANISSIZ}.jsonl")[0] is False
+    r = run(hub, kl, "android_giden")
+    assert r.added == 10 and len(r.report.missing) == 1

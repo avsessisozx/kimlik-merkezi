@@ -21,7 +21,8 @@ NAME = "android_giden"
 # Telefonun yazabileceği kategoriler (AKTARIM §1 tablosu); persona/eposta/mesaj/sohbet gibi başkaları reddedilir.
 _KATEGORILER = frozenset({"notlar", "medya_meta", "konum", "dosyalar", "uygulama"})
 BICIM = 1
-_MAX_SATIR = 4 * 1024 * 1024
+MAX_SATIR = 4 * 1024 * 1024     # tek satır üst sınırı; PC alıcısı da aynı sabiti kullanır
+_MAX_SATIR = MAX_SATIR
 _BILINEN_TURLER = frozenset({
     "paylasim.link", "paylasim.metin", "not.hizli", "medya.foto", "medya.video", "medya.konum",
     "indirilen.dosya", "uygulama.kullanim",
@@ -29,11 +30,15 @@ _BILINEN_TURLER = frozenset({
 
 
 class _Bozuk(Exception):
-    """Dosya eksik/bozuk; iletide yalnız neden, satır no ve alan adı (içerik YOK)."""
+    """Dosya eksik/bozuk; iletide yalnız neden, satır no ve alan adı (içerik YOK). `kod`: kararlı neden kodu."""
+
+    def __init__(self, ileti: str, kod: str = "bozuk"):
+        super().__init__(ileti)
+        self.kod = kod
 
 
 class _Desteklenmiyor(Exception):
-    pass
+    kod = "bicim_desteklenmiyor"
 
 
 @dataclass(slots=True)
@@ -53,83 +58,122 @@ class _Tarama:
     jsonl_disi: int = 0
 
 
-def _satirlar(entry: Entry) -> Iterator[tuple[int, bool, dict]]:
-    """(satır no, son_mu, nesne) üretir. Bozuk satırda _Bozuk."""
-    with entry.open() as f:
-        onceki: tuple[int, bytes] | None = None
-        n = 0
-        for ham in f:
-            n += 1
-            if len(ham) > _MAX_SATIR:
-                raise _Bozuk(f"{n}. satır aşırı uzun")
-            if onceki is not None:
-                yield _coz(onceki[0], onceki[1], False)
-            if not ham.strip():
-                raise _Bozuk(f"{n}. satır boş")
-            onceki = (n, ham)
+def _satirlar(f) -> Iterator[tuple[int, bool, dict]]:
+    """(satır no, son_mu, nesne) üretir. Bozuk satırda _Bozuk. Satır uzunluğu MAX_SATIR ile sınırlıdır
+    (aşırı uzun satır belleğe alınmadan reddedilir)."""
+    onceki: tuple[int, bytes] | None = None
+    n = 0
+    while True:
+        ham = f.readline(MAX_SATIR + 1)
+        if not ham:
+            break
+        n += 1
+        if len(ham) > MAX_SATIR:
+            raise _Bozuk(f"{n}. satır aşırı uzun", "satir_uzun")
         if onceki is not None:
-            yield _coz(onceki[0], onceki[1], True)
+            yield _coz(onceki[0], onceki[1], False)
+        if not ham.strip():
+            raise _Bozuk(f"{n}. satır boş", "bos_satir")
+        onceki = (n, ham)
+    if onceki is not None:
+        yield _coz(onceki[0], onceki[1], True)
 
 
 def _coz(n: int, ham: bytes, son: bool) -> tuple[int, bool, dict]:
     try:
         o = json.loads(ham.decode("utf-8"))
+    except (RecursionError, MemoryError):
+        raise _Bozuk(f"{n}. satır işlenemeyecek kadar derin/büyük JSON", "derin_json") from None
     except (ValueError, UnicodeDecodeError):
-        raise _Bozuk(f"{n}. satır yarım kalmış (kesik dosya)" if son else f"{n}. satır bozuk (geçerli JSON değil)") from None
+        if son:
+            raise _Bozuk(f"{n}. satır yarım kalmış (kesik dosya)", "satir_yarim") from None
+        raise _Bozuk(f"{n}. satır bozuk (geçerli JSON değil)", "satir_bozuk") from None
     if not isinstance(o, dict):
-        raise _Bozuk(f"{n}. satır bir JSON nesnesi değil")
+        raise _Bozuk(f"{n}. satır bir JSON nesnesi değil", "satir_bozuk")
     return n, son, o
 
 
 def _oku(entry: Entry) -> Iterator[tuple[str, int, dict]]:
+    with entry.open() as f:
+        yield from _oku_akis(f)
+
+
+def _oku_akis(f) -> Iterator[tuple[str, int, dict]]:
     """("baslik"|"kayit", satır no, nesne) üretir; kapanış doğrulanır, bozuklukta _Bozuk/_Desteklenmiyor."""
     baslik = None
     sayi = 0
     kapandi = False
-    for n, _son, o in _satirlar(entry):
+    for n, _son, o in _satirlar(f):
         if kapandi:
-            raise _Bozuk(f"{n}. satır: kapanış kaydından sonra satır var")
+            raise _Bozuk(f"{n}. satır: kapanış kaydından sonra satır var", "kapanis_sonrasi")
         if baslik is None:
             if o.get("baslik") is not True:
-                raise _Bozuk("ilk satır başlık kaydı değil")
+                raise _Bozuk("ilk satır başlık kaydı değil", "baslik_yok")
             b = o.get("bicim")
             if b != BICIM:
                 raise _Desteklenmiyor(f"biçim sürümü {b if isinstance(b, int) else '?'}: bu sürüm desteklenmiyor")
             for alan in ("cihaz_id", "dosya_id"):
                 if not isinstance(o.get(alan), str) or not o[alan]:
-                    raise _Bozuk(f"başlıkta `{alan}` yok")
+                    raise _Bozuk(f"başlıkta `{alan}` yok", "baslik_yok")
             baslik = o
             yield "baslik", n, o
             continue
         if o.get("kapanis") is True:
             k = o.get("kayit_sayisi")
             if not isinstance(k, int) or isinstance(k, bool) or k != sayi:
-                raise _Bozuk(f"kayıt sayısı tutmuyor (kapanışta {k if isinstance(k, int) else '?'}, dosyada {sayi})")
+                raise _Bozuk(f"kayıt sayısı tutmuyor (kapanışta {k if isinstance(k, int) else '?'}, dosyada {sayi})", "sayi_tutmuyor")
             kapandi = True
             continue
         _kayit_denetle(n, o)
         sayi += 1
         yield "kayit", n, o
     if baslik is None:
-        raise _Bozuk("dosya boş")
+        raise _Bozuk("dosya boş", "bos")
     if not kapandi:
-        raise _Bozuk("dosya eksik: kapanış kaydı yok")
+        raise _Bozuk("dosya eksik: kapanış kaydı yok", "kapanis_yok")
 
 
 def _kayit_denetle(n: int, o: dict) -> None:
     for alan in ("id", "tur", "kategori"):
         if not isinstance(o.get(alan), str) or not o[alan]:
-            raise _Bozuk(f"{n}. satır: `{alan}` yok ya da metin değil")
+            raise _Bozuk(f"{n}. satır: `{alan}` yok ya da metin değil", "alan_gecersiz")
     if o["kategori"] not in _KATEGORILER:
-        raise _Bozuk(f"{n}. satır: geçersiz kategori")
+        raise _Bozuk(f"{n}. satır: geçersiz kategori", "kategori_gecersiz")
     if iso_utc(o.get("ts")) is None:
-        raise _Bozuk(f"{n}. satır: `ts` okunamadı")
+        raise _Bozuk(f"{n}. satır: `ts` okunamadı", "ts_gecersiz")
     if not isinstance(o.get("metin", ""), str):
-        raise _Bozuk(f"{n}. satır: `metin` metin değil")
+        raise _Bozuk(f"{n}. satır: `metin` metin değil", "alan_gecersiz")
     if not isinstance(o.get("yuk", {}), dict):
-        raise _Bozuk(f"{n}. satır: `yuk` nesne değil")
+        raise _Bozuk(f"{n}. satır: `yuk` nesne değil", "alan_gecersiz")
     if o.get("onceki") is not None and not isinstance(o["onceki"], str):
-        raise _Bozuk(f"{n}. satır: `onceki` metin değil")
+        raise _Bozuk(f"{n}. satır: `onceki` metin değil", "alan_gecersiz")
+
+
+def dosya_dogrula(yol, cihaz_id: str | None = None, dosya_id: str | None = None) -> tuple[bool, int, str]:
+    """Giden kutusu dosyasını baştan sona doğrular (içe aktarıcının TÜM kuralları): başlık, `bicim` 1, kategori
+    kümesi, alan türleri, `ts`, satır uzunluğu, kapanış ve kayıt sayısı. Saf işlev: dosyaya yazmaz, Hub'a dokunmaz.
+
+    cihaz_id/dosya_id verilirse başlıktakilerin aynı olması da aranır (PC alıcısı yoldakini verir).
+    Dönüş: (ok, kayit_sayisi, neden_kodu); ok ise neden_kodu "". Kodlar: baslik_yok, bicim_desteklenmiyor,
+    kapanis_yok, sayi_tutmuyor, satir_yarim, satir_bozuk, satir_uzun, bos_satir, alan_gecersiz,
+    kategori_gecersiz, ts_gecersiz, kapanis_sonrasi, derin_json, bos, kimlik_uyusmuyor, okunamadi."""
+    kayit = 0
+    try:
+        with open(yol, "rb") as f:
+            for tur, _n, o in _oku_akis(f):
+                if tur == "baslik":
+                    if (cihaz_id is not None and o["cihaz_id"] != cihaz_id) or (
+                            dosya_id is not None and o["dosya_id"] != dosya_id):
+                        return False, 0, "kimlik_uyusmuyor"
+                else:
+                    kayit += 1
+    except (_Bozuk, _Desteklenmiyor) as x:
+        return False, 0, x.kod
+    except (RecursionError, MemoryError):
+        return False, 0, "derin_json"
+    except OSError:
+        return False, 0, "okunamadi"
+    return True, kayit, ""
 
 
 class AndroidGiden(ScanImporter):
