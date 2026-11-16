@@ -26,7 +26,7 @@ object HataRaporu {
         if (h == null) {
             appendLine("Son hata: yok")
         } else {
-            appendLine("Son hata: ${h.tur}: ${h.ileti}${if (h.cokme) " (uygulama çöktü)" else ""} [${h.zaman}]")
+            appendLine("Son hata: ${h.tur} [kod: ${h.kod}]${if (h.cokme) " (uygulama çöktü)" else ""} [${h.zaman}]")
         }
         appendLine("Giden kutusu: ${g.bekleyenKayit} kayıt, ${g.bekleyenDosya} dosya, ${g.bozukDosya} bozuk dosya")
         appendLine("Son ${g.gunlukSatirlari.size} günlük satırı:")

@@ -113,6 +113,11 @@ private fun turAdi(tur: String): String = when (tur) {
     "not.hizli" -> stringResource(R.string.tur_not)
     "paylasim.link" -> stringResource(R.string.tur_link)
     "paylasim.metin" -> stringResource(R.string.tur_metin)
+    "medya.foto" -> stringResource(R.string.tur_foto)
+    "medya.video" -> stringResource(R.string.tur_video)
+    "medya.konum" -> stringResource(R.string.tur_konum)
+    "indirilen.dosya" -> stringResource(R.string.tur_indirilen)
+    "uygulama.kullanim" -> stringResource(R.string.tur_kullanim)
     else -> stringResource(R.string.tur_diger)
 }
 
@@ -248,6 +253,8 @@ private fun AyarlarEkrani(depo: Depo, geri: () -> Unit, hakkinda: () -> Unit) {
             Text(stringResource(R.string.ayarlar_toplanan), style = MaterialTheme.typography.titleMedium)
             Text("• " + stringResource(R.string.veri_not))
             Text("• " + stringResource(R.string.veri_paylasim))
+            Spacer(Modifier.height(8.dp))
+            ToplayiciBolumu(depo)
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.ayarlar_hata_raporu_bilgi), color = MaterialTheme.colorScheme.secondary)
             OutlinedButton(

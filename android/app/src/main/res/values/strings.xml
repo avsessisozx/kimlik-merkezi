@@ -22,6 +22,33 @@
     <string name="tur_metin">Paylaşılan metin</string>
     <string name="tur_diger">Kayıt</string>
 
+    <string name="tur_foto">Fotoğraf</string>
+    <string name="tur_video">Video</string>
+    <string name="tur_konum">Fotoğraf konumu</string>
+    <string name="tur_indirilen">İndirilen dosya</string>
+    <string name="tur_kullanim">Uygulama kullanımı</string>
+
+    <string name="tp_baslik">İsteğe bağlı toplayıcılar</string>
+    <string name="tp_bilgi">Hepsi kapalı başlar. Bir tanesini açarsan yalnız altında yazanlar toplanır.</string>
+    <string name="tp_izin_verildi">İzin: verildi</string>
+    <string name="tp_izin_verilmedi">İzin: verilmedi</string>
+    <string name="tp_izin_reddedildi">İzin verilmedi, bu yüzden kapalı kaldı.</string>
+    <string name="tp_simdi_tara">Şimdi tara</string>
+    <string name="tp_tarama_durumu">Tarama: %1$s</string>
+
+    <string name="tp_medya_baslik">Fotoğraf ve video bilgisi</string>
+    <string name="tp_medya_aciklama">Toplanır: dosya adı, boyut, tür, ölçü, video süresi, çekim zamanı. Toplanmaz: fotoğrafın ve videonun kendisi.</string>
+    <string name="tp_medya_kismi">Android\'e yalnız seçtiğin fotoğraf ve videolara erişim verdin; yalnız onlar görünür.</string>
+    <string name="tp_konum_baslik">Fotoğraf konumlarını da al</string>
+    <string name="tp_konum_aciklama">Toplanır: fotoğrafın çekildiği yerin enlem ve boylamı, ayrı bir kayıt olarak. Toplanmaz: fotoğrafın kendisi.</string>
+    <string name="tp_indirilen_baslik">İndirilenler klasörü</string>
+    <string name="tp_indirilen_aciklama">Toplanır: seçtiğin klasördeki dosyaların adı, boyutu ve türü. Toplanmaz: dosyaların içi.</string>
+    <string name="tp_indirilen_ipucu">Açılan ekranda bir klasör seç. Android bazı sürümlerde İndirilenler\'in kendisini seçtirmez; içindeki bir klasörü seç.</string>
+    <string name="tp_kullanim_baslik">Uygulama kullanım süreleri</string>
+    <string name="tp_kullanim_aciklama">Toplanır: her uygulamanın bir günde ne kadar açık kaldığı (yalnız bitmiş günler). Toplanmaz: uygulamaların içinde ne yaptığın.</string>
+    <string name="tp_kullanim_yonlendirme">Açılan ekranda Kimlik Merkezi\'ni bulup izni aç, sonra geri dön.</string>
+    <string name="tp_ekran_acilamadi">Bu ayar ekranı bu cihazda açılamadı.</string>
+
     <string name="paylasim_kaydedildi">Kimlik Merkezi\'ne kaydedildi</string>
     <string name="paylasim_bos">Paylaşılacak metin yok</string>
     <string name="paylasim_hata">Kaydedilemedi</string>

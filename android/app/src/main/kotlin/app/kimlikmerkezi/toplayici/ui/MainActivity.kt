@@ -13,6 +13,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val depo = applicationContext.depo
+        if (savedInstanceState == null && depo.yonetici.ayarlar.herhangiAcik()) depo.tara()
         setContent {
             KimlikTemasi(depo.tema) { Uygulama(depo) }
         }

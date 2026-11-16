@@ -1,5 +1,6 @@
 package app.kimlikmerkezi.toplayici.giden
 
+import app.kimlikmerkezi.toplayici.gunluk.SabitIletili
 import java.security.GeneralSecurityException
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
@@ -15,7 +16,7 @@ interface Sifreleyici {
 }
 
 /** İletisi içerik taşımaz. */
-class BozukCerceveException(ileti: String) : Exception(ileti)
+class BozukCerceveException(ileti: String) : Exception(ileti), SabitIletili
 
 /** AES-256-GCM. [anahtar] Keystore'daki ya da (testte) bellekteki anahtar olabilir; nonce'u sağlayıcı üretir. */
 class AesGcmSifreleyici(private val anahtar: SecretKey) : Sifreleyici {

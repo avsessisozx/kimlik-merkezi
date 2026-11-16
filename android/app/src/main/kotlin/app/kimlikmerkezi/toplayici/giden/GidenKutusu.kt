@@ -1,6 +1,7 @@
 package app.kimlikmerkezi.toplayici.giden
 
 import app.kimlikmerkezi.toplayici.gunluk.Gunluk
+import app.kimlikmerkezi.toplayici.gunluk.SabitIletili
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -44,7 +45,7 @@ data class Kayit(
 data class DosyaBilgisi(val dosyaId: String, val kayitSayisi: Int, val boyutBayt: Long, val acilis: String)
 
 /** İletisi içerik taşımaz. */
-class GidenKutusuHatasi(ileti: String, neden: Throwable? = null) : Exception(ileti, neden)
+class GidenKutusuHatasi(ileti: String, neden: Throwable? = null) : Exception(ileti, neden), SabitIletili
 
 /**
  * Şifreli giden kutusu. Biçim: docs/AKTARIM.md §1; disk çerçevesi: android/BICIM.md.

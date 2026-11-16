@@ -12,6 +12,8 @@ import app.kimlikmerkezi.toplayici.giden.GidenKutusu
 import app.kimlikmerkezi.toplayici.giden.KeystoreAnahtar
 import app.kimlikmerkezi.toplayici.gunluk.Gunluk
 import app.kimlikmerkezi.toplayici.gunluk.HataRaporu
+import app.kimlikmerkezi.toplayici.topla.TercihDepolama
+import app.kimlikmerkezi.toplayici.topla.ToplayiciYonetici
 import java.io.File
 import java.util.UUID
 
@@ -45,6 +47,32 @@ class Depo(ctx: Context) {
     /** "sistem" | "koyu" | "acik" */
     var tema by mutableStateOf(tercihler.getString("tema", "sistem") ?: "sistem")
         private set
+
+    val depolama = TercihDepolama(tercihler)
+    val yonetici = ToplayiciYonetici(ctx, kutu, gunluk, depolama)
+
+    /** Ayarlar ekranını yenilemek için (izin sonuçları, anahtarlar). */
+    var ayarSayaci by mutableIntStateOf(0)
+        private set
+
+    /** Son tarama sonucu metni; boşsa gösterilmez. */
+    var taramaDurumu by mutableStateOf("")
+        private set
+
+    fun ayarDegisti() { ayarSayaci++ }
+
+    /** Açık toplayıcıları arka planda çalıştırır. Aynı anda tek tarama. */
+    fun tara() {
+        taramaDurumu = "taranıyor"
+        Thread {
+            val n = try { yonetici.tara() } catch (e: Exception) { gunluk.hata("tara", e); -1 }
+            taramaDurumu = when {
+                n == null -> "taranıyor"
+                n < 0 -> "tarama başarısız"
+                else -> "$n yeni kayıt"
+            }
+        }.start()
+    }
 
     init {
         kutu.dinleyici = { degisim++ }

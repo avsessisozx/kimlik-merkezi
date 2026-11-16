@@ -31,7 +31,7 @@ class GunlukVeRaporTest {
         assertEquals("hızlı not", g2.sonAdim())
         val h = g2.sonHata()!!
         assertEquals("java.lang.IllegalStateException", h.tur)
-        assertEquals("bozuk satir", h.ileti)
+        assertEquals("-", h.kod)
         assertTrue(h.cokme)
     }
 
@@ -57,6 +57,26 @@ class GunlukVeRaporTest {
         assertTrue(r.contains("Uretici Model"))
         assertTrue(r.contains("2 kayıt, 1 dosya"))
         assertNotNull(ku.gunluk.sonHata())
+    }
+
+    @Test
+    fun hataIletisiRaporaGirmez() {
+        val d = TestYardim.gecici()
+        val g = Gunluk(d)
+        g.hata("x", IllegalStateException("ICERIK-SIZINTISI-77"))
+        g.hata("y", RuntimeException("ICERIK-SIZINTISI-78"), cokme = true)
+        val sabit = app.kimlikmerkezi.toplayici.giden.GidenKutusuHatasi("yazilamadi")
+        g.hata("z", sabit)
+        for (gunluk in listOf(g, Gunluk(d))) {
+            val r = HataRaporu.olustur(
+                HataRaporu.Girdi("0.2.0", "12", 31, "U", "M", null, gunluk.sonHata(), gunluk.sonSatirlar(50), 0, 0),
+            )
+            assertFalse(r.contains("ICERIK-SIZINTISI"))
+            assertTrue(r.contains("GidenKutusuHatasi [kod: yazilamadi]"))
+        }
+        assertFalse(java.io.File(d, "gunluk.txt").readText().contains("ICERIK-SIZINTISI"))
+        assertFalse(java.io.File(d, "son_hata.txt").readText().contains("ICERIK-SIZINTISI"))
+        assertTrue(g.sonSatirlar(50).any { it.contains("java.lang.IllegalStateException -") })
     }
 
     @Test

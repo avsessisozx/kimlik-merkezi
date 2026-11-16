@@ -5,11 +5,15 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 /** Son hatanın özeti. [cokme]: yakalanmamış hata ile süreç öldü. */
-data class SonHata(val tur: String, val ileti: String, val zaman: String, val cokme: Boolean)
+/** Yalnız bizim attığımız, iletisi sabit kod olan istisnalar bunu uygular; iletileri günlüğe girebilir. */
+interface SabitIletili
+
+/** Son hatanın özeti: istisna SINIF adı + sabit kod (yoksa "-"). Serbest ileti metni tutulmaz. */
+data class SonHata(val tur: String, val kod: String, val zaman: String, val cokme: Boolean)
 
 /**
  * Uygulama içi günlük: halka tampon (bellek) + küçük dosya. KAYIT İÇERİĞİ YAZILMAZ:
- * çağıranlar yalnız sabit ifade ve sayı verir. Hata iletileri kısaltılır, satır sonu temizlenir.
+ * çağıranlar yalnız sabit ifade ve sayı verir. Hata iletisi yazılmaz (yalnız sınıf adı ve sabit kod).
  */
 class Gunluk(
     private val dizin: File?,
@@ -40,8 +44,9 @@ class Gunluk(
 
     fun hata(etiket: String, t: Throwable, cokme: Boolean = false) {
         val tur = t.javaClass.name
-        val ileti = temizle(t.message ?: "")
-        yaz(if (cokme) "COKME" else "HATA", etiket, "$tur $ileti".trim())
+        // Serbest ileti içerik taşıyabilir: yalnız bizim sabit kodlu istisnalarımızın iletisi yazılır.
+        val ileti = if (t is SabitIletili) temizle(t.message ?: "-") else "-"
+        yaz(if (cokme) "COKME" else "HATA", etiket, "$tur $ileti")
         val z = zaman()
         hataDosyasi?.let { f ->
             runCatching { f.writeText("$tur\n$ileti\n$z\n${if (cokme) "cokme" else "hata"}\n", Charsets.UTF_8) }
