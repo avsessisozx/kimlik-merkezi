@@ -4,7 +4,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
@@ -109,31 +108,6 @@ class IndirilenSafTest {
             ctx.contentResolver.releasePersistableUriPermission(agac, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } finally {
             ekler.forEach { runCatching { ctx.contentResolver.delete(it, null, null) } }
-        }
-    }
-}
-
-/** Seçenek 2 deneyi: MANAGE_EXTERNAL_STORAGE. İzin değişimi süreci öldürebilir; ayrı koşulur. */
-@Deney
-@RunWith(AndroidJUnit4::class)
-class IndirilenTumDosyalarDeneyi {
-    private val inst get() = InstrumentationRegistry.getInstrumentation()
-    private val ctx: Context get() = inst.targetContext
-
-    @Test
-    fun tumDosyalarErisimiVerilinceIndirilenlerListelenir() {
-        val ui = inst.uiAutomation
-        fun kabuk(c: String) = ui.executeShellCommand(c).use { f -> android.os.ParcelFileDescriptor.AutoCloseInputStream(f).readBytes() }
-        val ek = ctx.indirilenDosyaEkle("KMTum", "tum-a.txt")
-        try {
-            kabuk("appops set ${ctx.packageName} MANAGE_EXTERNAL_STORAGE allow")
-            assertTrue("isExternalStorageManager false", Environment.isExternalStorageManager())
-            val klasor = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "KMTum")
-            val ad = klasor.listFiles()?.map { it.name }.orEmpty()
-            assertTrue("liste: $ad", "tum-a.txt" in ad)
-        } finally {
-            kabuk("appops set ${ctx.packageName} MANAGE_EXTERNAL_STORAGE default")
-            ctx.contentResolver.delete(ek, null, null)
         }
     }
 }

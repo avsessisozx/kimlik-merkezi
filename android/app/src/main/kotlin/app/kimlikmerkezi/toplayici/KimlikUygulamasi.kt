@@ -20,6 +20,7 @@ import app.kimlikmerkezi.toplayici.aktarim.EslesmeDeposu
 import app.kimlikmerkezi.toplayici.aktarim.Eslestirici
 import app.kimlikmerkezi.toplayici.aktarim.Gonderici
 import app.kimlikmerkezi.toplayici.aktarim.HttpsBaglanti
+import app.kimlikmerkezi.toplayici.arkaplan.ArkaPlan
 import app.kimlikmerkezi.toplayici.giden.AesGcmSifreleyici
 import java.io.File
 import java.util.UUID
@@ -59,6 +60,10 @@ class Depo(ctx: Context) {
     val yonetici = ToplayiciYonetici(ctx, kutu, gunluk, depolama)
 
     val eslesme = EslesmeDeposu(depolama, AesGcmSifreleyici(KeystoreAnahtar.al("km_eslesme_v1")))
+
+    init {
+        eslesme.kaldirinca = { ArkaPlan.planla(ctx.applicationContext, false) }
+    }
 
     val gonderici = Gonderici(
         kutu, eslesme, depolama, gunluk,
@@ -131,6 +136,7 @@ class Depo(ctx: Context) {
             yerelAdres = eslesme.adresler().any { AdresSuzgeci.yerelMi(it) },
             sonGonderimKodu = gonderici.sonKod(),
             reddedilenDosya = gonderici.reddedilenSayisi(),
+            sonBasariMs = gonderici.sonBasariMs(),
         ),
     )
 }

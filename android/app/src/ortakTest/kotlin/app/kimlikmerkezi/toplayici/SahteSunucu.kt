@@ -49,6 +49,9 @@ class SahteSunucu(val mantik: PcMantik = PcMantik()) : AutoCloseable {
     }
     val port: Int get() = sunucu.localPort
     @Volatile private var kapali = false
+    /** Sonraki bu kadar PUT'a, gövdeyi HİÇ OKUMADAN [govdeOkumadanKod] yanıtı yazıp bağlantıyı kapat (PC `Connection: close` benzetimi). */
+    val govdeOkumadanKapat = java.util.concurrent.atomic.AtomicInteger(0)
+    @Volatile var govdeOkumadanKod = 507
 
     init {
         Thread {
@@ -75,6 +78,13 @@ class SahteSunucu(val mantik: PcMantik = PcMantik()) : AutoCloseable {
         val satirlar = String(baslikBayt.toByteArray(), Charsets.ISO_8859_1).split("\r\n").filter { it.isNotEmpty() }
         val (metot, yol) = satirlar[0].split(" ")
         val basliklar = satirlar.drop(1).associate { it.substringBefore(":").trim().lowercase() to it.substringAfter(":").trim() }
+        if (metot == "PUT" && govdeOkumadanKapat.get() > 0) {
+            govdeOkumadanKapat.decrementAndGet()
+            mantik.istekSayisi.incrementAndGet()
+            val h = "HTTP/1.1 $govdeOkumadanKod X\r\nConnection: close\r\nContent-Length: 0\r\nX-Alinan: 0\r\n\r\n"
+            s.getOutputStream().apply { write(h.toByteArray(Charsets.ISO_8859_1)); flush() }
+            return // gövde okunmadan kapanır
+        }
         val uzun = basliklar["content-length"]?.toInt() ?: 0
         val govde = ByteArray(uzun)
         var okunan = 0

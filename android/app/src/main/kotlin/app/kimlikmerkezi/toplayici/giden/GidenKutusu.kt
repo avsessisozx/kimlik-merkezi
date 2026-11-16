@@ -3,6 +3,8 @@ package app.kimlikmerkezi.toplayici.giden
 import app.kimlikmerkezi.toplayici.gunluk.Gunluk
 import app.kimlikmerkezi.toplayici.gunluk.SabitIletili
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -41,6 +43,9 @@ data class Kayit(
     val yuk: JsonObject,
     val onceki: String?,
 )
+
+/** Toplu ekleme girdisi. */
+class YeniKayit(val tur: String, val kategori: String, val metin: String, val yuk: JsonObject = JsonObject(emptyMap()), val onceki: String? = null)
 
 data class DosyaBilgisi(val dosyaId: String, val kayitSayisi: Int, val boyutBayt: Long, val acilis: String)
 
@@ -104,34 +109,77 @@ class GidenKutusu(
         metin: String,
         yuk: JsonObject = JsonObject(emptyMap()),
         onceki: String? = null,
-    ): String {
-        require(KATEGORI[tur] == kategori) { "bilinmeyen tur ya da kategori uyusmuyor" }
-        require(onceki == null || UUID_RE.matches(onceki)) { "onceki gecerli bir kimlik degil" }
-        val id: String
+    ): String = kayitlariEkle(listOf(YeniKayit(tur, kategori, metin, yuk, onceki))).single()
+
+    /**
+     * Toplu ekleme: dosya başına ve grup başına TEK fsync. Dönen kimlikler girdiyle aynı sırada.
+     * `metin` 64 KiB'a, `yuk` içindeki metin alanları 2 KiB'a kısaltılır; satır her durumda <= 1 MiB (aksi halde
+     * kayıt reddedilir: [GidenKutusuHatasi] `kayit_cok_buyuk`). Eşik kapatması hata verirse kayıt yine eklenmiş sayılır.
+     */
+    fun kayitlariEkle(liste: List<YeniKayit>): List<String> {
+        for (k in liste) {
+            require(KATEGORI[k.tur] == k.kategori) { "bilinmeyen tur ya da kategori uyusmuyor" }
+            require(k.onceki == null || UUID_RE.matches(k.onceki)) { "onceki gecerli bir kimlik degil" }
+        }
+        val idler = ArrayList<String>(liste.size)
         kilit.withLock {
-            val simdi = saat()
-            acik?.let { if (gun(it.acilis) != gun(simdi)) kapat(it) }
-            val d = acik ?: yeniDosya(simdi)
-            id = UUID.randomUUID().toString()
-            val ts = ISO.format(simdi)
-            val satir = guvenliSatir(
-                buildJsonObject {
-                    put("id", id)
-                    put("ts", ts)
-                    put("tur", tur)
-                    put("kategori", kategori)
-                    put("metin", metin)
-                    put("yuk", yuk)
-                    put("onceki", if (onceki == null) JsonNull else JsonPrimitive(onceki))
-                }.toString(),
-            )
-            ekle(d, satir)
-            d.kayitSayisi++
-            d.ozetler.add(KayitOzeti(id, ts, tur, ozet(metin), onceki))
-            if (d.kayitSayisi >= kapatmaEsigi) kapat(d)
+            var i = 0
+            while (i < liste.size) {
+                val simdi = saat()
+                acik?.let { if (it.kayitSayisi >= kapatmaEsigi || gun(it.acilis) != gun(simdi)) kapatDene(it) }
+                val d = acik ?: yeniDosya(simdi)
+                val kapasite = maxOf(1, kapatmaEsigi - d.kayitSayisi)
+                val parti = liste.subList(i, minOf(liste.size, i + kapasite))
+                val hazir = parti.map { hazirla(it, simdi) }
+                ekle(d, hazir.map { it.satir })
+                d.kayitSayisi += hazir.size
+                hazir.forEach { d.ozetler.add(KayitOzeti(it.id, it.ts, it.tur, ozet(it.metin), it.onceki)) }
+                hazir.forEach { idler.add(it.id) }
+                i += parti.size
+                if (d.kayitSayisi >= kapatmaEsigi) kapatDene(d)
+            }
         }
         dinleyici?.invoke()
-        return id
+        return idler
+    }
+
+    private class Hazir(val id: String, val ts: String, val tur: String, val metin: String, val onceki: String?, val satir: String)
+
+    private fun satirYap(id: String, ts: String, k: YeniKayit, metin: String, yuk: JsonObject) = guvenliSatir(
+        buildJsonObject {
+            put("id", id)
+            put("ts", ts)
+            put("tur", k.tur)
+            put("kategori", k.kategori)
+            put("metin", metin)
+            put("yuk", yuk)
+            put("onceki", if (k.onceki == null) JsonNull else JsonPrimitive(k.onceki))
+        }.toString(),
+    )
+
+    private fun hazirla(k: YeniKayit, simdi: Instant): Hazir {
+        val id = UUID.randomUUID().toString()
+        val ts = ISO.format(simdi)
+        var metin = kisalt(k.metin, METIN_UST).first
+        var satir = satirYap(id, ts, k, metin, kisaltYuk(k.yuk, ALAN_UST) as JsonObject)
+        if (satir.toByteArray(Charsets.UTF_8).size + 1 > SATIR_UST) {
+            metin = kisalt(metin, 16 * 1024).first
+            satir = satirYap(id, ts, k, metin, kisaltYuk(k.yuk, 256) as JsonObject)
+            if (satir.toByteArray(Charsets.UTF_8).size + 1 > SATIR_UST) {
+                gunluk.bilgi("giden", "kayit reddedildi: kayit_cok_buyuk")
+                throw GidenKutusuHatasi("kayit_cok_buyuk")
+            }
+        }
+        return Hazir(id, ts, k.tur, metin, k.onceki, satir)
+    }
+
+    /** Kapatma hatası kaydı etkilemez: günlüğe kod yazılır, sonraki eklemede yeniden denenir. */
+    private fun kapatDene(d: Dosya) {
+        try {
+            kapat(d)
+        } catch (e: GidenKutusuHatasi) {
+            gunluk.bilgi("giden", "kapatma ertelendi: ${e.message}")
+        }
     }
 
     /** Açık dosyayı kapatır; kapatılan dosyanın kimliğini, açık dosya yoksa null döner. */
@@ -214,7 +262,7 @@ class GidenKutusu(
         )
         val d = Dosya(id, dosyaYolu(id), milisaniyeye(simdi), 0, false, 0, 0, ArrayList())
         try {
-            ekle(d, baslik)
+            ekle(d, listOf(baslik))
         } catch (e: GidenKutusuHatasi) {
             d.dosya.delete()
             throw e
@@ -226,18 +274,19 @@ class GidenKutusu(
 
     private fun milisaniyeye(t: Instant): Instant = Instant.ofEpochMilli(t.toEpochMilli())
 
-    /** Tek çerçeve ekler; hata olursa dosyayı bilinen son iyi boyuta geri keser. */
-    private fun ekle(d: Dosya, satir: String) {
-        val cerceve = Cerceve.yaz(sifreleyici, d.id, d.sira, (satir + "\n").toByteArray(Charsets.UTF_8))
+    /** Çerçeveleri tek yazım + tek fsync ile ekler; hata olursa dosyayı bilinen son iyi boyuta geri keser. */
+    private fun ekle(d: Dosya, satirlar: List<String>) {
         try {
+            val cerceveler = satirlar.mapIndexed { n, s -> Cerceve.yaz(sifreleyici, d.id, d.sira + n, (s + "\n").toByteArray(Charsets.UTF_8)) }
+            val toplam = cerceveler.sumOf { it.size }
             FileOutputStream(d.dosya, true).use { o ->
-                o.write(cerceve)
+                cerceveler.forEach { o.write(it) }
                 o.flush()
                 if (zorlaYaz) o.fd.sync()
             }
-            d.bayt += cerceve.size
-            d.sira++
-        } catch (e: IOException) {
+            d.bayt += toplam
+            d.sira += cerceveler.size
+        } catch (e: Exception) {
             runCatching { RandomAccessFile(d.dosya, "rw").use { it.setLength(d.bayt.toLong()) } }
             gunluk.hata("giden", e)
             throw GidenKutusuHatasi("yazilamadi", e)
@@ -250,7 +299,7 @@ class GidenKutusu(
             d.dosya.delete()
             dosyalar.remove(d.id)
         } else {
-            ekle(d, guvenliSatir(buildJsonObject { put("kapanis", true); put("kayit_sayisi", d.kayitSayisi) }.toString()))
+            ekle(d, listOf(guvenliSatir(buildJsonObject { put("kapanis", true); put("kayit_sayisi", d.kayitSayisi) }.toString())))
             d.kapali = true
         }
         if (acik === d) acik = null
@@ -328,6 +377,28 @@ class GidenKutusu(
 
     companion object {
         const val KAPATMA_ESIGI = 1000
+        /** `metin` en çok 64 KiB (UTF-8), `yuk` içindeki her metin alanı en çok 2 KiB, serileştirilmiş satır en çok 1 MiB. */
+        const val METIN_UST = 64 * 1024
+        const val ALAN_UST = 2 * 1024
+        const val SATIR_UST = 1024 * 1024
+        const val KISALTMA_EKI = "… [kısaltıldı]"
+
+        /** UTF-8 bayt sınırına göre, kod noktası sınırında keser. (sonuç, kısaltıldı mı) */
+        fun kisalt(metin: String, azamiBayt: Int): Pair<String, Boolean> {
+            val b = metin.toByteArray(Charsets.UTF_8)
+            if (b.size <= azamiBayt) return metin to false
+            val ek = KISALTMA_EKI.toByteArray(Charsets.UTF_8).size
+            var son = maxOf(0, azamiBayt - ek)
+            while (son > 0 && (b[son].toInt() and 0xC0) == 0x80) son--
+            return String(b, 0, son, Charsets.UTF_8) + KISALTMA_EKI to true
+        }
+
+        private fun kisaltYuk(e: JsonElement, sinir: Int): JsonElement = when (e) {
+            is JsonObject -> JsonObject(e.mapValues { kisaltYuk(it.value, sinir) })
+            is JsonArray -> JsonArray(e.map { kisaltYuk(it, sinir) })
+            is JsonPrimitive -> if (e.isString) JsonPrimitive(kisalt(e.content, sinir).first) else e
+        }
+
         const val UZANTI = ".jsonl.kmx"
 
         /** AKTARIM §1 tür → kategori tablosu. */

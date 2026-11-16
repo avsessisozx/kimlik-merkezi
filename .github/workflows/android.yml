@@ -6,6 +6,11 @@ on:
       - "android/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
+    inputs:
+      imzali:
+        description: "İmzalı sürüm APK'sı üret (secrets gerekir)"
+        type: boolean
+        default: false
 
 concurrency:
   group: android-${{ github.ref }}
@@ -78,12 +83,94 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           working-directory: android
-          script: |
-            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=app.kimlikmerkezi.toplayici.Deney --console=plain
-            (./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.annotation=app.kimlikmerkezi.toplayici.Deney --console=plain && echo "DENEY-SONUC MANAGE_EXTERNAL_STORAGE: YESIL") || echo "DENEY-SONUC MANAGE_EXTERNAL_STORAGE: KIRMIZI"
+          script: ./gradlew connectedDebugAndroidTest --console=plain
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emulator-rapor
           path: android/app/build/reports/androidTests
           if-no-files-found: ignore
+
+  # YALNIZ elle ve `imzali: true` ile çalışır. Secrets yoksa KIRMIZI olur; debug anahtarına düşmez.
+  surum-apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.imzali
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      apk: ${{ steps.paket.outputs.apk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Secrets denetimi
+        env:
+          KM_KEYSTORE_B64: ${{ secrets.KM_KEYSTORE_B64 }}
+          KM_KEYSTORE_PAROLA: ${{ secrets.KM_KEYSTORE_PAROLA }}
+          KM_ANAHTAR_AD: ${{ secrets.KM_ANAHTAR_AD }}
+          KM_ANAHTAR_PAROLA: ${{ secrets.KM_ANAHTAR_PAROLA }}
+        run: |
+          eksik=""
+          for d in KM_KEYSTORE_B64 KM_KEYSTORE_PAROLA KM_ANAHTAR_AD KM_ANAHTAR_PAROLA; do
+            eval "v=\${$d}"
+            [ -n "$v" ] || eksik="$eksik $d"
+          done
+          if [ -n "$eksik" ]; then
+            echo "::error::Imza secret'lari tanimli degil:$eksik. Imzali APK uretilmedi; debug anahtarina DUSULMEZ."
+            exit 1
+          fi
+          echo "$KM_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/km-surum.jks"
+          echo "KM_KEYSTORE_DOSYA=$RUNNER_TEMP/km-surum.jks" >> "$GITHUB_ENV"
+      - name: Release derle ve lint (imzali)
+        working-directory: android
+        env:
+          KM_KEYSTORE_PAROLA: ${{ secrets.KM_KEYSTORE_PAROLA }}
+          KM_ANAHTAR_AD: ${{ secrets.KM_ANAHTAR_AD }}
+          KM_ANAHTAR_PAROLA: ${{ secrets.KM_ANAHTAR_PAROLA }}
+        run: ./gradlew assembleRelease lintVitalRelease --console=plain
+      - name: Imzayi dogrula, adlandir
+        id: paket
+        working-directory: android
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::Imzali APK uretilmedi (app-release.apk yok)"; ls app/build/outputs/apk/release; exit 1; }
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee "$RUNNER_TEMP/sertifika.txt"
+          grep -q "SHA-256 digest" "$RUNNER_TEMP/sertifika.txt" || { echo "::error::apksigner dogrulamasi basarisiz"; exit 1; }
+          echo "Sertifika SHA-256: $(grep 'SHA-256 digest' "$RUNNER_TEMP/sertifika.txt" | head -1)"
+          SURUM=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
+          mkdir -p cikti
+          cp "$APK" "cikti/KimlikMerkezi-v$SURUM.apk"
+          echo "apk=KimlikMerkezi-v$SURUM.apk" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: surum-apk
+          path: android/cikti/*.apk
+          if-no-files-found: error
+
+  # Üretilen imzalı APK'yı emülatöre kurar, BAŞLATIR ve ana ekranın açıldığını doğrular.
+  surum-dogrula:
+    needs: surum-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: surum-apk
+          path: apk
+      - name: KVM etkinleştir
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Emülatörde kur, başlat, doğrula
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: sh android/ci/surum_dogrula.sh apk/${{ needs.surum-apk.outputs.apk }}

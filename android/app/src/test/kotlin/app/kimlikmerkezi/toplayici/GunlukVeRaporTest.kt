@@ -87,4 +87,13 @@ class GunlukVeRaporTest {
         assertEquals(50, r.lines().count { it.contains(" BILGI t s") })
         assertTrue(r.contains("Son hata: yok"))
     }
+
+    @Test
+    fun raporDogrulamaDurumuSatiriVar() {
+        val r = HataRaporu.olustur(
+            HataRaporu.Girdi("0.2.0", "12", 31, "U", "M", null, null, emptyList(), 5, 2, bozukDosya = 1, eslesme = true, sonBasariMs = 1_700_000_000_000),
+        )
+        assertTrue(r.contains("Doğrulama durumu: giden kutusu 2 dosya, 1 bozuk; son başarılı gönderim: 2023-11-14T22:13:20Z; eşleşme: var"))
+        assertTrue(HataRaporu.olustur(HataRaporu.Girdi("0.2.0", "12", 31, "U", "M", null, null, emptyList(), 0, 0)).contains("son başarılı gönderim: yok"))
+    }
 }

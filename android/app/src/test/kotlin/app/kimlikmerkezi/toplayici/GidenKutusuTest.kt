@@ -257,4 +257,97 @@ class GidenKutusuTest {
         val k = TestYardim.Kurulum().ac()
         assertFailsWith<IllegalArgumentException> { k.not("x", onceki = "../../etc") }
     }
+
+    // ---- A: kayıt boyutu ----
+    @Test
+    fun birMiBKontrolKarakterliPaylasimKisaltilirSatirSinirliDosyaGecerli() {
+        val ku = TestYardim.Kurulum()
+        val k = ku.ac()
+        k.not("onceki gecerli not")
+        val kotu = "\u0001".repeat(1024 * 1024) // JSON'da 6 kat şişer
+        k.kayitEkle("paylasim.metin", "notlar", kotu, buildJsonObject { put("kaynak_uygulama", "k".repeat(10_000)) })
+        k.not("sonraki gecerli not")
+        val id = k.acikDosyayiKapat()!!
+        val icerik = k.oku(id)
+        val kayitlar = TestYardim.bicimiDogrula(icerik)
+        assertEquals(3, kayitlar.size)
+        assertTrue(icerik.lines().all { it.toByteArray().size <= GidenKutusu.SATIR_UST })
+        val m = kayitlar[1]["metin"]!!.jsonPrimitive.content
+        assertTrue(m.endsWith(GidenKutusu.KISALTMA_EKI))
+        assertTrue(m.toByteArray().size <= GidenKutusu.METIN_UST)
+        val kaynak = ((kayitlar[1]["yuk"]) as JsonObject)["kaynak_uygulama"]!!.jsonPrimitive.content
+        assertTrue(kaynak.toByteArray().size <= GidenKutusu.ALAN_UST && kaynak.endsWith(GidenKutusu.KISALTMA_EKI))
+        assertEquals("sonraki gecerli not", kayitlar[2]["metin"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun kisaltKodNoktasiSinirindaKesilirKisaMetinDegismez() {
+        val emoji = "\uD83D\uDE00" // 4 bayt
+        val (k, kisaldi) = GidenKutusu.kisalt(emoji.repeat(30_000), GidenKutusu.METIN_UST)
+        assertTrue(kisaldi)
+        assertTrue(k.toByteArray().size <= GidenKutusu.METIN_UST)
+        assertFalse(k.contains('\uFFFD'))
+        assertTrue(k.removeSuffix(GidenKutusu.KISALTMA_EKI).all { true } && k.endsWith(GidenKutusu.KISALTMA_EKI))
+        assertEquals("kısa" to false, GidenKutusu.kisalt("kısa", 100))
+        val (t, _) = GidenKutusu.kisalt("é".repeat(100), 51) // 2 baytlık harfler: sınır ortasında kesilmez
+        assertFalse(t.contains('\uFFFD'))
+    }
+
+    @Test
+    fun asiriYukReddedilirGunlugeKodYazilirDosyaBozulmaz() {
+        val ku = TestYardim.Kurulum()
+        val k = ku.ac()
+        k.not("once")
+        val dev = buildJsonObject { repeat(3000) { put("a$it", "\u0001".repeat(2000)) } }
+        val e = assertFailsWith<GidenKutusuHatasi> { k.kayitEkle("paylasim.metin", "notlar", "x", dev) }
+        assertEquals("kayit_cok_buyuk", e.message)
+        assertTrue(ku.gunluk.sonSatirlar(20).any { it.contains("kayit_cok_buyuk") })
+        k.not("sonra")
+        TestYardim.bicimiDogrula(k.oku(k.acikDosyayiKapat()!!)).let { assertEquals(2, it.size) }
+    }
+
+    // ---- I: eşik kapatma hatası çağırana yansımaz ----
+    class SaskinSifreleyici(val ic: app.kimlikmerkezi.toplayici.giden.Sifreleyici, var basarisizCagri: Int) : app.kimlikmerkezi.toplayici.giden.Sifreleyici {
+        var n = 0
+        override fun sifrele(duz: ByteArray, aad: ByteArray): ByteArray {
+            if (++n == basarisizCagri) throw IllegalStateException("ICERIK-SIZINTISI")
+            return ic.sifrele(duz, aad)
+        }
+        override fun coz(paket: ByteArray, aad: ByteArray) = ic.coz(paket, aad)
+    }
+
+    @Test
+    fun esikKapatmaHatasiKaydiEtkilemezSonrakiEklemedeYenidenDenenir() {
+        val ku = TestYardim.Kurulum(esik = 2)
+        // çağrılar: 1 başlık, 2 kayıt-1, 3 kayıt-2, 4 kapanış (BAŞARISIZ)
+        val s = SaskinSifreleyici(app.kimlikmerkezi.toplayici.giden.AesGcmSifreleyici(TestYardim.ANAHTAR), 4)
+        val k = GidenKutusu(File(ku.dizin, "giden"), s, TestYardim.CIHAZ, ku.gunluk, saat = ku.saat::simdi, bolge = { java.time.ZoneId.of("UTC") }, kapatmaEsigi = 2)
+        k.not("bir")
+        k.not("iki") // kapanış yazımı patlar ama ÇAĞIRANA hata fırlamaz
+        assertEquals(2, k.bekleyenKayitSayisi())
+        assertEquals(0, k.kapatilmisDosyalar().size)
+        assertTrue(ku.gunluk.sonSatirlar(20).any { it.contains("kapatma ertelendi") })
+        assertFalse(ku.gunluk.sonSatirlar(20).joinToString().contains("SIZINTI"))
+        k.not("uc") // önce kapatmayı yeniden dener (başarılı), kayıt yeni dosyaya gider
+        assertEquals(1, k.kapatilmisDosyalar().size)
+        assertEquals(2, k.kapatilmisDosyalar()[0].kayitSayisi)
+        assertEquals(3, k.bekleyenKayitSayisi())
+        TestYardim.bicimiDogrula(k.oku(k.kapatilmisDosyalar()[0].dosyaId))
+    }
+
+    // ---- J: toplu ekleme ----
+    @Test
+    fun topluEklemeSiraliKimlikGrupBasinaDosyaDondurur() {
+        val ku = TestYardim.Kurulum(zorla = false)
+        val k = ku.ac()
+        val idler = k.kayitlariEkle((1..2500).map { app.kimlikmerkezi.toplayici.giden.YeniKayit("not.hizli", "notlar", "n$it") })
+        assertEquals(2500, idler.size)
+        assertEquals(2500, idler.toSet().size)
+        assertEquals(listOf(1000, 1000), k.kapatilmisDosyalar().map { it.kayitSayisi })
+        assertEquals(2500, k.bekleyenKayitSayisi())
+        assertEquals(2500, ku.ac().bekleyenKayitSayisi())
+        k.acikDosyayiKapat()
+        val sirali = k.kapatilmisDosyalar().flatMap { TestYardim.bicimiDogrula(k.oku(it.dosyaId)) }.map { it["metin"]!!.jsonPrimitive.content }
+        assertEquals((1..2500).map { "n$it" }, sirali)
+    }
 }

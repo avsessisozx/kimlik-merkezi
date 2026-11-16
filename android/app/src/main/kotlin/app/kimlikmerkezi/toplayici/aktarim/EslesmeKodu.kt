@@ -16,6 +16,9 @@ data class EslesmeKodu(
     val gizli: String,
     val pcAdi: String,
 ) {
+    /** Gizli ve parmak izi YAZILMAZ. */
+    override fun toString() = "EslesmeKodu(adres=${adresler.size}, port=$port, pcAdi=$pcAdi)"
+
     companion object {
         /** Bozuksa null. Dolgulu ve dolgusuz base64url kabul edilir. Yerel olmayan adresler atılır. */
         fun coz(metin: String): EslesmeKodu? {

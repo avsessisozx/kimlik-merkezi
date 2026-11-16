@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import app.kimlikmerkezi.toplayici.R
 import app.kimlikmerkezi.toplayici.depo
+import app.kimlikmerkezi.toplayici.giden.GidenKutusu
 
 /** Paylaş menüsü hedefi: ayrı ekran yok; kaydeder, kısa bildirim gösterir, kapanır. */
 class PaylasimActivity : Activity() {
@@ -22,8 +23,10 @@ class PaylasimActivity : Activity() {
         val baslik = intent.getStringExtra(Intent.EXTRA_SUBJECT)
         val kaynak = arayanPaket()
         Thread {
+            var kisaltildi = false
             val ok = try {
                 val s = PaylasimAyristir.ayristir(metin, baslik, kaynak)
+                kisaltildi = GidenKutusu.kisalt(s.metin, GidenKutusu.METIN_UST).second
                 depo.kutu.kayitEkle(s.tur, "notlar", s.metin, s.yuk)
                 true
             } catch (e: Exception) {
@@ -31,7 +34,7 @@ class PaylasimActivity : Activity() {
                 false
             }
             runOnUiThread {
-                Toast.makeText(this, if (ok) R.string.paylasim_kaydedildi else R.string.paylasim_hata, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, if (ok && kisaltildi) R.string.paylasim_kisaltildi else if (ok) R.string.paylasim_kaydedildi else R.string.paylasim_hata, Toast.LENGTH_SHORT).show()
                 finish()
             }
         }.start()

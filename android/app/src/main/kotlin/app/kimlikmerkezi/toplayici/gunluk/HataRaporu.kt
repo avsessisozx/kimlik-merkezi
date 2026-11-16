@@ -18,6 +18,7 @@ object HataRaporu {
         val yerelAdres: Boolean = false,
         val sonGonderimKodu: String = "-",
         val reddedilenDosya: Int = 0,
+        val sonBasariMs: Long = 0,
     )
 
     fun olustur(g: Girdi): String = buildString {
@@ -35,6 +36,8 @@ object HataRaporu {
         appendLine("Giden kutusu: ${g.bekleyenKayit} kayıt, ${g.bekleyenDosya} dosya, ${g.bozukDosya} bozuk dosya")
         appendLine("Eşleşme: ${if (g.eslesme) "var" else "yok"}; yerel adres: ${if (g.yerelAdres) "evet" else "hayır"}")
         appendLine("Son gönderim sonucu: ${g.sonGonderimKodu}; PC'nin reddettiği dosya: ${g.reddedilenDosya}")
+        val sonBasari = if (g.sonBasariMs > 0) java.time.Instant.ofEpochMilli(g.sonBasariMs).toString() else "yok"
+        appendLine("Doğrulama durumu: giden kutusu ${g.bekleyenDosya} dosya, ${g.bozukDosya} bozuk; son başarılı gönderim: $sonBasari; eşleşme: ${if (g.eslesme) "var" else "yok"}")
         appendLine("Son ${g.gunlukSatirlari.size} günlük satırı:")
         g.gunlukSatirlari.takeLast(50).forEach { appendLine(it) }
     }

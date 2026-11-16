@@ -5,6 +5,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// İmza YALNIZ ortam değişkenlerinden okunur (depoda anahtar/parola yok). Eksikse release İMZASIZ üretilir;
+// debug anahtarına sessizce DÜŞÜLMEZ.
+val imzaDosya: String? = System.getenv("KM_KEYSTORE_DOSYA")?.takeIf { it.isNotBlank() }
+val imzaParola: String? = System.getenv("KM_KEYSTORE_PAROLA")?.takeIf { it.isNotEmpty() }
+val imzaAd: String? = System.getenv("KM_ANAHTAR_AD")?.takeIf { it.isNotBlank() }
+val imzaAnahtarParola: String? = System.getenv("KM_ANAHTAR_PAROLA")?.takeIf { it.isNotEmpty() }
+val imzaVar = imzaDosya != null && imzaParola != null && imzaAd != null && imzaAnahtarParola != null && file(imzaDosya).exists()
+
 android {
     namespace = "app.kimlikmerkezi.toplayici"
     compileSdk = 35
@@ -18,10 +26,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (imzaVar) {
+            create("release") {
+                storeFile = file(imzaDosya!!)
+                storePassword = imzaParola
+                keyAlias = imzaAd
+                keyPassword = imzaAnahtarParola
+            }
+        }
+    }
     buildTypes {
         release {
-            // İmzalı sürüm bu işte yok; imza anahtarı depoya girmez.
+            // Bilinçli: R8 kuralları (Compose, kotlinx-serialization, WorkManager) doğrulanmadan küçültme yok.
             isMinifyEnabled = false
+            // İmza değişkenleri yoksa signingConfig null kalır: çıktı app-release-unsigned.apk (debug imzasına düşmez).
+            signingConfig = if (imzaVar) signingConfigs.getByName("release") else null
         }
     }
     compileOptions {

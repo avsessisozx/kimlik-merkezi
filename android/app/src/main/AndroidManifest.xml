@@ -8,9 +8,6 @@
     <!-- Yalnız eşleştirme ekranında, QR okumak için istenir. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- Arka plan gönderiminde sessiz bildirim; çalışma anında İSTENMEZ, kapalıysa bildirim atlanır. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
     <!-- Hepsi isteğe bağlı toplayıcılar içindir ve Ayarlar'dan açılana kadar istenmez. INTERNET YOK. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

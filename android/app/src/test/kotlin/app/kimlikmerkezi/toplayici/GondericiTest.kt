@@ -155,9 +155,9 @@ class GondericiTest {
     @Test
     fun parcaBirMiBiGecmez() {
         val z = Duzen()
-        repeat(3) { z.not("p".repeat(850_000)) }
+        repeat(40) { z.not("p".repeat(60_000)) }
         val toplam = z.dosyalar().single().let { z.icerik(it.dosyaId).size }
-        assertEquals(AktarimDurumu.Tamam(1, 3), z.g.gonder())
+        assertEquals(AktarimDurumu.Tamam(1, 40), z.g.gonder())
         assertTrue(z.m.putBoyutlari.all { it <= 1024 * 1024 })
         assertEquals(1024 * 1024, z.m.putBoyutlari.first())
         assertEquals(toplam, z.m.putBoyutlari.sum())
@@ -204,5 +204,100 @@ class GondericiTest {
         assertEquals(AktarimDurumu.Hata("sertifika"), z.g.gonder())
         assertEquals(1, z.kutu.bekleyenDosyaSayisi())
         assertNull(z.m.tamamlanan.values.firstOrNull())
+    }
+
+    // ---- B ----
+    @Test
+    fun tamBoyutluAmaTamamlanmamisSunucuDosyasiSonsuzDongudenKacinir() {
+        val z = Duzen()
+        z.not("a".repeat(500))
+        val id = z.dosyalar().single().dosyaId
+        val tum = z.icerik(id)
+        z.m.kismi[id] = java.io.ByteArrayOutputStream().also { it.write(tum) } // HEAD: kismi, X-Alinan == toplam
+        assertEquals(AktarimDurumu.Hata("pc_tamamlayamadi"), z.g.gonder())
+        assertEquals(1, z.kutu.bekleyenDosyaSayisi()) // silinmedi
+        assertEquals(0, z.g.reddedilenSayisi()) // kalıcı ret işaretlenmedi
+        assertEquals(0, z.m.putSayisi.get())
+    }
+
+    // ---- D ----
+    @Test
+    fun kayitliAdresteSertifikaUyusmazligiOnceUdpSonraSertifika() {
+        val uyusmaz = BaglantiUretici { a, _ -> if (a == "192.168.1.2") throw SSLHandshakeException("x").initCause(SertifikaUyusmadi()) as SSLHandshakeException else throw IOException() }
+        val z = Duzen(uretici = { uyusmaz }, bulucu = { null })
+        z.not("a")
+        assertEquals(AktarimDurumu.Hata("sertifika"), z.g.gonder()) // uyuşmazlık görüldü, doğru PC bulunamadı
+        // UDP doğru PC'yi bulursa başarılı olur
+        val z2 = Duzen(
+            uretici = { m -> BaglantiUretici { a, _ -> if (a == "192.168.1.2") throw SSLHandshakeException("x").initCause(SertifikaUyusmadi()) as SSLHandshakeException else BellekBaglanti(m) } },
+            bulucu = { "192.168.1.9" to 47821 },
+        )
+        z2.not("a")
+        assertEquals(AktarimDurumu.Tamam(1, 1), z2.g.gonder())
+        // yalnızca ulaşılamayan adres: sertifika DEĞİL ulasilamadi
+        val z3 = Duzen(uretici = { BaglantiUretici { _, _ -> throw IOException() } })
+        z3.not("a")
+        assertEquals(AktarimDurumu.Hata("ulasilamadi"), z3.g.gonder())
+    }
+
+    // ---- E ----
+    @Test
+    fun yokDurumluYirmiIkiYuzYirmiIkiBirKezBastanDenenir() {
+        val z = Duzen(parca = 200)
+        z.not("e".repeat(700))
+        val id = z.dosyalar().single().dosyaId
+        z.m.yok422.set(1)
+        assertEquals(AktarimDurumu.Tamam(1, 1), z.g.gonder())
+        assertEquals(0, z.g.reddedilenSayisi())
+        assertTrue(z.m.tamamlanan.containsKey(id))
+        // ikinci kez de 422/yok gelirse kalıcı ret
+        val z2 = Duzen(parca = 200)
+        z2.not("e".repeat(700))
+        z2.m.yok422.set(2)
+        assertEquals(AktarimDurumu.Hata("reddedildi"), z2.g.gonder())
+        assertEquals(1, z2.g.reddedilenSayisi())
+        assertEquals(1, z2.kutu.bekleyenDosyaSayisi())
+    }
+
+    // ---- F ----
+    @Test
+    fun eslesmeKalkincaRetlerTemizlenirVeGeriCagriCalisir() {
+        val z = Duzen()
+        z.not("a")
+        z.m.zorla422 = true
+        z.g.gonder()
+        assertEquals(1, z.g.reddedilenSayisi())
+        var iptal = 0
+        z.eslesme.kaldirinca = { iptal++ }
+        z.eslesme.kaldir()
+        assertEquals(0, z.g.reddedilenSayisi())
+        assertEquals(1, iptal)
+    }
+
+    // ---- H ----
+    @Test
+    fun durdurulunca_temizCikis_dosyaSilinmez() {
+        val z = Duzen(parca = 100)
+        z.not("d".repeat(1000))
+        var kontrol = 0
+        assertEquals(AktarimDurumu.Hata("durduruldu"), z.g.gonder { ++kontrol > 4 })
+        assertEquals(1, z.kutu.bekleyenDosyaSayisi())
+        assertTrue(z.m.putSayisi.get() in 1..4)
+        // sonra devam eder
+        assertEquals(AktarimDurumu.Tamam(1, 1), z.g.gonder())
+    }
+
+    // ---- K, L ----
+    @Test
+    fun toStringGizliAlanYazmazVeEslestirmeAdiBosModeldeVarsayilan() {
+        val k = EslesmeKodu(listOf("192.168.1.2"), 47821, pin, "COK-GIZLI-KOD", "EV-PC")
+        assertTrue(!k.toString().contains("COK-GIZLI-KOD") && !k.toString().contains(pin))
+        val z = Duzen()
+        val e = app.kimlikmerkezi.toplayici.aktarim.Eslestirici({ BellekBaglanti.uretici(z.m) }, EslesmeDeposu(BellekDepolama(), AesGcmSifreleyici(TestYardim.ANAHTAR)))
+        assertEquals(app.kimlikmerkezi.toplayici.aktarim.EslesmeSonucu.Tamam, e.eslestir(EslesmeKodu(listOf("192.168.1.2"), 1, pin, z.m.eslesmeKodu, "PC"), TestYardim.CIHAZ.cihazId, "  "))
+        assertTrue(z.m.sonEslestirGovde!!.contains("\"ad\":\"Android cihaz\""))
+        val z2 = Duzen(); z2.m.eslestir400 = true
+        val e2 = app.kimlikmerkezi.toplayici.aktarim.Eslestirici({ BellekBaglanti.uretici(z2.m) }, EslesmeDeposu(BellekDepolama(), AesGcmSifreleyici(TestYardim.ANAHTAR)))
+        assertEquals(app.kimlikmerkezi.toplayici.aktarim.EslesmeSonucu.IstekHatali, e2.eslestir(EslesmeKodu(listOf("192.168.1.2"), 1, pin, "x", "PC"), TestYardim.CIHAZ.cihazId, "M"))
     }
 }

@@ -38,8 +38,13 @@ class EslesmeDeposu(private val d: Depolama, private val sifreleyici: Sifreleyic
 
     /** Anahtar ve adres silinir; giden kutusu kayıtlarına dokunulmaz. */
     fun kaldir() {
-        listOf(ADRESLER, PARMAK, PC_ADI, ANAHTAR).forEach { d.yazMetin(it, null) }
+        listOf(ADRESLER, PARMAK, PC_ADI, ANAHTAR, Gonderici.REDDEDILEN).forEach { d.yazMetin(it, null) } // eski retler yeni PC'de yeniden denenir
+        kaldirinca?.invoke()
     }
+
+    /** Eşleşme kalkınca çalışır (periyodik işi iptal etmek için). */
+    @Volatile
+    var kaldirinca: (() -> Unit)? = null
 
     companion object {
         const val ADRESLER = "pc_adresler"
@@ -53,6 +58,8 @@ class EslesmeDeposu(private val d: Depolama, private val sifreleyici: Sifreleyic
 sealed class EslesmeSonucu {
     object Tamam : EslesmeSonucu()
     object KodGecersiz : EslesmeSonucu()
+    /** PC 400 döndü: istek anlaşılmadı (sürüm uyumsuzluğu olabilir). */
+    object IstekHatali : EslesmeSonucu()
     object SertifikaUyusmadi : EslesmeSonucu()
     object Ulasilamadi : EslesmeSonucu()
     object Beklenmeyen : EslesmeSonucu()
@@ -61,11 +68,12 @@ sealed class EslesmeSonucu {
 /** `POST /eslestir` (AKTARIM §2). */
 class Eslestirici(private val ureticiFabrikasi: (parmakIzi: String) -> BaglantiUretici, private val depo: EslesmeDeposu) {
     fun eslestir(kod: EslesmeKodu, cihazId: String, model: String): EslesmeSonucu {
+        val ad = model.ifBlank { "Android cihaz" }
         val govde = kotlinx.serialization.json.buildJsonObject {
             put("cihaz_id", kotlinx.serialization.json.JsonPrimitive(cihazId))
-            put("ad", kotlinx.serialization.json.JsonPrimitive(model))
+            put("ad", kotlinx.serialization.json.JsonPrimitive(ad))
             put("platform", kotlinx.serialization.json.JsonPrimitive("android"))
-            put("model", kotlinx.serialization.json.JsonPrimitive(model))
+            put("model", kotlinx.serialization.json.JsonPrimitive(ad))
             put("kod", kotlinx.serialization.json.JsonPrimitive(kod.gizli))
         }.toString().toByteArray(Charsets.UTF_8)
         var ulasildi = false
@@ -88,7 +96,11 @@ class Eslestirici(private val ureticiFabrikasi: (parmakIzi: String) -> BaglantiU
                 depo.kaydet(kod, anahtar)
                 return EslesmeSonucu.Tamam
             }
-            return if (y.kod in 400..499) EslesmeSonucu.KodGecersiz else EslesmeSonucu.Beklenmeyen
+            return when (y.kod) {
+                400 -> EslesmeSonucu.IstekHatali
+                in 401..499 -> EslesmeSonucu.KodGecersiz
+                else -> EslesmeSonucu.Beklenmeyen
+            }
         }
         return if (ulasildi) EslesmeSonucu.Beklenmeyen else EslesmeSonucu.Ulasilamadi
     }

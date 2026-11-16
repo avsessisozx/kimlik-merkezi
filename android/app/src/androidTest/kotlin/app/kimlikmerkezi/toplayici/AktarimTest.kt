@@ -114,7 +114,7 @@ class GondericiEmulatorTest {
     @Test
     fun ortadaKesilinceYenidenBaslarKaldigiYerdenTamamlanirAyniDosyaIkinciKezGitmez() {
         val (kutu, g) = kur()
-        repeat(3) { kutu.kayitEkle("not.hizli", "notlar", "k".repeat(850_000)) }
+        repeat(30) { kutu.kayitEkle("not.hizli", "notlar", "k".repeat(60_000)) }
         kutu.acikDosyayiKapat()
         val id = kutu.kapatilmisDosyalar().single().dosyaId
         val ozet = kutu.dosyayiOku(id).readBytes().sha256Hex()
@@ -125,7 +125,7 @@ class GondericiEmulatorTest {
         assertEquals(1024 * 1024, sunucu.mantik.kismi[id]!!.size())
 
         sunucu.mantik.izinVerilenPut = Int.MAX_VALUE
-        assertEquals(AktarimDurumu.Tamam(1, 3), g.gonder())
+        assertEquals(AktarimDurumu.Tamam(1, 30), g.gonder())
         assertEquals(0, kutu.bekleyenKayitSayisi())
         assertEquals(ozet, sunucu.mantik.tamamlanan[id]!!.sha256Hex())
         assertTrue(sunucu.mantik.putBoyutlari.all { it <= 1024 * 1024 })

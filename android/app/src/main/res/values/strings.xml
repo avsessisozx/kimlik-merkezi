@@ -15,6 +15,8 @@
     <string name="not_kaydet">Kaydet</string>
     <string name="not_bos">Önce bir şeyler yaz.</string>
     <string name="not_kaydedildi">Kaydedildi</string>
+    <string name="not_kisaltildi">Kaydedildi (çok uzun metin kısaltıldı)</string>
+    <string name="paylasim_kisaltildi">Kaydedildi (çok uzun metin kısaltıldı)</string>
     <string name="not_kaydedilemedi">Kaydedilemedi. Hata raporunu Ayarlar\'dan kopyalayabilirsin.</string>
 
     <string name="tur_not">Not</string>
@@ -86,6 +88,8 @@
     <string name="ak_hata_sertifika">PC\'nin güvenlik sertifikası değişmiş; yeniden eşleştir.</string>
     <string name="ak_hata_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık ve "Telefon aktarımı" açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
     <string name="ak_hata_reddedildi">PC bir dosyayı reddetti. Dosya telefonda duruyor.</string>
+    <string name="ak_hata_pc_tamamlayamadi">PC dosyayı tamamlayamadı; daha sonra yeniden denenecek.</string>
+    <string name="ak_hata_durduruldu">Gönderim durduruldu.</string>
     <string name="ak_hata_bekle">PC şu an meşgul ya da yer yok; sonra tekrar dene.</string>
     <string name="ak_hata_sunucu">Gönderim tamamlanamadı. Hata raporunu kopyalayabilirsin.</string>
     <string name="ak_hata_kutu">Giden kutusu okunamadı. Hata raporunu kopyalayabilirsin.</string>
@@ -106,6 +110,7 @@
     <string name="es_kod_gecersiz">Kod yanlış ya da süresi dolmuş. PC\'den yeni kod üret.</string>
     <string name="es_sertifika">PC\'nin güvenlik sertifikası koddakiyle uyuşmadı. Eşleştirme yapılmadı.</string>
     <string name="es_ulasilamadi">PC\'ye ulaşılamadı. Aynı Wi-Fi\'da mısın? PC\'de Kimlik Merkezi açık mı? Windows Güvenlik Duvarı izin veriyor mu?</string>
+    <string name="es_istek_hatali">PC isteği anlamadı. Telefondaki ve PC\'deki uygulamanın sürümü uyuşmuyor olabilir; ikisini de güncelle ve yeni kod üret.</string>
     <string name="es_beklenmeyen">PC beklenmeyen bir yanıt verdi. Yeni kod üretip tekrar dene.</string>
     <string name="es_eslesmis">Eşleşti: %1$s</string>
     <string name="es_adres_alani">PC adresi (ör. 192.168.1.20)</string>
@@ -136,7 +141,4 @@
     <string name="pil_uygulama_ayari">Uygulama ayrıntılarını aç</string>
     <string name="pil_garanti">Her zaman çalışan yol: uygulamayı açıp "PC\'ye gönder"e basmak.</string>
 
-    <string name="bildirim_kanal">Gönderim</string>
-    <string name="bildirim_baslik">Kimlik Merkezi</string>
-    <string name="bildirim_metin">%1$d dosya PC\'ye gönderildi</string>
 </resources>

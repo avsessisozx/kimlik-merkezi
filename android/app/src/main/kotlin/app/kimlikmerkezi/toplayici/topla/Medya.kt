@@ -1,6 +1,7 @@
 package app.kimlikmerkezi.toplayici.topla
 
 import app.kimlikmerkezi.toplayici.giden.GidenKutusu
+import app.kimlikmerkezi.toplayici.giden.YeniKayit
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.security.MessageDigest
@@ -55,7 +56,7 @@ class MedyaToplayici(
     /** Yeni foto ve video kaydı sayısı. */
     fun taraMedya(): Int = MedyaTuru.entries.sumOf { t ->
         gez(t, t.anahtar) { o ->
-            kutu.kayitEkle(
+            YeniKayit(
                 o.tur.kayitTuru, "medya_meta", o.ad,
                 buildJsonObject {
                     put("ad", o.ad)
@@ -68,14 +69,13 @@ class MedyaToplayici(
                     put("medya_id", o.medyaId())
                 },
             )
-            true
         }
     }
 
     /** Yeni `medya.konum` kaydı sayısı (yalnız fotoğraflar). Çağıran ayarı ve izni denetler. */
     fun taraKonum(): Int = gez(MedyaTuru.FOTO, "konum") { o ->
-        val k = konum.oku(o) ?: return@gez false
-        kutu.kayitEkle(
+        val k = konum.oku(o) ?: return@gez null
+        YeniKayit(
             "medya.konum", "konum", o.ad + " konumu",
             buildJsonObject {
                 put("enlem", k.first)
@@ -83,28 +83,31 @@ class MedyaToplayici(
                 put("medya_id", o.medyaId())
             },
         )
-        true
     }
 
-    private fun gez(tur: MedyaTuru, anahtar: String, isle: (MedyaOge) -> Boolean): Int {
+    /** Her parti (<= 200) tek fsync ile yazılır; imleç YALNIZ parti diske yazıldıktan sonra ilerler. */
+    private fun gez(tur: MedyaTuru, anahtar: String, kayitYap: (MedyaOge) -> YeniKayit?): Int {
         var eklenme = d.uzun("${anahtar}_eklenme")
         var id = d.uzun("${anahtar}_id")
         var yazilan = 0
         while (true) {
-            val parti = kaynak.sonrasi(tur, eklenme, id, 200)
+            val parti = kaynak.sonrasi(tur, eklenme, id, PARTI)
             if (parti.isEmpty()) break
-            for (o in parti) {
-                if (isle(o)) yazilan++
-                eklenme = o.eklenmeSn
-                id = o.id
-                d.yazUzun("${anahtar}_eklenme", eklenme)
-                d.yazUzun("${anahtar}_id", id)
-            }
+            val kayitlar = parti.mapNotNull(kayitYap)
+            if (kayitlar.isNotEmpty()) kutu.kayitlariEkle(kayitlar)
+            yazilan += kayitlar.size
+            val son = parti.last()
+            eklenme = son.eklenmeSn
+            id = son.id
+            d.yazUzun("${anahtar}_eklenme", eklenme)
+            d.yazUzun("${anahtar}_id", id)
         }
         return yazilan
     }
 
     companion object {
+        const val PARTI = 200
+
         fun ISO(ms: Long): String = GidenKutusu.ISO.format(Instant.ofEpochMilli(ms))
     }
 }

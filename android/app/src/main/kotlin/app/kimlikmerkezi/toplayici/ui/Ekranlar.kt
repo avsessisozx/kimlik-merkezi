@@ -50,6 +50,7 @@ import app.kimlikmerkezi.toplayici.BuildConfig
 import app.kimlikmerkezi.toplayici.Depo
 import app.kimlikmerkezi.toplayici.R
 import app.kimlikmerkezi.toplayici.aktarim.AktarimDurumu
+import app.kimlikmerkezi.toplayici.giden.GidenKutusu
 import app.kimlikmerkezi.toplayici.giden.KayitOzeti
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -231,7 +232,7 @@ private fun NotEkrani(depo: Depo, duzenlenenId: String?, geri: () -> Unit) {
                                 }
                             }
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(ctx, if (ok) R.string.not_kaydedildi else R.string.not_kaydedilemedi, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(ctx, if (ok && GidenKutusu.kisalt(m, GidenKutusu.METIN_UST).second) R.string.not_kisaltildi else if (ok) R.string.not_kaydedildi else R.string.not_kaydedilemedi, Toast.LENGTH_SHORT).show()
                                 if (ok) geri()
                             }
                         }
@@ -326,6 +327,8 @@ private fun aktarimMetni(d: AktarimDurumu): String? = when (d) {
             "ulasilamadi" -> R.string.ak_hata_ulasilamadi
             "reddedildi" -> R.string.ak_hata_reddedildi
             "bekle" -> R.string.ak_hata_bekle
+            "pc_tamamlayamadi" -> R.string.ak_hata_pc_tamamlayamadi
+            "durduruldu" -> R.string.ak_hata_durduruldu
             "kutu" -> R.string.ak_hata_kutu
             else -> R.string.ak_hata_sunucu
         },

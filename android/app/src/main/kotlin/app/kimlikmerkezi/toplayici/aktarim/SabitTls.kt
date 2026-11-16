@@ -1,6 +1,7 @@
 package app.kimlikmerkezi.toplayici.aktarim
 
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.net.Proxy
 import java.net.URL
 import java.security.MessageDigest
@@ -71,12 +72,23 @@ class HttpsBaglanti(private val adres: String, private val port: Int, parmakIzi:
             c.useCaches = false
             c.requestMethod = metot
             basliklar.forEach { (k, v) -> c.setRequestProperty(k, v) }
+            var yazmaHatasi: IOException? = null
             if (govde != null) {
                 c.doOutput = true
                 c.setFixedLengthStreamingMode(govde.size)
-                c.outputStream.use { it.write(govde) }
+                try {
+                    c.outputStream.use { it.write(govde) }
+                } catch (e: IOException) {
+                    // PC gövdeyi okumadan yanıt verip kapatmış olabilir: yanıt okunabiliyorsa onu kullan.
+                    if (e.sertifikaHatasiMi()) throw e
+                    yazmaHatasi = e
+                }
             }
-            val kod = c.responseCode
+            val kod = try {
+                c.responseCode
+            } catch (e: IOException) {
+                throw yazmaHatasi ?: e
+            }
             val b = HashMap<String, String>()
             c.headerFields.forEach { (k, v) -> if (k != null && v.isNotEmpty()) b[k.lowercase()] = v.last() }
             val ac = if (metot == "HEAD") ByteArray(0) else okuSinirli(if (kod >= 400) c.errorStream else c.inputStream)

@@ -223,4 +223,42 @@ class ToplayicilarTest {
         assertTrue(a.izinSonucu(ToplayiciAyarlari.Ad.KONUM, true))
         assertTrue(a.acik(ToplayiciAyarlari.Ad.KONUM))
     }
+
+    @Test
+    fun otuzBinMedyaKaydiToplu_ekleme_performansi() {
+        val ku = TestYardim.Kurulum(zorla = true) // gerçek fsync
+        val k = ku.ac()
+        val kaynak = SahteMedya(MutableList(30_000) { foto(it + 1L, 1000L + it / 50) })
+        val t = MedyaToplayici(k, kaynak, SahteKonum(emptyMap()), BellekDepolama())
+        val bas = System.nanoTime()
+        assertEquals(30_000, t.taraMedya())
+        val ms = (System.nanoTime() - bas) / 1_000_000
+        println("OLCUM 30000 kayit toplu tarama: $ms ms (grup 200, gercek fsync)")
+        assertEquals(30_000, k.bekleyenKayitSayisi())
+        assertEquals(30, k.kapatilmisDosyalar().size)
+        assertEquals(0, t.taraMedya())
+        assertTrue(ms < 120_000, "çok yavaş: $ms ms")
+    }
+
+    @Test
+    fun imlecYalnizGrupYazildiktanSonraIlerler() {
+        val ku = TestYardim.Kurulum()
+        val k = ku.ac()
+        val d = BellekDepolama()
+        val kaynak = SahteMedya(MutableList(450) { foto(it + 1L, 100L + it) })
+        // 2. grupta yazım hatası: kutu klasörü kaldırılır
+        val t = MedyaToplayici(k, kaynak, SahteKonum(emptyMap()), d)
+        var cagri = 0
+        val bozucu = object : MedyaKaynagi {
+            override fun sonrasi(tur: MedyaTuru, eklenmeSn: Long, id: Long, sinir: Int): List<MedyaOge> {
+                if (tur == MedyaTuru.FOTO && ++cagri == 2) throw java.io.IOException("kopya")
+                return kaynak.sonrasi(tur, eklenmeSn, id, sinir)
+            }
+        }
+        val t2 = MedyaToplayici(k, bozucu, SahteKonum(emptyMap()), d)
+        runCatching { t2.taraMedya() }
+        assertEquals(200, k.bekleyenKayitSayisi()) // ilk grup yazıldı, imleç onun sonunda
+        assertEquals(250, t.taraMedya()) // kalan 250, tekrarsız
+        assertEquals(450, k.bekleyenKayitSayisi())
+    }
 }

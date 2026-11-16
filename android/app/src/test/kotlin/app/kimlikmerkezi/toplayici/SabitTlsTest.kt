@@ -48,9 +48,9 @@ class SabitTlsTest {
         // gönderim (1 MiB üstü, çok parçalı) gerçek TLS üzerinden
         val ku = TestYardim.Kurulum()
         val kutu = ku.ac()
-        repeat(3) { kutu.kayitEkle("not.hizli", "notlar", "t".repeat(700_000)) }
+        repeat(30) { kutu.kayitEkle("not.hizli", "notlar", "t".repeat(60_000)) }
         val g = Gonderici(kutu, e, d, ku.gunluk, BaglantiUretici { a, p -> HttpsBaglanti(a, p, e.parmakIzi()!!) }, { TestYardim.CIHAZ.cihazId }, bekle = {}, bulucu = { null })
-        assertEquals(AktarimDurumu.Tamam(1, 3), g.gonder())
+        assertEquals(AktarimDurumu.Tamam(1, 30), g.gonder())
         assertEquals(0, kutu.bekleyenKayitSayisi())
         assertEquals(1, sunucu.mantik.tamamlanan.size)
         assertTrue(sunucu.mantik.putBoyutlari.size >= 2 && sunucu.mantik.putBoyutlari.all { it <= 1024 * 1024 })
@@ -101,5 +101,37 @@ class SabitTlsTest {
         AdresSuzgeci.testLoopback = false
         assertFailsWith<IllegalArgumentException> { HttpsBaglanti("127.0.0.1", sunucu.port, sunucu.parmakIzi) }
         assertFailsWith<IllegalArgumentException> { HttpsBaglanti("example.com", 443, sunucu.parmakIzi) }
+    }
+
+    private fun gonderici(kayit: Int): Triple<app.kimlikmerkezi.toplayici.giden.GidenKutusu, Gonderici, EslesmeDeposu> {
+        val ku = TestYardim.Kurulum(); val kutu = ku.ac()
+        repeat(kayit) { kutu.kayitEkle("not.hizli", "notlar", "c".repeat(60_000)) }
+        val d = BellekDepolama(); val e = EslesmeDeposu(d, AesGcmSifreleyici(TestYardim.ANAHTAR))
+        e.kaydet(kod(), sunucu.mantik.anahtar)
+        return Triple(kutu, Gonderici(kutu, e, d, ku.gunluk, BaglantiUretici { a, p -> HttpsBaglanti(a, p, e.parmakIzi()!!) }, { TestYardim.CIHAZ.cihazId }, bekle = {}, bulucu = { null }), e)
+    }
+
+    /** C: PC gövdeyi okumadan 409 dönüp kapatır; istemci ya yanıtı okur ya HEAD ile durumu sorar; sonuçta tamamlanır. */
+    @Test
+    fun gövdeOkunmadanKapanan409DaTamamlanir() {
+        val (kutu, g, _) = gonderici(26)
+        sunucu.govdeOkumadanKod = 409
+        sunucu.govdeOkumadanKapat.set(2)
+        assertEquals(AktarimDurumu.Tamam(1, 26), g.gonder())
+        assertEquals(0, kutu.bekleyenDosyaSayisi())
+        assertEquals(1, sunucu.mantik.tamamlanan.size)
+        assertEquals(0, sunucu.govdeOkumadanKapat.get())
+    }
+
+    /** C: PC yer yok (507) der ve gövdeyi okumadan kapatır: "ulaşılamadı" değil "bekle"; dosya silinmez. */
+    @Test
+    fun govdeOkunmadanKapananYerYok507BekleOlarakGorunur() {
+        val (kutu, g, _) = gonderici(26)
+        sunucu.govdeOkumadanKod = 507
+        sunucu.govdeOkumadanKapat.set(100)
+        sunucu.mantik.putSonrasiHeadKodu = 507 // PC bu durumda HEAD'e de aynı yanıtı verir
+        assertEquals(AktarimDurumu.Hata("bekle"), g.gonder())
+        assertEquals(1, kutu.bekleyenDosyaSayisi())
+        assertEquals(0, sunucu.mantik.tamamlanan.size)
     }
 }

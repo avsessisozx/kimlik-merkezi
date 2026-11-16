@@ -52,6 +52,9 @@ class Gonderici(
 
     private class Dur(val kod: String) : Exception(kod)
 
+    @Volatile private var durdur: () -> Boolean = { false }
+    private fun durdurKontrol() { if (durdur()) throw Dur("durduruldu") }
+
     fun reddedilenSayisi(): Int = reddedilen().size
     private fun reddedilen(): Set<String> = d.metin(REDDEDILEN)?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty()
     private fun reddet(id: String) = d.yazMetin(REDDEDILEN, (reddedilen() + id).joinToString(","))
@@ -60,7 +63,8 @@ class Gonderici(
     fun sonKod(): String = d.metin(SON_KOD) ?: "-"
 
     /** Çalışan gönderim varsa null. */
-    fun gonder(): AktarimDurumu? {
+    fun gonder(durdur: () -> Boolean = { false }): AktarimDurumu? {
+        this.durdur = durdur
         if (!calisiyor.compareAndSet(false, true)) return null
         try {
             val s = try {
@@ -99,6 +103,7 @@ class Gonderici(
         var kayit = 0
         var reddedildi = false
         dosyalar.forEachIndexed { i, f ->
+            durdurKontrol()
             when (dosyaGonder(baglanti, anahtar, f.dosyaId, i + 1, dosyalar.size)) {
                 Sonuc.VAR -> { gonderilen++; kayit += f.kayitSayisi }
                 Sonuc.REDDEDILDI -> reddedildi = true
@@ -110,16 +115,20 @@ class Gonderici(
 
     private enum class Sonuc { VAR, REDDEDILDI }
 
-    /** Kayıtlı adresler -> UDP bulma. Parmak izi uymazsa hemen "sertifika". */
+    /**
+     * Kayıtlı adresler -> UDP bulma. Bir adreste parmak izi uyuşmazsa (IP başka cihaza geçmiş olabilir) diğer adresler ve
+     * UDP bulma yine denenir; doğru PC hiçbir yerde bulunamaz ve en az bir uyuşmazlık görüldüyse "sertifika" döner.
+     */
     private fun baglantiBul(): PcBaglanti {
         val pin = eslesme.parmakIzi() ?: throw Dur("eslesme_yok")
+        var uyusmazlik = false
         fun dene(a: String, p: Int): PcBaglanti? {
             if (!AdresSuzgeci.yerelMi(a)) return null
             return try {
                 val b = uretici.ac(a, p)
                 if (b.durum().kod in 200..299) b else null
             } catch (e: Exception) {
-                if (e.sertifikaHatasiMi()) throw Dur("sertifika")
+                if (e.sertifikaHatasiMi()) uyusmazlik = true
                 null
             }
         }
@@ -131,15 +140,15 @@ class Gonderici(
                 return it
             }
         }
-        throw Dur("ulasilamadi")
+        throw Dur(if (uyusmazlik) "sertifika" else "ulasilamadi")
     }
 
     private class RedEdildi : Exception()
 
-    /** 401 tüm gönderimi durdurur (dosya silinmez); 422 o dosyayı reddedilmiş işaretletir. */
-    private fun kodKontrol(kod: Int) {
-        if (kod == 401) throw Dur("yetkisiz")
-        if (kod == 422) throw RedEdildi()
+    /** 401 tüm gönderimi durdurur (dosya silinmez); 422 dosyayı reddedilmiş işaretletir (`X-Durum: yok` ise bir kez baştan denenir). */
+    private fun kodKontrol(y: Yanit) {
+        if (y.kod == 401) throw Dur("yetkisiz")
+        if (y.kod == 422) throw RedEdildi()
     }
 
     private fun dosyaGonder(b: PcBaglanti, anahtar: String, id: String, no: Int, n: Int): Sonuc = try {
@@ -168,19 +177,24 @@ class Gonderici(
         var alinan = 0L
         var hizalama = 0
         var basarisiz = 0
+        var bastanDenendi = false
+        var sonPcKodu = 0 // PC'nin okunabilen son "meşgul / yer yok" yanıtı
         var durumKontrol = true
         while (true) {
+            durdurKontrol()
             try {
                 if (durumKontrol) {
                     val h = b.head(cihaz, id, anahtar)
-                    kodKontrol(h.kod)
-                    if (h.kod == 429 || h.kod == 507) { bekle(2000); throw Dur("bekle") }
+                    if (h.kod in setOf(413, 429, 507)) sonPcKodu = h.kod
+                    kodKontrol(h)
+                    if (h.kod == 429 || h.kod == 507 || h.kod == 413) { bekle(2000); throw Dur("bekle") }
                     if (h.kod !in 200..299) throw Dur("sunucu")
                     if (h.baslik("x-durum") == "var") return sil(id)
                     alinan = h.baslik("x-alinan")?.toLongOrNull() ?: 0L
                     durumKontrol = false
                 }
-                if (alinan >= toplam) throw Dur("sunucu")
+                // PC tam boyutlu ama tamamlanmamış dosya bildiriyor: sonsuz döngüye girme, dosya silinmez, ret işaretlenmez.
+                if (alinan >= toplam) throw Dur("pc_tamamlayamadi")
                 val parca = kutu_ac(id).use { s ->
                     var atla = alinan
                     while (atla > 0) { val k = s.skip(atla); if (k <= 0) throw Dur("kutu"); atla -= k }
@@ -192,7 +206,14 @@ class Gonderici(
                 }
                 _durum.value = AktarimDurumu.Gonderiliyor(no, n, alinan, toplam)
                 val y = b.put(cihaz, id, anahtar, alinan, toplam, sha, parca)
-                kodKontrol(y.kod)
+                if (y.kod in setOf(413, 429, 507)) sonPcKodu = y.kod
+                if (y.kod == 422 && y.baslik("x-durum") == "yok" && !bastanDenendi) {
+                    // toplam parçalar arasında değişti: baştan başla (en fazla 1 kez)
+                    bastanDenendi = true
+                    alinan = 0
+                    continue
+                }
+                kodKontrol(y)
                 when {
                     y.kod == 409 -> {
                         if (++hizalama > 5) throw Dur("sunucu")
@@ -202,15 +223,18 @@ class Gonderici(
                         if (y.baslik("x-durum") == "var") return sil(id)
                         alinan = y.baslik("x-alinan")?.toLongOrNull() ?: (alinan + parca.size)
                     }
-                    y.kod == 429 || y.kod == 507 -> { bekle(2000); throw Dur("bekle") }
+                    y.kod == 429 || y.kod == 507 || y.kod == 413 -> { bekle(2000); throw Dur("bekle") }
                     y.kod >= 500 -> throw IOException("sunucu hatasi")
                     else -> throw Dur("sunucu")
                 }
                 basarisiz = 0
             } catch (e: IOException) {
                 if (e.sertifikaHatasiMi()) throw Dur("sertifika")
-                // Bağlantı koptu: üstel beklemeyle sınırlı yeniden deneme; PC'nin gerçek ofseti HEAD ile öğrenilir.
-                if (++basarisiz >= denemeSiniri) { gunluk.hata("ag", e); throw Dur("ulasilamadi") }
+                // Yanıt okunamadı (PC gövdeyi okumadan bağlantıyı kapatmış olabilir): HEAD ile durumu sor, sınırlı yeniden dene.
+                if (++basarisiz >= denemeSiniri) {
+                    gunluk.hata("ag", e)
+                    throw Dur(if (sonPcKodu != 0) "bekle" else "ulasilamadi")
+                }
                 bekle(1000L shl (basarisiz - 1))
                 durumKontrol = true
             }

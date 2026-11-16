@@ -44,6 +44,7 @@ import app.kimlikmerkezi.toplayici.aktarim.AdresSuzgeci
 import app.kimlikmerkezi.toplayici.aktarim.EslesmeKodu
 import app.kimlikmerkezi.toplayici.aktarim.EslesmeSonucu
 import app.kimlikmerkezi.toplayici.aktarim.QrCozucu
+import app.kimlikmerkezi.toplayici.arkaplan.ArkaPlan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -135,15 +136,20 @@ fun EslesmeEkrani(depo: Depo, geri: () -> Unit) {
                         kapsam.launch {
                             val s = withContext(Dispatchers.IO) {
                                 try {
-                                    depo.eslestirici.eslestir(k, depo.cihazId, android.os.Build.MODEL)
+                                    depo.eslestirici.eslestir(k, depo.cihazId, android.os.Build.MODEL ?: "")
                                 } catch (e: Exception) {
                                     depo.gunluk.hata("eslestir", e); EslesmeSonucu.Beklenmeyen
                                 }
                             }
                             calisiyor = false
                             mesaj = when (s) {
-                                EslesmeSonucu.Tamam -> { kodMetni = ""; null }
+                                EslesmeSonucu.Tamam -> {
+                                    kodMetni = ""
+                                    ArkaPlan.planla(ctx.applicationContext, depo.arkaPlanAcik)
+                                    null
+                                }
                                 EslesmeSonucu.KodGecersiz -> R.string.es_kod_gecersiz
+                                EslesmeSonucu.IstekHatali -> R.string.es_istek_hatali
                                 EslesmeSonucu.SertifikaUyusmadi -> R.string.es_sertifika
                                 EslesmeSonucu.Ulasilamadi -> R.string.es_ulasilamadi
                                 EslesmeSonucu.Beklenmeyen -> R.string.es_beklenmeyen
