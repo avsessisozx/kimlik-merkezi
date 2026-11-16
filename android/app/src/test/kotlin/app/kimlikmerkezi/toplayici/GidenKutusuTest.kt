@@ -44,7 +44,7 @@ class GidenKutusuTest {
     fun uretilenDosyaAltinOrnekleAyniSekildedir() {
         val altin = javaClass.getResource("/giden_ornek.jsonl")!!.readText()
         val kayitlar = TestYardim.bicimiDogrula(altin)
-        assertEquals(8, kayitlar.size)
+        assertEquals(9, kayitlar.size)
         // Sözleşmedeki bütün türler örnekte var.
         assertEquals(GidenKutusu.KATEGORI.keys, kayitlar.map { it["tur"]!!.jsonPrimitive.content }.toSet())
     }
@@ -113,7 +113,7 @@ class GidenKutusuTest {
         val k = TestYardim.Kurulum().ac()
         assertNull(k.acikDosyayiKapat())
         k.not("a")
-        assertEquals(1, k.kapatilmisDosyalar().size.let { k.acikDosyayiKapat(); it + k.kapatilmisDosyalar().size - 1 + 0 }.coerceAtLeast(1))
+        assertEquals(1, k.kapatilmisDosyalar().size.let { k.acikDosyayiKapat(); k.kapatilmisDosyalar().size })
         assertNull(k.acikDosyayiKapat())
     }
 
