@@ -71,12 +71,13 @@ def list_topics(veri_klasoru: Path | str | None = None) -> list[str]:
 def konu_kosulu(izinli: Iterable[str], sutun: str = "events.hassas_konu") -> tuple[str, list[str]]:
     """SQL koşulu (+ bağımsız değişkenler): kayıt, `hassas_konu` içindeki HER konu `izinli`de
     ise geçer. İzinli küme boşsa `sutun IS NULL`. Değer alfabetik virgüllü konu kimlikleridir;
-    json_each ile ayrılır (küme büyüklüğünden bağımsız, tam doğru)."""
+    özyinelemeli CTE ile virgülden ayrılır (JSON kurulmaz: kimlikte tırnak/ters bölü olsa da çalışır; küme büyüklüğünden bağımsız)."""
     izin = sorted(set(izinli))
     if not izin:
         return f"{sutun} IS NULL", []
-    return (f"({sutun} IS NULL OR NOT EXISTS (SELECT 1 FROM json_each('[\"' || "
-            f"replace({sutun}, ',', '\",\"') || '\"]') WHERE value NOT IN "
+    return (f"({sutun} IS NULL OR NOT EXISTS (WITH RECURSIVE _k(v, r) AS (SELECT '', {sutun} || ',' "
+            "UNION ALL SELECT substr(r, 1, instr(r, ',') - 1), substr(r, instr(r, ',') + 1) "
+            "FROM _k WHERE r <> '') SELECT 1 FROM _k WHERE v <> '' AND v NOT IN "
             f"({','.join('?' * len(izin))})))", izin)
 
 

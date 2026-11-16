@@ -407,3 +407,118 @@ def test_anahtar_uret_izinsiz_uyarir(veri, capsys):
     assert "anahtar: kim_" in c.out
     assert yonetim(["--veri", str(veri), "anahtar-uret", "--ad", "Dolu", "--izin", "notlar"]) == 0
     assert "hiçbir kategori izni yok" not in capsys.readouterr().err
+
+
+# ------------------------------------------------------------------ inceleme küçükleri
+def _kur(veri, olaylar, kategoriler=("notlar",), hassas=()):
+    with Hub.open(veri, write=True) as hub:
+        hub.add_events(hub.add_source("t", "1", None), olaylar)
+        km = KeyManager(hub)
+        app, key = km.create_key("K")
+        for k in kategoriler:
+            km.grant(app, k, confirmed_sensitive=k in hassas)
+    return app, key
+
+
+def test_esanlam_genislemesinde_isaretli_kayit_donmez_sayilar_degismez(veri):
+    (veri / "esanlamlilar.json").write_text(json.dumps(
+        {"alt_kavramlar": {"linux": ["fedora"]}}), encoding="utf-8")
+    app, key = _kur(veri, [ev("linux notu bir", "notlar", key="a"),
+                           ev("fedora kurulumu sade", "notlar", key="b"),
+                           ev(f"fedora kurulumu {SAGLIK}", "notlar", key="c")])
+    s = QueryService(veri, key)
+    r = s.ara("linux", genislet=True)
+    assert metinler(r) == ["fedora kurulumu sade", "linux notu bir"]
+    def fedora(c):
+        return [i for t in c["genisletilen_terimler"] for i in t["iliskili"]
+                if i["terim"] == "fedora"]
+    onceki = fedora(r)
+    assert onceki == [{"terim": "fedora", "kayit": 1}]
+    with Hub.open(veri, write=True) as hub:
+        hub.add_events(hub.add_source("u", "1", None), [
+            ev(f"fedora ayrıca {SAGLIK} {i}", "notlar", key=f"x{i}") for i in range(5)])
+    assert fedora(s.ara("linux")) == onceki
+    with Hub.open(veri, write=True) as hub:
+        KeyManager(hub).grant_topic(app, "saglik", confirmed=True)
+    r = s.ara("linux", limit=50)
+    assert any(SAGLIK in k["veri"] for k in r["kayitlar"])
+    assert fedora(r) == [{"terim": "fedora", "kayit": 7}]
+
+
+def test_konu_kimliginde_tirnak_ve_ters_bolu_sorgulari_bozmaz(veri):
+    app, key = _kur(veri, [ev("alfa sade", "notlar", key="s"), ev("alfa tirnakli", "notlar", key="q"),
+                           ev("alfa tersbolu", "notlar", key="b"), ev("alfa ikili", "notlar", key="i")])
+    ids = _ids(veri)
+    with Hub.open(veri, write=True) as hub:
+        with hub.transaction() as c:
+            c.execute("UPDATE events SET hassas_konu = ? WHERE event_id = ?", ('x"y', ids["q"]))
+            c.execute("UPDATE events SET hassas_konu = ? WHERE event_id = ?", ("x\\y", ids["b"]))
+            c.execute("UPDATE events SET hassas_konu = ? WHERE event_id = ?", ('saglik,x"y', ids["i"]))
+        km = KeyManager(hub)
+    s = QueryService(veri, key)
+    assert metinler(s.ara("alfa", kategori="notlar", limit=50)) == ["alfa sade"]
+    assert metinler(s.ornekle("notlar", 50)) == ["alfa sade"]
+    assert metinler(s.zaman_cizelgesi(kategori="notlar", limit=50)) == ["alfa sade"]
+    assert s.say("uzanti")["toplam_kayit"] >= 0
+    with Hub.open(veri, write=True) as hub:
+        KeyManager(hub).grant_topic(app, "saglik", confirmed=True)
+    assert metinler(s.ara("alfa", kategori="notlar", limit=50)) == ["alfa sade"]   # x"y hâlâ yok
+    with Hub.open(veri, write=True) as hub:           # izin tablosuna doğrudan yaz (geçersiz kimlik)
+        with hub.transaction() as c:
+            for k in ('x"y', "x\\y"):
+                c.execute("INSERT INTO konu_izinleri(app_id, konu, granted_at) VALUES (?, ?, 'x')",
+                          (app, k))
+    assert metinler(s.ara("alfa", kategori="notlar", limit=50)) == \
+        ["alfa ikili", "alfa sade", "alfa tersbolu", "alfa tirnakli"]
+
+
+def test_kart_onem_sifir_saat_son_donem_ve_kapsami_beslemez(veri):
+    olaylar = [ev(f"BEGENI {i}", "sosyal", kind="instagram.begeni", key=f"b{i}",
+                  ts=f"2026-11-0{1 + i % 8}T0{i % 9}:00:00Z") for i in range(40)]
+    app, key = _kur(veri, olaylar, ("sosyal", "persona"))
+    s = QueryService(veri, key, clock=FakeClock())
+    for kisa in (False, True):
+        k = s.kimlik_karti(kisa=kisa)["veri"]
+        assert "etkinlik en çok" not in k
+        assert "40 beğeni/takip kaydı (düşük önem, özetlenmedi)" in k
+    tam = s.kimlik_karti(kisa=False)["veri"]
+    assert "sosyal: 40 kayıt" not in tam and "Son 90 günde yalnız 0 kayıt" in tam
+
+
+def test_say_sayilari_ve_erisim_sayisi_isaretli_kayitla_degismez(veri):
+    app, key = _kur(veri, [ev("sade bir", "dosyalar", key="p1", payload={"uzanti": "pdf"}),
+                           ev("sade iki", "dosyalar", key="p2", payload={"uzanti": "pdf"}),
+                           ev("sade yok", "dosyalar", key="p3")], ("dosyalar",))
+    s = QueryService(veri, key)
+    def al():
+        r = s.say("uzanti", kategori="dosyalar")
+        n = [x for x in AccessLog(veri).read_all() if x[2] == "say"][-1][4]
+        return {k: r.get(k) for k in ("toplam_kayit", "alansiz_kayit", "farkli_deger",
+                                      "alanli_kayit", "satirlar")}, n
+    onceki = al()
+    with Hub.open(veri, write=True) as hub:
+        hub.add_events(hub.add_source("u", "1", None), (
+            [ev(f"{SAGLIK} {i}", "dosyalar", key=f"m{i}", payload={"uzanti": f"e{i}"}) for i in range(4)]
+            + [ev(f"{FINANS} yok", "dosyalar", key="m_yok")]))
+    assert al() == onceki
+
+
+def test_hassas_kategori_ve_hassas_konu_birlikte(veri):
+    app, key = _kur(veri, [
+        ev("sade sohbet bir", "sohbet", kind="sohbet.mesaj", key="a", payload={"rol": "kullanici", "platform": "p"}),
+        ev(f"{SAGLIK} sohbeti", "sohbet", kind="sohbet.mesaj", key="b", payload={"rol": "kullanici", "platform": "q"})],
+        ("sohbet", "notlar"), hassas=("sohbet",))
+    ids = _ids(veri)
+    s = QueryService(veri, key)
+    # içerik alanları sohbette zaten hesaplanmaz; içerik olmayan alan işaretliyi sayar
+    r = s.say("uzanti", kategori="sohbet")
+    assert r["satirlar"] == []                       # hassas kategoride içerik alanı hesaplanmaz
+    assert s.say("platform", kategori="sohbet")["toplam_kayit"] == 2
+    assert s.kayit_getir(ids["a"])["id"] == ids["a"]
+    with pytest.raises(ServiceError, match="reddedildi"):
+        s.kayit_getir(ids["b"])
+    with Hub.open(veri, write=True) as hub:
+        KeyManager(hub).grant_topic(app, "saglik", confirmed=True)
+        KeyManager(hub).revoke_grant(app, "sohbet")
+    with pytest.raises(ServiceError, match="reddedildi"):     # konu izni kategori yerine geçmez
+        s.kayit_getir(ids["b"])

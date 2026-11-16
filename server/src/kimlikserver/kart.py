@@ -217,7 +217,7 @@ def _kapsam(tz: YerelSaat, hub, cats: list[str]) -> tuple[list[str], list[str]]:
         "SELECT category, COUNT(*), MIN(CASE WHEN COALESCE(json_extract(payload,'$.zaman_kaynagi'),"
         "'') <> 'dosya_tarihi' THEN ts END), MAX(CASE WHEN COALESCE(json_extract(payload,"
         "'$.zaman_kaynagi'),'') <> 'dosya_tarihi' THEN ts END) FROM events WHERE hidden = 0 AND "
-        f"category IN ({','.join('?' * len(cats))}) AND hassas_konu IS NULL "
+        f"category IN ({','.join('?' * len(cats))}) AND hassas_konu IS NULL AND onem >= 1 "
         "GROUP BY category ORDER BY 2 DESC", cats)
     var = {r[0] for r in rows}
     satir = [f"{k}: {n} kayıt" + (f", {_tarih(a, tz)} - {_tarih(b, tz)}" if a else "")
@@ -255,7 +255,7 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
         if not kl:
             continue
         saatler = [0] * 24
-        for saat, sayi in tg.say("saat", kategoriler=kl, isaretli_haric=True)["satirlar"]:   # [["05", 12], ...]
+        for saat, sayi in tg.say("saat", kategoriler=kl, isaretli_haric=True, onem_min=1)["satirlar"]:   # [["05", 12], ...]
             saatler[int(saat[:2])] += sayi
         p = _pencere(saatler)
         if p:
@@ -328,7 +328,7 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
     n_son = tg.hub.query(
         "SELECT COUNT(*) FROM events WHERE hidden = 0 AND ts >= ? AND category IN "
         f"({','.join('?' * len(cats))}) AND COALESCE(json_extract(payload,'$.zaman_kaynagi'),'') "
-        "<> 'dosya_tarihi' AND hassas_konu IS NULL", [since, *cats])[0][0] if cats else 0
+        "<> 'dosya_tarihi' AND hassas_konu IS NULL AND onem >= 1", [since, *cats])[0][0] if cats else 0
     if n_son >= 5:
         sk = [c for c in ("tarama", "video") if var(c)]
         kel = _kelimeler(tg.ham_top("terim", sk, since=since, limit=2000)) if sk else []

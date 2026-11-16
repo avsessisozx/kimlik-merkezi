@@ -121,7 +121,8 @@ class Toplulastirici:
             kaynak: str | None = None, since: str | None = None, until: str | None = None,
             en_cok: int | None = None, rol: str | None = None,
             konular: set[str] | frozenset[str] = frozenset(),
-            isaretli_haric: bool = False) -> dict[str, Any]:
+            isaretli_haric: bool = False,
+            onem_min: int = 0) -> dict[str, Any]:
         """`since`/`until` UTC ISO (çağıran normalleştirir). `kategoriler` izin süzülmüş liste.
         `konular`: çağıranın izinli hassas konuları; İÇERİK alanlarında hassas konulu kayıtlar,
         her konusu izinli değilse sayıma girmez (içerik olmayan alanlarda girer). `isaretli_haric`:
@@ -145,9 +146,9 @@ class Toplulastirici:
         icerik = alan in ALANLAR and ALANLAR[alan][2]
         kn: set[str] | None = set() if isaretli_haric else (set(konular) if icerik else None)
         # Aynı filtrenin toplamı ve zamansız dışlanan sayısı
-        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False, rol, kn)
+        w_hepsi, a_hepsi = self._kosul(cats, tur, kaynak, since, until, False, rol, kn, onem_min)
         toplam = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w_hepsi}", a_hepsi)[0][0]
-        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli, rol, kn)
+        w, a = self._kosul(cats, tur, kaynak, since, until, zaman_alani or aralikli, rol, kn, onem_min)
         if zaman_alani or aralikli:
             sayilan = self.hub.query(f"SELECT COUNT(*) FROM events WHERE {w}", a)[0][0]
             zamansiz = toplam - sayilan
