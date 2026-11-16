@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kimlik Merkezi</string>
+
+    <string name="ana_bekleyen">%1$d kayıt henüz PC\'ye gitmedi</string>
+    <string name="ana_bekleyen_yok">PC\'ye gidecek kayıt yok</string>
+    <string name="ana_son_kayitlar">Son kayıtlar</string>
+    <string name="ana_kayit_yok">Henüz kayıt yok. Bir not yaz ya da başka bir uygulamadan buraya paylaş.</string>
+    <string name="ana_hizli_not">Hızlı not</string>
+    <string name="ana_pc_gonder">Önce PC ile eşleştir</string>
+
+    <string name="not_baslik">Hızlı not</string>
+    <string name="not_duzenle_baslik">Notu düzenle</string>
+    <string name="not_ipucu">Notunu yaz</string>
+    <string name="not_kaydet">Kaydet</string>
+    <string name="not_bos">Önce bir şeyler yaz.</string>
+    <string name="not_kaydedildi">Kaydedildi</string>
+    <string name="not_kaydedilemedi">Kaydedilemedi. Hata raporunu Ayarlar\'dan kopyalayabilirsin.</string>
+
+    <string name="tur_not">Not</string>
+    <string name="tur_link">Bağlantı</string>
+    <string name="tur_metin">Paylaşılan metin</string>
+    <string name="tur_diger">Kayıt</string>
+
+    <string name="paylasim_kaydedildi">Kimlik Merkezi\'ne kaydedildi</string>
+    <string name="paylasim_bos">Paylaşılacak metin yok</string>
+    <string name="paylasim_hata">Kaydedilemedi</string>
+
+    <string name="ayarlar_baslik">Ayarlar</string>
+    <string name="ayarlar_tema">Tema</string>
+    <string name="tema_sistem">Sistem</string>
+    <string name="tema_koyu">Koyu</string>
+    <string name="tema_acik">Açık</string>
+    <string name="ayarlar_toplanan">Toplanan veriler</string>
+    <string name="veri_not">Notlar</string>
+    <string name="veri_paylasim">Paylaşılan metin ve bağlantılar</string>
+    <string name="ayarlar_uyari">Aktarılmamış %1$d kayıt var; uygulamayı kaldırırsan kaybolur.</string>
+    <string name="ayarlar_hata_raporu">Hata raporunu kopyala</string>
+    <string name="ayarlar_hata_raporu_bilgi">Panoya düz metin kopyalanır. Kayıtlarının metni raporda yer almaz.</string>
+    <string name="hata_raporu_kopyalandi">Hata raporu panoya kopyalandı</string>
+    <string name="ayarlar_hakkinda">Hakkında</string>
+
+    <string name="hakkinda_baslik">Hakkında</string>
+    <string name="hakkinda_surum">Sürüm %1$s</string>
+    <string name="hakkinda_cihaz">Cihaz kimliği: %1$s</string>
+    <string name="hakkinda_lisans">Kimlik Merkezi açık kaynaklıdır (MIT lisansı). Ayrıntılar kaynak deposundaki LICENSE ve THIRD-PARTY-NOTICES dosyalarında.</string>
+    <string name="hakkinda_gizlilik">Veri yalnız bu cihazda ve senin bilgisayarında durur.</string>
+
+    <string name="geri">Geri</string>
+    <string name="ayarlar">Ayarlar</string>
+</resources>
