@@ -370,6 +370,7 @@ class Uygulama:
                 "id": app_id, "ad": ad, "olusturma": olusturma, "iptal": iptal,
                 "izinler": [{"kategori": g.category, "bitis": g.expires_at, "hassas_onay": g.confirmed_sensitive}
                             for g in izinler if g.app_id == app_id]})
+            uygulamalar[-1]["izinsiz"] = not iptal and not uygulamalar[-1]["izinler"]   # "Hiç izni yok" etiketi
         return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler()}
 
     def anahtar_uret(self, ad: str) -> dict:
@@ -418,15 +419,36 @@ class Uygulama:
         yol = self._claude_yolu()
 
         def uret() -> tuple[str, str]:
-            app_id, duz = self.anahtarlar.create_key("Claude Desktop")
-            self.anahtarlar.grant_all_non_sensitive(app_id)  # hassaslar kapalı kalır
+            app_id, duz = self.anahtarlar.create_key(CLAUDE_ANAHTAR_AD)
+            try:
+                self.anahtarlar.grant_all_non_sensitive(app_id)  # hassaslar kapalı kalır
+            except Exception as e:   # yarım izinli anahtar kalmasın: ya birlikte oluşur ya hiç
+                try:
+                    self.anahtarlar.revoke_key(app_id)
+                except Exception:
+                    gunluk.log().exception("yarım izinli anahtar iptal edilemedi")
+                gunluk.log().error("claude'a ekle: izinler verilemedi (%s); anahtar iptal edildi", type(e).__name__)
+                raise IslemHatasi("Anahtarın izinleri verilemedi; anahtar iptal edildi, hiçbir şey eklenmedi. "
+                                  "Lütfen yeniden deneyin.", "izin_hatasi") from e
             return app_id, duz
 
+        onceki = [a[0] for a in self.anahtarlar.list_keys() if a[1] == CLAUDE_ANAHTAR_AD and not a[3]]
         s = claude_ayar.ekle(yol, uret, self.veri)
+        if s.durum in ("eklendi", "guncellendi"):
+            # yenisi ayar dosyasına yazıldıktan SONRA eskileri iptal et (yazılamadıysa eskisi çalışmaya devam eder)
+            for eski in onceki:
+                if eski != s.app_id:
+                    try:
+                        self.anahtarlar.revoke_key(eski)
+                    except Exception:
+                        gunluk.log().exception("eski Claude anahtarı iptal edilemedi")
         if s.durum not in ("eklendi", "guncellendi"):
             s.aranan = claude_ayar.arama_yerleri()
         gunluk.log().info("claude'a ekle: %s", s.durum)
         return s.to_dict()
+
+
+CLAUDE_ANAHTAR_AD = "Claude Desktop"
 
 
 def simdi() -> str:
