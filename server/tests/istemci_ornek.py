@@ -168,6 +168,10 @@ class Istemci:
                 elif y.status == 409:
                     ofset = int(y.getheader("X-Alinan") or 0)
                     time.sleep(0.02)
+                    if ofset >= toplam:   # eşzamanlı başka gönderen dosyayı tamamladı: boş PUT (Content-Length: 0 -> 411) atma
+                        durum, _ = self.durum(dosya_id)
+                        if durum == "var":
+                            return {"sonuc": "var", "ilk_durum": ilk, "baslangic_ofset": bas0, "gonderilen_bayt": gonderilen}
                 elif y.status == 422:
                     return {"sonuc": "reddedildi", "ilk_durum": ilk, "baslangic_ofset": bas0,
                             "gonderilen_bayt": gonderilen, "neden": json.loads(y.govde).get("hata")}

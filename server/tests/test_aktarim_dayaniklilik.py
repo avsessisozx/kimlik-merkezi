@@ -552,3 +552,21 @@ def test_401de_govde_okunmaz(tmp_path):
         assert okunan == [0]       # kimliksizde boşaltılacak bayt kaydı bile yok
     finally:
         d.kapat()
+
+
+def test_bosta_keepalive_baglantilar_ip_sinirini_tuketmez(tmp_path):
+    """4 el sıkışmış, boşta bağlantı varken 5. geçerli istek hizmet alır (en eski boşta bağlantı kapatılır)."""
+    d = yeni(tmp_path)
+    try:
+        i = d.eslesmis()
+        bostalar = [tls(d.alici.port) for _ in range(4)]
+        for _ in range(100):                      # hepsi boşta (istek bekler) duruma geçsin
+            if len(d.alici._srv._bosta) >= 4:
+                break
+            time.sleep(0.05)
+        assert i.durum(DOSYA) == ("yok", 0)
+        assert kapandi(bostalar[0], 3)            # en eskisi kapatıldı
+        for s in bostalar:
+            s.close()
+    finally:
+        d.kapat()
