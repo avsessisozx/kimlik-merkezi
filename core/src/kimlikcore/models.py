@@ -62,6 +62,8 @@ class Event(EventIn):
     source_id: str
     schema_version: int
     hidden: bool
+    onem: int = 1                       # 0 düşük, 1 olağan, 2 yüksek (docs/SEMA.md)
+    hassas_konu: tuple[str, ...] = ()   # konu kimlikleri, alfabetik; boş = işaret yok
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

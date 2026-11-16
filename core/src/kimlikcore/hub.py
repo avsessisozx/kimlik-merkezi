@@ -43,13 +43,15 @@ from .models import (
     Source,
 )
 from .streaming import CHUNK
+from . import hassas as _hassas
+from .onem import onem_hesapla
 from .turkish import build_fts_query, fold
 
 DB_NAME = "kimlik.db"
 _TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 _EVENT_COLS = (
     "event_id, event_key, source_id, device_id, ts, kind, category, payload, text, "
-    "schema_version, hidden"
+    "schema_version, hidden, onem, hassas_konu"
 )
 _BATCH = 5000
 
@@ -140,6 +142,7 @@ class Hub:
         self._closed = False
         self.schema_version = _schema.current_version(conn)
         self.goc_uyarilari: list[str] = []   # açılışta eski dosya göçü / gelen kutusu uyarıları
+        self._hassas_yukle()
 
     # ------------------------------------------------------------------ açma/kapama
     @classmethod
@@ -184,7 +187,7 @@ class Hub:
                         conn.execute("PRAGMA temp_store = MEMORY")
                     conn.execute("PRAGMA foreign_keys = ON")
                     conn.execute("PRAGMA cache_size = -65536")
-                    _schema.migrate(conn)
+                    _schema.migrate(conn, migrations={**_schema.MIGRATIONS, 5: _schema.v5_adimi(root)})
                     if dek is not None and (durum != "sifreli" or conn.total_changes > 0):
                         _sif.bayt_sifrele_yaz(dek, conn.serialize(), db)   # yeni klasör ya da göç yapıldı
                 except BaseException:
@@ -239,6 +242,12 @@ class Hub:
     @property
     def sifreli(self) -> bool:
         return self._dek is not None
+
+    def _hassas_yukle(self) -> None:
+        """Hassas konu listesini (paket + veri klasörü eki) yükler; bozuk ek dosya uyarı üretir."""
+        self._siniflandirici, uyari = _hassas.yukle(self.root)
+        if uyari and uyari not in self.goc_uyarilari:
+            self.goc_uyarilari.append(uyari)
 
     # ------------------------------------------------------------------ gelen kutusu / eski dosyalar
     @property
@@ -657,8 +666,7 @@ class Hub:
         return [Source(*r) for r in self._conn.execute(sql + " ORDER BY s.imported_at, s.source_id")]
 
     # ------------------------------------------------------------------ olaylar
-    @staticmethod
-    def _prepare(ev: EventIn, source_kind: str) -> tuple[str, str, str, str, str, str | None, str]:
+    def _prepare(self, ev: EventIn, source_kind: str) -> tuple:
         if ev.category not in Category.ALL:
             raise FormatError(f"Bilinmeyen kategori: {ev.category!r}")
         if not isinstance(ev.kind, str) or not ev.kind:
@@ -684,7 +692,9 @@ class Hub:
             key = "h:" + digest
         elif not isinstance(key, str) or not key or len(key) > 1000:
             raise FormatError("event_key boş olmayan, en çok 1000 karakterlik metin olmalı.")
-        return key, ts, ev.kind, ev.category, payload, ev.device_id, text
+        onem = onem_hesapla(ev.kind, ev.category, ev.payload)
+        hassas = _hassas.isaret(self._siniflandirici.konular(text))
+        return key, ts, ev.kind, ev.category, payload, ev.device_id, text, onem, hassas
 
     @_write_only
     def add_events(
@@ -727,12 +737,13 @@ class Hub:
         now = now_iso()
         ver = self.schema_version
         with self._tx() as c:
-            for key, ts, kind, cat, payload, device, text in batch:
+            for key, ts, kind, cat, payload, device, text, onem, hassas in batch:
                 cur = c.execute(
                     "INSERT OR IGNORE INTO events(event_id, event_key, source_id, device_id, ts, "
-                    "kind, category, payload, text, schema_version, hidden, ingested_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
-                    (str(uuid.uuid4()), key, source_id, device, ts, kind, cat, payload, text, ver, now),
+                    "kind, category, payload, text, schema_version, hidden, ingested_at, onem, hassas_konu) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+                    (str(uuid.uuid4()), key, source_id, device, ts, kind, cat, payload, text, ver, now,
+                     onem, hassas),
                 )
                 if cur.rowcount == 1:
                     folded = fold(text)
@@ -760,6 +771,7 @@ class Hub:
         return Event(
             event_id=r[0], event_key=r[1], source_id=r[2], device_id=r[3], ts=r[4], kind=r[5],
             category=r[6], payload=json.loads(r[7]), text=r[8], schema_version=r[9], hidden=bool(r[10]),
+            onem=r[11], hassas_konu=tuple(r[12].split(",")) if r[12] else (),
         )
 
     @staticmethod
@@ -832,6 +844,23 @@ class Hub:
         if r is None:
             raise NotFoundError(f"Olay yok: {event_id}")
         return self._row_event(r)
+
+    @_write_only
+    def yeniden_isaretle(self, progress: Callable[[int], None] | None = None) -> dict[str, int]:
+        """Tüm olayların `onem`/`hassas_konu` işaretini güncel kural ve listeyle yeniden hesaplar.
+
+        Veri klasöründeki ek liste yeniden okunur. `{"incelenen", "degisen"}` döner.
+        `progress(incelenen)` her grupta çağrılır.
+        """
+        sn, uyari = _hassas.yukle(self.root)
+        if uyari:
+            raise FormatError(
+                f"Yeniden işaretleme yapılmadı, hiçbir olay değiştirilmedi: {uyari} "
+                f"(dosya: {self.root / _hassas.EK_DOSYA})")
+        self._siniflandirici = sn
+        with self._tx() as c:
+            inc, deg = _schema.geri_isaretle(c, self._siniflandirici, progress)
+        return {"incelenen": inc, "degisen": deg}
 
     # ------------------------------------------------------------------ silme yolu
     @_write_only

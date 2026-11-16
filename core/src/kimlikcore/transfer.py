@@ -16,8 +16,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from . import hassas as _hassas
 from .errors import FormatError, HubNotEmptyError, SchemaTooNew
 from .models import ExportResult, ImportResult
+from .onem import onem_hesapla
 from .streaming import iter_lines
 from .turkish import fold
 
@@ -27,6 +29,7 @@ if TYPE_CHECKING:  # pragma: no cover
 FORMAT = "kimlikmerkezi-jsonl"
 FORMAT_VERSION = 1
 _MOD = 1 << 256
+_SONRADAN_EKLENEN = "konu_izni"   # v5'te eklendi; eski dışa aktarımlarda yok
 
 # (kayıt türü, tablo) — sıra dış anahtar bağımlılığına uygundur.
 TYPES: list[tuple[str, str]] = [
@@ -37,6 +40,7 @@ TYPES: list[tuple[str, str]] = [
     ("device", "devices"),
     ("app_key", "app_keys"),
     ("permission", "permissions"),
+    ("konu_izni", "konu_izinleri"),
     ("fact", "facts"),
     ("contradiction", "contradictions"),
     ("event", "events"),
@@ -185,6 +189,9 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
                     vals = dict(rec)
                     vals["payload"] = canonical_json(rec["payload"])
                     vals["hidden"] = int(bool(rec["hidden"]))
+                    # Önem ve hassas konu işareti içe alınırken yeniden hesaplanır (eski dosyalarda yok).
+                    vals["onem"] = onem_hesapla(rec["kind"], rec["category"], rec["payload"])
+                    vals["hassas_konu"] = _hassas.isaret(hub._siniflandirici.konular(rec["text"]))
                     names = list(vals)
                     cur = c.execute(
                         f"INSERT INTO events({', '.join(names)}) VALUES ({','.join('?' * len(names))})",
@@ -206,7 +213,16 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
         if header is None or footer is None:
             raise FormatError("Dosya eksik ya da kesik (header/footer yok).")
         got = acc.result()
-        if got != {"counts": footer.get("counts"), "digests": footer.get("digests")}:
+        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni` türü için (0 kayıt ve footer'da yok);
+        # başka bir türün özeti eksikse ya da farklıysa dosya reddedilir.
+        fc, fd = footer.get("counts"), footer.get("digests")
+        if not isinstance(fc, dict) or not isinstance(fd, dict):
+            fc = fd = None
+        if (fc is None or any(t not in got["counts"] for t in (*fc, *fd))
+                or any(
+                    (fc.get(t) != got["counts"][t] or fd.get(t) != got["digests"][t])
+                    for t in got["counts"]
+                    if not (t == _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
             if summarize(c) != got:

@@ -320,6 +320,21 @@ def cmd_zaman(args):
          "\n".join(_event_line(e) for e in found) or "Kayıt yok.")
 
 
+def cmd_yeniden_isaretle(args):
+    with Hub.open(args.veri, write=True) as hub:
+        for u in hub.goc_uyarilari:
+            print(f"Uyarı: {u}", file=sys.stderr)
+        son = [0]
+
+        def ilerle(n):
+            if not args.json and n - son[0] >= 50000:
+                son[0] = n
+                print(f"{n} olay incelendi...", file=sys.stderr)
+
+        r = hub.yeniden_isaretle(ilerle)
+    _out(args, r, f"{r['incelenen']} olay incelendi, {r['degisen']} olayın önem/hassas konu işareti güncellendi.")
+
+
 def cmd_kaynaklar(args):
     with Hub.open(args.veri, write=False) as hub:
         srcs = hub.sources()
@@ -478,6 +493,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--kategori", action="append", choices=sorted(Category.ALL))
     sp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--onek", action="store_true", help="her terimi önek olarak ara")
+    add("yeniden-isaretle", cmd_yeniden_isaretle,
+        "tüm olayların önem ve hassas konu işaretini güncel kural/listeyle yeniden hesaplar")
     sp = add("zaman", cmd_zaman, "zaman çizelgesi (yeniden eskiye)")
     sp.add_argument("--kategori", action="append", choices=sorted(Category.ALL))
     sp.add_argument("--baslangic")
