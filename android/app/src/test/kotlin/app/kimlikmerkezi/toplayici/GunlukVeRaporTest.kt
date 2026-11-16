@@ -1,0 +1,70 @@
+package app.kimlikmerkezi.toplayici
+
+import app.kimlikmerkezi.toplayici.gunluk.Gunluk
+import app.kimlikmerkezi.toplayici.gunluk.HataRaporu
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class GunlukVeRaporTest {
+    @Test
+    fun halkaTamponSinirliVeKalici() {
+        val d = TestYardim.gecici()
+        val g = Gunluk(d, bellekSiniri = 10)
+        repeat(50) { g.bilgi("t", "satir $it") }
+        assertEquals(10, g.sonSatirlar(50).size)
+        assertTrue(g.sonSatirlar(1)[0].endsWith("satir 49"))
+        val g2 = Gunluk(d, bellekSiniri = 10) // yeniden açılış: dosyadan
+        assertTrue(g2.sonSatirlar(1)[0].endsWith("satir 49"))
+        assertTrue(java.io.File(d, "gunluk.txt").readLines().size <= 20)
+    }
+
+    @Test
+    fun sonAdimVeSonHataKaliciDir() {
+        val d = TestYardim.gecici()
+        val g = Gunluk(d)
+        g.adim("hızlı not")
+        g.hata("x", IllegalStateException("bozuk\nsatir"), cokme = true)
+        val g2 = Gunluk(d)
+        assertEquals("hızlı not", g2.sonAdim())
+        val h = g2.sonHata()!!
+        assertEquals("java.lang.IllegalStateException", h.tur)
+        assertEquals("bozuk satir", h.ileti)
+        assertTrue(h.cokme)
+    }
+
+    @Test
+    fun raporKayitMetniIcermez() {
+        val ku = TestYardim.Kurulum(gunluk = Gunluk(TestYardim.gecici()))
+        val k = ku.ac()
+        val gizli = "BU-NOT-GIZLIDIR-4711"
+        k.kayitEkle("not.hizli", "notlar", gizli)
+        k.kayitEkle("paylasim.link", "notlar", "https://gizli.test/$gizli")
+        runCatching { k.kayitEkle("yok", "notlar", gizli) }.onFailure { ku.gunluk.hata("not", it) }
+        ku.ac() // açılış günlüğü
+        val r = HataRaporu.olustur(
+            HataRaporu.Girdi(
+                "0.2.0", "12", 31, "Uretici", "Model", ku.gunluk.sonAdim(), ku.gunluk.sonHata(),
+                ku.gunluk.sonSatirlar(50), k.bekleyenKayitSayisi(), k.bekleyenDosyaSayisi(),
+            ),
+        )
+        assertFalse(r.contains(gizli))
+        assertFalse(r.contains("gizli.test"))
+        assertTrue(r.contains("Uygulama sürümü: 0.2.0"))
+        assertTrue(r.contains("API 31"))
+        assertTrue(r.contains("Uretici Model"))
+        assertTrue(r.contains("2 kayıt, 1 dosya"))
+        assertNotNull(ku.gunluk.sonHata())
+    }
+
+    @Test
+    fun raporSonElliSatirlaSinirli() {
+        val g = Gunluk(null)
+        repeat(120) { g.bilgi("t", "s$it") }
+        val r = HataRaporu.olustur(HataRaporu.Girdi("0.2.0", "12", 31, "U", "M", null, null, g.sonSatirlar(80), 0, 0))
+        assertEquals(50, r.lines().count { it.contains(" BILGI t s") })
+        assertTrue(r.contains("Son hata: yok"))
+    }
+}

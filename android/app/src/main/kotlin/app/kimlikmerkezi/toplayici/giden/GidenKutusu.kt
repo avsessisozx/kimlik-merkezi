@@ -58,6 +58,8 @@ class GidenKutusu(
     private val saat: () -> Instant = { Instant.now() },
     private val bolge: () -> ZoneId = { ZoneId.systemDefault() },
     private val kapatmaEsigi: Int = KAPATMA_ESIGI,
+    /** Her çerçeveden sonra fsync. Yalnız çok sayıda kayıt yazan testlerde kapatılır. */
+    private val zorlaYaz: Boolean = true,
 ) {
     private class Dosya(
         val id: String,
@@ -230,7 +232,7 @@ class GidenKutusu(
             FileOutputStream(d.dosya, true).use { o ->
                 o.write(cerceve)
                 o.flush()
-                o.fd.sync()
+                if (zorlaYaz) o.fd.sync()
             }
             d.bayt += cerceve.size
             d.sira++
