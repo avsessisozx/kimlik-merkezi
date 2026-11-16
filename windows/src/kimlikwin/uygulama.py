@@ -183,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{modul}: var")
             except ImportError:
                 print(f"{modul}: YOK")
+        try:                                         # çekirdek paket verisi (importlib.resources); pakette olmalı
+            from kimlikcore import hassas
+            print(f"hassas konu listesi: var ({len(hassas.hassas_konulari('doktor'))} konu)")
+        except Exception as e:
+            print(f"hassas konu listesi: YOK ({type(e).__name__})")
         return 0
     if a.komut == "tanila":
         return tanila_komutu(a.yol, a.adlari_goster, a.ayrinti)

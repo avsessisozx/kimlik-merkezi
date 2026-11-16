@@ -61,6 +61,8 @@ if BEKLENEN_SURUM:
 kontrol(r.returncode == 0 and "ijson arka ucu: yajl2_c" in r.stdout, "pakette ijson C uzantısı (yajl2_c) var")
 kontrol("pypdf: var" in r.stdout and "docx: var" in r.stdout, "pakette pypdf ve python-docx (belge okuyucular) var")
 
+kontrol("hassas konu listesi: var" in r.stdout, "pakette çekirdek verisi (kimlikcore/veri/hassas_konular.json) okunuyor")
+
 # ---- konsol exe: `tanila <yol>` (dosya denetimi). Sahte örnekte özel işaretli dizgiler (sentinel) rapora SIZMAMALI.
 import tanila_dene as TD
 os.makedirs(calisma, exist_ok=True)
