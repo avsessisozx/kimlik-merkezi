@@ -391,6 +391,7 @@ class Uygulama:
     # ------------------------------------------------------------------ erişim
     def erisim(self) -> dict:
         izinler = self.anahtarlar.list_grants()
+        konu_izinleri = self.anahtarlar.list_topic_grants()
         uygulamalar = []
         for app_id, ad, olusturma, iptal in self.anahtarlar.list_keys():
             uygulamalar.append({
@@ -400,7 +401,10 @@ class Uygulama:
             simdi_ = simdi()
             uygulamalar[-1]["izinsiz"] = not iptal and not any(   # "Hiç izni yok": yalnız SÜRESİ DOLMAMIŞ izinler sayılır
                 i["bitis"] is None or i["bitis"] > simdi_ for i in uygulamalar[-1]["izinler"])
-        return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler()}
+            uygulamalar[-1]["konular"] = [   # hassas KONU izinleri (kategori izinlerinden ayrı); süresi dolmamış olanlar
+                {"konu": k[1], "bitis": k[3]} for k in konu_izinleri if k[0] == app_id and (k[3] is None or k[3] > simdi_)]
+        return {"uygulamalar": uygulamalar, "kategoriler": self.kategoriler(),
+                "tum_konular": [{"kimlik": k, "ad": KONU_ADLARI.get(k, k)} for k in self.anahtarlar.list_topics()]}
 
     def anahtar_uret(self, ad: str) -> dict:
         app_id, duz = self.anahtarlar.create_key(ad)
@@ -412,6 +416,15 @@ class Uygulama:
 
     def izin_ver(self, app_id: str, kategori: str, bitis: str | None = None, hassas_onay: bool = False) -> dict:
         self.anahtarlar.grant(app_id, kategori, expires_at=bitis or None, confirmed_sensitive=bool(hassas_onay))
+        return {"ok": True}
+
+    def konu_izin_ver(self, app_id: str, konu: str, bitis: str | None = None, hassas_onay: bool = False) -> dict:
+        """Hassas KONU izni: her konu AYRI onayla (`hassas_onay=True`); hiçbir toplu işlem konu izni vermez."""
+        self.anahtarlar.grant_topic(app_id, konu, expires_at=bitis or None, confirmed=hassas_onay is True)
+        return {"ok": True}
+
+    def konu_izin_kaldir(self, app_id: str, konu: str) -> dict:
+        self.anahtarlar.revoke_topic(app_id, konu)
         return {"ok": True}
 
     def izin_kaldir(self, app_id: str, kategori: str) -> dict:
@@ -490,6 +503,8 @@ class Uygulama:
 
 
 CLAUDE_ANAHTAR_AD = "Claude Desktop"
+KONU_ADLARI = {"saglik": "Sağlık", "hukuk": "Hukuk", "finans": "Para ve finans", "din_siyaset": "Din ve siyaset",
+               "cinsellik": "Cinsellik"}   # bilinmeyen (kullanıcı ek dosyası) kimlik olduğu gibi gösterilir
 
 
 def ag_yolu_mu(yol: str) -> bool:

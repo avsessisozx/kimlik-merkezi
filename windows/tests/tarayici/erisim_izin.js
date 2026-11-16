@@ -71,7 +71,8 @@ const hepsi = p => p.evaluate(() => [...document.querySelectorAll('#izin-ekrani 
     await p.waitForSelector('#izin-ekrani', { timeout: 15000 });
     sonuc.diyaloglar.length = 0;
     await p.click('#izin-kaydet'); await bekle(1000);
-    sonuc.onerili = { diyalog: [...sonuc.diyaloglar], api: await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Onerili').izinler.map(i => i.kategori).sort()) };
+    sonuc.onerili = { diyalog: [...sonuc.diyaloglar], api: await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Onerili').izinler.map(i => i.kategori).sort()),
+      konular: await p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Onerili').konular) };
 
     // kısmi hata: bir izin verilemezse hangileri verildi/verilemedi yazılır, ekran açık kalır
     await p.fill('input[placeholder^="Uygulama adı"]', 'Kismi');
@@ -98,6 +99,24 @@ const hepsi = p => p.evaluate(() => [...document.querySelectorAll('#izin-ekrani 
     sonuc.diyaloglar.length = 0; kabul = false;
     await p.click('#izin-kapat'); await bekle(600);
     sonuc.kapat_uyari = { diyalog: [...sonuc.diyaloglar], ekran_acik: (await p.locator('#izin-ekrani').count()) === 1 };
+    // hassas konu: ayrı bölüm, varsayılan kapalı, her konu ayrı onayla açılır
+    const konuApi = () => p.evaluate(async () => (await api('erisim')).uygulamalar.find(u => u.ad === 'Kapatilan').konular.map(k => k.konu));
+    sonuc.konu = { bolum: await metin(p, '#izin-ekrani .konu-bolum'), baslangic: await konuApi(),
+      isaretli_baslangic: await p.evaluate(() => [...document.querySelectorAll('#izin-ekrani input[data-konu]')].filter(c => c.checked).length),
+      adlar: await p.evaluate(() => [...document.querySelectorAll('#izin-ekrani input[data-konu]')].map(c => c.dataset.konu)) };
+    await p.click('#izin-konu-saglik');
+    await p.waitForSelector('#konu-onay-evet', { timeout: 5000 });
+    sonuc.konu.onay_metni = await metin(p, '#kok-pencere');
+    sonuc.konu.onaysiz_kapali = await p.isDisabled('#konu-onay-evet');
+    sonuc.konu.onaysiz_api = await konuApi();
+    await p.check('#konu-onay-kutu');
+    await p.click('#konu-onay-evet');
+    await p.waitForSelector('#izin-ekrani', { timeout: 10000 }); await bekle(800);
+    sonuc.konu.acik_api = await konuApi();
+    sonuc.konu.acik_isaretli = await p.isChecked('#izin-konu-saglik');
+    sonuc.konu.acik_baska_isaretli = await p.evaluate(() => [...document.querySelectorAll('#izin-ekrani input[data-konu]')].filter(c => c.checked).length);
+    await p.uncheck('#izin-konu-saglik'); await bekle(800);
+    sonuc.konu.kapali_api = await konuApi();
     sonuc.bildirim_hatalari = await p.evaluate(() => [...document.querySelectorAll('#bildirim div.h')].map(d => d.textContent));
     await c.close();
     process.stdout.write(JSON.stringify(sonuc) + '\n');

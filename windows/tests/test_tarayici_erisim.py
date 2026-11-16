@@ -87,6 +87,7 @@ def test_bos_kayitta_uyari_ve_onay_gerekir(sonuc):
 def test_onerilenlerle_kaydet_uyarisiz_10_izin_verir(sonuc):
     o = sonuc["onerili"]
     assert o["diyalog"] == [] and len(o["api"]) == 10 and not (HASSAS & set(o["api"]))
+    assert o["konular"] == []                                       # önerilen/kaydet konu izni vermez
 
 
 def test_izinsiz_kapatmada_da_uyari(sonuc):
@@ -99,3 +100,14 @@ def test_kismi_kayitta_verilen_ve_verilemeyen_yazilir(sonuc):
     assert "Kısmen kaydedildi" in k["bildirim"] and "VERİLEMEYEN: Notlar ve linkler" in k["bildirim"] and "deneme hatası" in k["bildirim"]
     assert k["ekran_acik"] is True and "notlar" not in k["api"] and len(k["api"]) == 9
     assert k["sonra"] == 10
+
+
+def test_hassas_konu_ayri_bolum_ayri_onayla_acilir(sonuc):
+    k = sonuc["konu"]
+    assert "Hassas konular" in k["bolum"] and "o kategori açık olsa bile bu yapay zekâya GÖSTERİLMEZ" in k["bolum"]
+    assert "Bu ayrım sözcük listesine dayanır" in k["bolum"] and "Para ve finans" in k["bolum"] and "Din ve siyaset" in k["bolum"]
+    assert k["baslangic"] == [] and k["isaretli_baslangic"] == 0
+    assert set(k["adlar"]) >= {"saglik", "hukuk", "finans", "din_siyaset", "cinsellik"}
+    assert "Sağlık" in k["onay_metni"] and k["onaysiz_kapali"] is True and k["onaysiz_api"] == []
+    assert k["acik_api"] == ["saglik"] and k["acik_isaretli"] is True and k["acik_baska_isaretli"] == 1
+    assert k["kapali_api"] == []
