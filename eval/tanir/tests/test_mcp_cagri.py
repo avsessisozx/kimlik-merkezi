@@ -27,7 +27,7 @@ def kurulu(tmp_path_factory):
 def cagir(kurulu, *args):
     cfg = kurulu / "paket" / "C" / "mcp.json"
     p = subprocess.run([sys.executable, str(YARDIMCI), "--yapilandirma", str(cfg), *args],
-                       capture_output=True, text=True, timeout=120, env=os.environ.copy())
+                       capture_output=True, text=True, encoding="utf-8", timeout=120, env=os.environ.copy())
     return p
 
 

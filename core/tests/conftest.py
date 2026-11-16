@@ -7,7 +7,7 @@ import pytest
 SRC = str(Path(__file__).resolve().parents[1] / "src")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture  # işlev kapsamlı: sahte sağlayıcı ortamı (ag_koruma) her testte güncel alınır
 def child_env():
     """Alt süreçlerin kimlikcore'u bulması için ortam."""
     env = dict(os.environ)

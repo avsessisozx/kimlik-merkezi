@@ -45,24 +45,24 @@ jobs:
       # Her paket ayrı koşulur ve biri başarısız olsa da diğerleri koşar: tüm Windows hataları tek seferde görünsün.
       - name: core testleri (kilit, dosya izni, yollar)
         if: success() || failure()
-        run: python -m pytest -rs core -m "not buyuk"
+        run: python -m pytest -rfEs core -m "not buyuk"
       - name: server testleri
         if: success() || failure()
-        run: python -m pytest -rs server
+        run: python -m pytest -rfEs server
       - name: importers testleri
         if: (success() || failure()) && hashFiles('importers/pyproject.toml') != ''
-        run: python -m pytest -rs importers -m "not buyuk"
+        run: python -m pytest -rfEs importers -m "not buyuk"
       - name: windows klasörü testleri (sihirbaz, Claude ayarı, kilit, yerel web)
         if: (success() || failure()) && hashFiles('windows/pyproject.toml') != ''
-        run: python -m pytest -rs windows
+        run: python -m pytest -rfEs windows
       - name: entegrasyon testleri
         if: success() || failure()
-        run: python -m pytest -rs entegrasyon -m "not buyuk"
+        run: python -m pytest -rfEs entegrasyon -m "not buyuk"
       - name: eval testleri
         if: success() || failure()
         run: |
           python -m pip install pyyaml
-          python -m pytest -rs eval
+          python -m pytest -rfEs eval
 
   buyuk:
     # ~2 GB sentetik dosya; test Windows'ta atlanır (resource modülü), bu yüzden yalnızca Linux.
