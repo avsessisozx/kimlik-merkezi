@@ -330,6 +330,7 @@ class Guvenlik:
         self.hatirla(kilit["klasor"], parola)
         self.y.uygulama, self.y.kilit = uyg, None
         gunluk.log().info("parolalı klasör açıldı")
+        self.y.blok_guncelle("parola_acildi")
         return {"ok": True}
 
     def api_kilit_kurtar(self, ifade: str, yeni_parola: str | None = None,
@@ -345,6 +346,7 @@ class Guvenlik:
             self.unut(kilit["klasor"])
         self.y.uygulama = self.y.uygulama_olustur(kilit["klasor"], parola)
         self.y.kilit = None
+        self.y.blok_guncelle("kilit_acildi")
         return {"ok": True, "mod": mod}
 
     # ------------------------------------------------------------------ şifrelemeyi aç / kapat

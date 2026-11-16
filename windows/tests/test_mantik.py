@@ -219,3 +219,141 @@ def test_ana_sayfa_ile_harita_toplami_farki_hassas_ve_gizlenenlerden_gelir(kurul
         u.kayit_gizle(ilk[0]["id"])
         assert u.harita()["profil"]["olay"] == gizlenen_once - 1
         assert u.durum()["ozet"]["counts"]["event"] == toplam
+
+
+# ---------------------------------------------------------------- madde 11: izinsiz/yarım izinli anahtar
+def _claude_dosyasi(kurulu, tmp_path):
+    f = tmp_path / "claude_desktop_config.json"
+    f.write_text("{}", encoding="utf-8")
+    kurulu.uygulama._claude_yolu = lambda: f
+    return f
+
+
+def _claude_anahtarlari(kurulu):
+    return [u for u in kurulu.api("erisim", {})["uygulamalar"] if u["ad"] == "Claude Desktop"]
+
+
+def test_claude_ekle_yaniti_app_id_tasir_ve_on_kategori_izinli(kurulu, tmp_path):
+    _claude_dosyasi(kurulu, tmp_path)
+    r = kurulu.api("claude_ekle", {})
+    (a,) = _claude_anahtarlari(kurulu)
+    assert r["app_id"] == a["id"] and len(a["izinler"]) == 10 and a["izinsiz"] is False
+    assert not ({"eposta", "mesaj", "konum", "sohbet"} & {i["kategori"] for i in a["izinler"]})
+
+
+def test_claude_ekle_izin_verme_ortada_hata_verirse_anahtar_gecersiz(kurulu, tmp_path, monkeypatch):
+    f = _claude_dosyasi(kurulu, tmp_path)
+    gercek = kurulu.uygulama.anahtarlar.grant
+    sayac = {"n": 0}
+
+    def bozuk(*a, **k):
+        sayac["n"] += 1
+        if sayac["n"] == 4:
+            raise RuntimeError("disk hatası")
+        return gercek(*a, **k)
+    monkeypatch.setattr(kurulu.uygulama.anahtarlar, "grant", bozuk)
+    with pytest.raises(Exception) as e:
+        kurulu.api("claude_ekle", {})
+    assert "izin" in str(e.value).lower()
+    (a,) = _claude_anahtarlari(kurulu)
+    assert a["iptal"] is True and a["izinsiz"] is False        # iptal: yarım izinli anahtar kullanılamaz
+    assert json.loads(f.read_text(encoding="utf-8")) == {}     # ayar dosyasına hiçbir şey yazılmadı
+
+
+def test_claude_ekle_eski_claude_anahtarini_yenisi_yazildiktan_sonra_iptal_eder(kurulu, tmp_path):
+    _claude_dosyasi(kurulu, tmp_path)
+    ilk = kurulu.api("claude_ekle", {})["app_id"]
+    ikinci = kurulu.api("claude_ekle", {})["app_id"]
+    assert ilk != ikinci
+    durum = {a["id"]: a["iptal"] for a in _claude_anahtarlari(kurulu)}
+    assert durum == {ilk: True, ikinci: False}
+    diger = kurulu.api("anahtar_uret", {"ad": "Başka"})["id"]
+    kurulu.api("claude_ekle", {})
+    assert {a["id"]: a["iptal"] for a in kurulu.api("erisim", {})["uygulamalar"]}[diger] is False
+
+
+def test_claude_ekle_yazilamazsa_eski_anahtar_korunur(kurulu, tmp_path, monkeypatch):
+    f = _claude_dosyasi(kurulu, tmp_path)
+    ilk = kurulu.api("claude_ekle", {})["app_id"]
+    once = f.read_text(encoding="utf-8")
+    import os
+    gercek = os.replace
+
+    def bozuk(a, b):
+        raise OSError("yazılamadı")
+    monkeypatch.setattr(os, "replace", bozuk)
+    r = kurulu.api("claude_ekle", {})
+    monkeypatch.setattr(os, "replace", gercek)
+    assert r["durum"] == "hata"
+    assert f.read_text(encoding="utf-8") == once
+    assert {a["id"]: a["iptal"] for a in _claude_anahtarlari(kurulu)}[ilk] is False
+
+
+def test_sifir_izinli_anahtar_bayragi(kurulu):
+    app = kurulu.api("anahtar_uret", {"ad": "Boş"})["id"]
+    u = next(u for u in kurulu.api("erisim", {})["uygulamalar"] if u["id"] == app)
+    assert u["izinsiz"] is True and u["izinler"] == []
+    kurulu.api("izin_ver", {"app_id": app, "kategori": "notlar"})
+    u = next(u for u in kurulu.api("erisim", {})["uygulamalar"] if u["id"] == app)
+    assert u["izinsiz"] is False
+    kurulu.api("anahtar_iptal", {"app_id": app})
+    u = next(u for u in kurulu.api("erisim", {})["uygulamalar"] if u["id"] == app)
+    assert u["izinsiz"] is False        # iptal edilmiş anahtar için etiket yok
+
+
+def test_toplu_ve_onerilen_secime_hassas_kategori_girmez(kurulu):
+    app = kurulu.api("anahtar_uret", {"ad": "X"})["id"]
+    acilan = kurulu.api("izin_toplu", {"app_id": app})["acilan"]
+    assert not ({"eposta", "mesaj", "konum", "sohbet"} & set(acilan)) and len(acilan) == 10
+
+
+# ---------------------------------------------------------------- inceleme düzeltmeleri (B)
+def test_eski_anahtar_ada_gore_degil_ayardaki_girise_gore_iptal_edilir(kurulu, tmp_path):
+    f = _claude_dosyasi(kurulu, tmp_path)
+    elle = kurulu.api("anahtar_uret", {"ad": "Claude Desktop"})["id"]      # kullanıcının elle verdiği aynı ad
+    ilk = kurulu.api("claude_ekle", {})["app_id"]
+    ikinci = kurulu.api("claude_ekle", {})["app_id"]
+    d = {a["id"]: a["iptal"] for a in kurulu.api("erisim", {})["uygulamalar"]}
+    assert d == {elle: False, ilk: True, ikinci: False}
+    # ayar dosyasında giriş yokken (eşleşme yok) hiçbir anahtar iptal edilmez
+    f.write_text("{}", encoding="utf-8")
+    ucuncu = kurulu.api("claude_ekle", {})["app_id"]
+    d = {a["id"]: a["iptal"] for a in kurulu.api("erisim", {})["uygulamalar"]}
+    assert d[ikinci] is False and d[elle] is False and d[ucuncu] is False
+
+
+def test_izinsiz_bayragi_suresi_dolmus_izinleri_saymaz(kurulu):
+    app = kurulu.api("anahtar_uret", {"ad": "Süreli"})["id"]
+    kurulu.api("izin_ver", {"app_id": app, "kategori": "notlar", "bitis": "2099-01-01T00:00:00Z"})
+    u = next(u for u in kurulu.api("erisim", {})["uygulamalar"] if u["id"] == app)
+    assert u["izinsiz"] is False
+    with kurulu.uygulama.hub.transaction() as c:
+        c.execute("UPDATE permissions SET expires_at = '2020-01-01T00:00:00Z' WHERE app_id = ?", (app,))
+    u = next(u for u in kurulu.api("erisim", {})["uygulamalar"] if u["id"] == app)
+    assert u["izinsiz"] is True and len(u["izinler"]) == 1
+
+
+@pytest.mark.parametrize("yol", ["\\\\\\\\sunucu\\\\paylasim\\\\x.zip", "//sunucu/paylasim/x.zip"])
+def test_ag_yolu_reddedilir_exists_cagrilmadan(kurulu, monkeypatch, yol):
+    import os
+    from kimlikwin.cekirdek import IslemHatasi
+    cagri = []
+    gercek = os.path.exists
+    monkeypatch.setattr(os.path, "exists", lambda p: cagri.append(p) or gercek(p))
+    for ad, girdi in (("kopya_baslat", {"paket": yol}), ("ice_aktar_baslat", {"yol": yol}),
+                      ("ice_aktar_baslat", {"yol": "", "yollar": [yol, "x"], "tur": "computer_files"})):
+        with pytest.raises(IslemHatasi) as e:
+            kurulu.api(ad, girdi)
+        assert e.value.kod == "ag_yolu" and "Ağ yolları" in str(e.value)
+    assert not [c for c in cagri if str(c).startswith(("\\\\", "//"))]
+
+
+def test_kopya_surerken_ice_aktarma_reddedilir(kurulu, tmp_path):
+    from kimlikwin.cekirdek import IslemHatasi
+
+    class Canli:
+        canli = True
+    kurulu.uygulama.kopya_is = Canli()
+    with pytest.raises(IslemHatasi) as e:
+        kurulu.api("ice_aktar_baslat", {"yol": str(tmp_path)})
+    assert e.value.kod == "mesgul" and "kopya denetimi sürüyor" in str(e.value)

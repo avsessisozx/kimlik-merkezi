@@ -183,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{modul}: var")
             except ImportError:
                 print(f"{modul}: YOK")
+        try:                                         # çekirdek paket verisi (importlib.resources); pakette olmalı
+            from kimlikserver.access import list_topics
+            print(f"hassas konu listesi: var ({len(list_topics())} konu)")
+        except Exception as e:
+            print(f"hassas konu listesi: YOK ({type(e).__name__})")
         return 0
     if a.komut == "tanila":
         return tanila_komutu(a.yol, a.adlari_goster, a.ayrinti)
