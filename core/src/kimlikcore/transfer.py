@@ -47,6 +47,7 @@ TYPES: list[tuple[str, str]] = [
     ("event", "events"),
 ]
 _TABLE_OF = dict(TYPES)
+_DEVICE_FIELDS = ("device_id", "name", "platform", "created", "last_seen", "paired_at", "revoked")
 _EVENT_FIELDS = (
     "event_id", "event_key", "source_id", "device_id", "ts", "kind", "category", "payload",
     "text", "schema_version", "hidden", "ingested_at",
@@ -91,6 +92,8 @@ def iter_records(conn: sqlite3.Connection) -> Iterator[tuple[str, dict[str, Any]
     for t, table in TYPES:
         if t == "event":
             cur = conn.execute(f"SELECT {', '.join(_EVENT_FIELDS)} FROM events ORDER BY seq")
+        elif t == "device":   # anahtar özeti dışa aktarılmaz: yedekten dönen kurulumda telefonlar yeniden eşleşir
+            cur = conn.execute(f"SELECT {', '.join(_DEVICE_FIELDS)} FROM devices ORDER BY rowid")
         else:
             cur = conn.execute(f"SELECT * FROM {table} ORDER BY rowid")
         cols = [d[0] for d in cur.description]
@@ -150,7 +153,8 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
     cols_of: dict[str, set[str]] = {}
     for _t, table in TYPES:
         cols_of[table] = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
-    acc = _Acc()
+    acc = _Acc()       # dosyadaki kayıtlar olduğu gibi (footer karşılaştırması)
+    acc_db = _Acc()    # veritabanına girecek biçim (key_hash atılmış; summarize ile karşılaştırma)
     header: dict[str, Any] | None = None
     footer: dict[str, Any] | None = None
     verified = False
@@ -185,6 +189,9 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
             if unknown:
                 raise FormatError(f"{n}. satır: bilinmeyen alanlar: {', '.join(sorted(unknown))}")
             acc.add(t, rec)
+            if t == "device":
+                rec = {k: v for k, v in rec.items() if k != "key_hash"}   # eski dosyadaki anahtar özeti yok sayılır
+            acc_db.add(t, rec)
             try:
                 if t == "event":
                     vals = dict(rec)
@@ -226,7 +233,7 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
                     if not (t in _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
-            if summarize(c) != got:
+            if summarize(c) != acc_db.result():
                 raise FormatError("Geri yüklenen veri özeti dosyadakiyle uyuşmuyor.")
             verified = True
     missing = sum(

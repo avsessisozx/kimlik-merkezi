@@ -94,7 +94,37 @@ def test_dis_ice_aktarim_gidis_donus(root, tmp_path):
         r = h2.import_jsonl(out)
         assert r.verified and r.counts["aktarim_dosyasi"] == 1
         assert h2.summary() == ozet
-        assert h2.cihaz_dogrula(DEV, H1) and h2.aktarim_dosyasi_var(DEV, "f1") == "ab" * 32
+        # anahtar özeti dışa aktarılmaz: telefon yeniden eşleşmeli; dosya geçmişi (tekrarsızlık) taşınır
+        assert not h2.cihaz_dogrula(DEV, H1) and h2.cihazlar()[0]["eslesmis"] is False
+        assert h2.aktarim_dosyasi_var(DEV, "f1") == "ab" * 32
+    assert H1 not in out.read_text(encoding="utf-8")
+
+
+def test_key_hash_iceren_eski_dosya_yok_sayilir(root, tmp_path):
+    with Hub.open(root, write=True) as h:
+        h.cihaz_ekle(DEV, "Telefon", "android", H1)
+        out = tmp_path / "d.jsonl"
+        h.export_jsonl(out)
+    # eski v6 dosyası: device kaydında key_hash var, footer özeti buna göre
+    acc = transfer._Acc()
+    satirlar = []
+    for ln in open(out, encoding="utf-8"):
+        rec = json.loads(ln)
+        if rec["t"] == "device":
+            rec["key_hash"] = H1
+        if rec["t"] == "footer":
+            res = acc.result()
+            rec["counts"], rec["digests"] = res["counts"], res["digests"]
+        elif rec["t"] != "header":
+            acc.add(rec["t"], {k: v for k, v in rec.items() if k != "t"})
+        satirlar.append(json.dumps(rec, ensure_ascii=False))
+    eski = tmp_path / "eski6.jsonl"
+    eski.write_text("\n".join(satirlar) + "\n", encoding="utf-8")
+    assert H1 in eski.read_text(encoding="utf-8")
+    with Hub.open(tmp_path / "yeni", write=True) as h2:
+        r = h2.import_jsonl(eski)
+        assert r.verified and not h2.cihaz_dogrula(DEV, H1)
+        assert h2.query("SELECT key_hash FROM devices") == [(None,)]
 
 
 def _eski_dosya(src, dst):
@@ -110,7 +140,7 @@ def _eski_dosya(src, dst):
             rec["schema_version"] = 5
         if t == "device":
             for k in ("key_hash", "paired_at", "revoked"):
-                rec.pop(k)
+                rec.pop(k, None)
         if t == "footer":
             res = acc.result()
             rec["counts"] = {k: v for k, v in res["counts"].items() if k != "aktarim_dosyasi"}
