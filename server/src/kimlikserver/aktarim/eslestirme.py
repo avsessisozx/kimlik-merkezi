@@ -17,7 +17,7 @@ from collections.abc import Callable
 
 KOD_SURESI_S = 600
 EN_FAZLA_YANLIS = 5
-UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")   # her yerde fullmatch
 
 _YEREL_AGLAR = tuple(ipaddress.ip_network(n) for n in (
     "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "::1/128", "fe80::/10"))
@@ -84,34 +84,43 @@ class EslestirmeKodlari:
         self._kod: str | None = None
         self._bitis = 0.0
         self._yanlis = 0
+        self._neden: str | None = "uretilmedi"   # kod geçersizse nedeni (arayüz için)
 
     def uret(self, sure_s: float = KOD_SURESI_S) -> str:
         with self._kilit:
             self._kod = secrets.token_urlsafe(18)
             self._bitis = self._saat() + sure_s
             self._yanlis = 0
+            self._neden = None
             return self._kod
 
     def gecerli_mi(self) -> bool:
+        return self.durum()[0]
+
+    def durum(self) -> tuple[bool, str | None]:
+        """(geçerli_mi, neden). neden: None | "sure_doldu" | "cok_yanlis_deneme" | "kullanildi" | "uretilmedi" | "iptal"."""
         with self._kilit:
-            return self._kod is not None and self._saat() < self._bitis
+            if self._kod is not None and self._saat() >= self._bitis:
+                self._kod, self._neden = None, "sure_doldu"
+            return self._kod is not None, (None if self._kod is not None else self._neden)
 
     def iptal(self) -> None:
         with self._kilit:
-            self._kod = None
+            self._kod, self._neden = None, "iptal"
 
     def tuket(self, kod: str) -> bool:
         """Doğruysa kodu tüketir (tek kullanım). Yanlışta sayaç artar; 5. yanlışta etkin kod geçersiz olur."""
         with self._kilit:
-            if self._kod is None or self._saat() >= self._bitis:
-                self._kod = None
+            if self._kod is not None and self._saat() >= self._bitis:
+                self._kod, self._neden = None, "sure_doldu"
+            if self._kod is None:
                 return False
             if isinstance(kod, str) and secrets.compare_digest(kod.encode("utf-8"), self._kod.encode("utf-8")):
-                self._kod = None
+                self._kod, self._neden = None, "kullanildi"
                 return True
             self._yanlis += 1
             if self._yanlis >= EN_FAZLA_YANLIS:
-                self._kod = None
+                self._kod, self._neden = None, "cok_yanlis_deneme"
             return False
 
 
@@ -121,7 +130,7 @@ def eslestir(govde: object, kodlar: EslestirmeKodlari, cihaz_ekle: Callable[[str
     if not isinstance(govde, dict):
         return 400, {"hata": "gövde bir JSON nesnesi olmalı"}
     cihaz_id, ad, kod = govde.get("cihaz_id"), govde.get("ad"), govde.get("kod")
-    if not isinstance(cihaz_id, str) or not UUID_RE.match(cihaz_id):
+    if not isinstance(cihaz_id, str) or not UUID_RE.fullmatch(cihaz_id):
         return 400, {"hata": "cihaz_id UUID olmalı"}
     if not isinstance(ad, str) or not ad.strip() or len(ad) > 100:
         return 400, {"hata": "ad gerekli (en çok 100 karakter)"}

@@ -34,6 +34,7 @@ class Dunya:
         km1 = self.alici.eslestirme_kodu_uret(adresler=["127.0.0.1"])
         self.istemci = Istemci.kodla(km1, self.cihaz, parca_bayt=700)
         self.istemci.eslestir(eslestirme_coz(km1)["k"])
+        self.istemci.kapat()
 
     def _alici(self, port):
         return AktarimAlici(DogrudanKopru(self.hub), self.veri, port=port, adres="127.0.0.1", bulma_port=0,

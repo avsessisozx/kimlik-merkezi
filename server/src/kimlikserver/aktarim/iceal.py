@@ -23,7 +23,7 @@ def gelenleri_ice_al(hub, klasor: Path | str | None = None) -> dict[str, int]:
         return sonuc
     for cihaz_dizin in sorted(p for p in kok.iterdir() if p.is_dir()):
         for yol in sorted(cihaz_dizin.glob("*.jsonl")):
-            if not UUID_DOSYA_RE.match(yol.name):
+            if not UUID_DOSYA_RE.fullmatch(yol.name):
                 continue
             try:
                 r = run(hub, yol, "android_giden")

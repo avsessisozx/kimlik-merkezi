@@ -72,6 +72,7 @@ class AktarimDunyasi:
         from kimlikserver.aktarim import eslestirme_coz
 
         i.eslestir(eslestirme_coz(km1)["k"])
+        i.kapat()        # IP başına 4 bağlantı sınırı: boşta bağlantı tutma
         return i
 
     def dosya_yaz(self, dosya_id=None, kayit=5, **kw):

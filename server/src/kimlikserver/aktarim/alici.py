@@ -15,12 +15,14 @@ Günlüğe kayıt içeriği yazılmaz: yalnız kimlikler, bayt ve kayıt sayıla
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
 import logging
 import os
 import re
+import shutil
 import socket
 import ssl
 import threading
@@ -39,12 +41,12 @@ _log = logging.getLogger("kimlikserver.aktarim")
 VARSAYILAN_PORT = 47821
 PROTOKOL = 1
 GELEN_KLASOR = "gelen_aktarim"
-UUID_DOSYA_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$")
-_YOL_RE = re.compile(
-    r"^/giden/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/"
-    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
-_ARALIK_RE = re.compile(r"^bytes (\d{1,12})-(\d{1,12})/(\d{1,12})$")
-_SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+_U = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+UUID_DOSYA_RE = re.compile(_U + r"\.jsonl")            # her yerde fullmatch
+_YOL_RE = re.compile(rf"/giden/({_U})/({_U})\.jsonl")   # fullmatch
+_ARALIK_RE = re.compile(r"bytes ([0-9]{1,12})-([0-9]{1,12})/([0-9]{1,12})")   # ASCII rakam (\d Unicode'u da yakalar)
+_SAYI_RE = re.compile(r"[0-9]{1,12}")
+_SHA_RE = re.compile(r"[0-9a-fA-F]{64}")
 
 # Sınırlar (kurucuda değiştirilebilir; testler küçültür).
 SINIRLAR = {
@@ -52,11 +54,18 @@ SINIRLAR = {
     "parca_en_fazla": 8 * 1024 * 1024,     # tek PUT gövdesi
     "baslik_en_fazla": 16 * 1024,          # tüm başlıkların toplam boyutu
     "eslestir_govde_en_fazla": 4096,
-    "satir_en_fazla": 4 * 1024 * 1024,     # dosyadaki tek satır
-    "soket_zaman_asimi_s": 30.0,           # her okuma/yazma
-    "el_sikisma_zaman_asimi_s": 10.0,
+    "soket_zaman_asimi_s": 30.0,           # her okuma/yazma (tek işlem)
+    "el_sikisma_zaman_asimi_s": 10.0,      # TLS el sıkışmasının TOPLAMI
+    "baslik_toplam_zaman_asimi_s": 10.0,   # istek satırı + tüm başlıkların TOPLAMI (slowloris)
+    "bosta_zaman_asimi_s": 15.0,           # keep-alive bağlantıda yeni istek bekleme
     "govde_toplam_zaman_asimi_s": 120.0,   # bir parçanın tamamı (yavaş istemci)
     "eszamanli_baglanti": 32,
+    "ip_basina_baglanti": 4,
+    "cihaz_basina_yarim_yukleme": 8,
+    "gecici_toplam_en_fazla": 1024 * 1024 * 1024,   # tüm yarım yüklemelerin toplam baytı
+    "bos_disk_en_az": 500 * 1024 * 1024,   # ve boş alan >= 2 x kalan bayt
+    "gecici_omur_s": 7 * 24 * 3600.0,      # bundan eski .part/.sha temizlenir
+    "temizlik_araligi_s": 24 * 3600.0,
 }
 
 
@@ -95,58 +104,48 @@ class DogrudanKopru:
             self._tamamlandi(yol)
 
 
-class _Gecersiz(Exception):
-    pass
-
-
-def dosya_denetle(yol: Path, cihaz_id: str, dosya_id: str, satir_en_fazla: int) -> int:
-    """Tam dosyayı akışla denetler: başlık (cihaz/dosya kimliği yoldakiyle aynı), her satır JSON nesnesi,
-    son satır kapanış ve `kayit_sayisi` gerçek kayıt satırı sayısına eşit. Kayıt sayısını döner."""
-    kayit = 0
-    baslik_var = kapandi = False
-    n = 0
-    with open(yol, "rb") as f:
-        while True:
-            ham = f.readline(satir_en_fazla + 1)
-            if not ham:
-                break
-            n += 1
-            if len(ham) > satir_en_fazla and not ham.endswith(b"\n"):
-                raise _Gecersiz(f"{n}. satır çok uzun")
-            if kapandi:
-                raise _Gecersiz("kapanış kaydından sonra satır var")
-            try:
-                o = json.loads(ham.decode("utf-8"))
-            except (ValueError, UnicodeDecodeError):
-                raise _Gecersiz(f"{n}. satır geçerli JSON değil") from None
-            if not isinstance(o, dict):
-                raise _Gecersiz(f"{n}. satır nesne değil")
-            if not baslik_var:
-                if o.get("baslik") is not True:
-                    raise _Gecersiz("ilk satır başlık değil")
-                if o.get("cihaz_id") != cihaz_id or o.get("dosya_id") != dosya_id:
-                    raise _Gecersiz("başlıktaki cihaz/dosya kimliği yolla uyuşmuyor")
-                baslik_var = True
-            elif o.get("kapanis") is True:
-                k = o.get("kayit_sayisi")
-                if not isinstance(k, int) or isinstance(k, bool) or k != kayit:
-                    raise _Gecersiz("kapanıştaki kayıt sayısı dosyadakiyle tutmuyor")
-                kapandi = True
-            else:
-                kayit += 1
-    if not baslik_var:
-        raise _Gecersiz("dosya boş")
-    if not kapandi:
-        raise _Gecersiz("kapanış kaydı yok")
-    return kayit
-
-
 def _sha256_dosya(yol: Path) -> str:
     h = hashlib.sha256()
     with open(yol, "rb") as f:
         for b in iter(lambda: f.read(1 << 20), b""):
             h.update(b)
     return h.hexdigest()
+
+
+
+
+def _kes(sock) -> None:
+    """Bağlantıyı başka iş parçacığından keser (engelli okumayı uyandırır). SSL katmanına dokunmaz."""
+    try:
+        socket.socket.shutdown(sock, socket.SHUT_RDWR)
+    except (OSError, ValueError):
+        pass
+
+
+def _bekci(sock, sure_s: float) -> threading.Timer:
+    """`sure_s` sonra bağlantıyı keser; işlem zamanında biterse `.cancel()` edilir (TOPLAM süre sınırı)."""
+    t = threading.Timer(sure_s, _kes, args=(sock,))
+    t.daemon = True
+    t.start()
+    return t
+
+
+def _dizin_yap(yol: Path) -> None:
+    """Klasörü (ve eksik üstlerini) oluşturur; aktarım klasörleri yalnız sahibine açık (POSIX 0700)."""
+    var = [yol, *yol.parents]
+    olusacak = [d for d in reversed(var) if not d.exists()]
+    yol.mkdir(parents=True, exist_ok=True)
+    for d in olusacak:
+        try:
+            if d == yol or d.name in ("aktarim", "gecici", GELEN_KLASOR) or d.parent.name in ("gecici", GELEN_KLASOR):
+                os.chmod(d, 0o700)
+        except OSError:  # pragma: no cover
+            pass
+
+
+def _ip(adres: str) -> str:
+    a = str(adres).split("%", 1)[0]
+    return a[7:] if a.lower().startswith("::ffff:") else a
 
 
 class _Sunucu(ThreadingHTTPServer):
@@ -158,13 +157,14 @@ class _Sunucu(ThreadingHTTPServer):
         self.a = a
         self.bag = bag
         self._sem = threading.BoundedSemaphore(a.sinirlar["eszamanli_baglanti"])
-        self._acik: set[socket.socket] = set()
+        self._acik: dict[socket.socket, str] = {}
+        self._ip_sayac: dict[str, int] = {}
         self._acik_kilit = threading.Lock()
         super().__init__(adres, _Isleyici)
 
     def get_request(self):
         ham, adres = self.socket.accept()
-        # El sıkışma istek iş parçacığında (zaman aşımıyla): yavaş istemci kabul döngüsünü tutmaz.
+        # El sıkışma istek iş parçacığında (toplam süre sınırıyla): yavaş istemci kabul döngüsünü tutmaz.
         return self.bag.wrap_socket(ham, server_side=True, do_handshake_on_connect=False), adres
 
     def verify_request(self, request, client_address):
@@ -173,11 +173,19 @@ class _Sunucu(ThreadingHTTPServer):
         return True
 
     def process_request(self, request, client_address):
-        if not self._sem.acquire(blocking=False):
+        ip = _ip(client_address[0])
+        with self._acik_kilit:
+            if self._ip_sayac.get(ip, 0) >= self.a.sinirlar["ip_basina_baglanti"]:
+                kabul = False
+            elif not self._sem.acquire(blocking=False):
+                kabul = False
+            else:
+                kabul = True
+                self._ip_sayac[ip] = self._ip_sayac.get(ip, 0) + 1
+                self._acik[request] = ip
+        if not kabul:
             self.shutdown_request(request)
             return
-        with self._acik_kilit:
-            self._acik.add(request)
         try:
             super().process_request(request, client_address)
         except BaseException:
@@ -186,7 +194,14 @@ class _Sunucu(ThreadingHTTPServer):
 
     def _biraktir(self, request) -> None:
         with self._acik_kilit:
-            self._acik.discard(request)
+            ip = self._acik.pop(request, None)
+            if ip is None:
+                return
+            n = self._ip_sayac.get(ip, 1) - 1
+            if n <= 0:
+                self._ip_sayac.pop(ip, None)
+            else:
+                self._ip_sayac[ip] = n
         self._sem.release()
 
     def process_request_thread(self, request, client_address):
@@ -202,10 +217,7 @@ class _Sunucu(ThreadingHTTPServer):
         with self._acik_kilit:
             acik = list(self._acik)
         for s in acik:
-            try:
-                s.shutdown(socket.SHUT_RDWR)
-            except (OSError, ValueError):
-                pass
+            _kes(s)
 
 
 class _Isleyici(BaseHTTPRequestHandler):
@@ -214,14 +226,41 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     def setup(self):
         s = self.server.a.sinirlar
-        self.request.settimeout(s["el_sikisma_zaman_asimi_s"])
-        self.request.do_handshake()
         self.request.settimeout(s["soket_zaman_asimi_s"])
+        bekci = _bekci(self.request, s["el_sikisma_zaman_asimi_s"])      # el sıkışmanın TOPLAM süresi
+        try:
+            self.request.do_handshake()
+        finally:
+            bekci.cancel()
         self.timeout = s["soket_zaman_asimi_s"]
         super().setup()
 
     def log_message(self, *a):
         pass
+
+    # --- süre sınırları: boşta keep-alive + istek satırı/başlıkların TOPLAM süresi
+    def handle_one_request(self):
+        s = self.server.a.sinirlar
+        try:
+            self.request.settimeout(s["bosta_zaman_asimi_s"])
+            if not self.rfile.peek(1):
+                self.close_connection = True
+                return
+            self.request.settimeout(s["soket_zaman_asimi_s"])
+        except (OSError, ssl.SSLError, ValueError):
+            self.close_connection = True
+            return
+        self._bekci = _bekci(self.request, s["baslik_toplam_zaman_asimi_s"])
+        try:
+            super().handle_one_request()
+        finally:
+            self._bekci.cancel()
+
+    def parse_request(self):
+        try:
+            return super().parse_request()
+        finally:
+            self._bekci.cancel()      # başlıklar tamam (ya da hata): gövde kendi sınırına tabidir
 
     # --- yanıt
     def _cevap(self, kod: int, govde: dict | None = None, *, kapat: bool = False, **basliklar):
@@ -239,7 +278,7 @@ class _Isleyici(BaseHTTPRequestHandler):
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(data)
-        except (OSError, ssl.SSLError):
+        except (OSError, ssl.SSLError, ValueError):
             self.close_connection = True
 
     def _hata(self, kod: int, ileti: str, **basliklar):
@@ -251,7 +290,7 @@ class _Isleyici(BaseHTTPRequestHandler):
         a = self.server.a
         cihaz = (self.headers.get("X-Cihaz") or "").strip()
         ver = self.headers.get("Authorization") or ""
-        if not UUID_RE.match(cihaz) or not ver.startswith("Bearer ") or not (8 <= len(ver) - 7 <= 200):
+        if not UUID_RE.fullmatch(cihaz) or not ver.startswith("Bearer ") or not (8 <= len(ver) - 7 <= 200):
             return None
         try:
             return cihaz if a.hub.cihaz_dogrula(cihaz, eslestirme.anahtar_ozeti(ver[7:].strip())) else None
@@ -263,16 +302,16 @@ class _Isleyici(BaseHTTPRequestHandler):
         n = sum(len(k) + len(v) for k, v in self.headers.items())
         return n <= self.server.a.sinirlar["baslik_en_fazla"]
 
+    def _sayi(self, ad: str) -> int:
+        """Katı ASCII rakam; yoksa/bozuksa -1."""
+        v = self.headers.get(ad)
+        return int(v) if v is not None and _SAYI_RE.fullmatch(v) else -1
+
     # --- yönlendirme
     def do_GET(self):
         self._yonlendir()
 
-    do_HEAD = do_PUT = do_POST = do_GET
-
-    def do_DELETE(self):
-        self._hata(405, "yöntem desteklenmiyor")
-
-    do_PATCH = do_OPTIONS = do_DELETE
+    do_HEAD = do_PUT = do_POST = do_DELETE = do_PATCH = do_OPTIONS = do_GET
 
     def _yonlendir(self):
         a = self.server.a
@@ -281,16 +320,23 @@ class _Isleyici(BaseHTTPRequestHandler):
                 return self._hata(431, "başlıklar çok büyük")
             yol, yontem = self.path, self.command
             if yol == "/durum" and yontem in ("GET", "HEAD"):
-                return self._cevap(200, {"surum": a.surum, "pc_adi": a.pc_adi, "protokol": PROTOKOL})
+                # Kimliksiz yanıt yalnız protokol sürümü; PC adı/sürüm kimlikli istekte (ve eşleştirme kodunda).
+                govde = {"protokol": PROTOKOL}
+                try:
+                    if self._kimlik() is not None:
+                        govde.update({"surum": a.surum, "pc_adi": a.pc_adi})
+                except _Hub503:
+                    pass
+                return self._cevap(200, govde)
             if yol == "/eslestir":
                 return self._eslestir() if yontem == "POST" else self._hata(405, "yalnız POST")
             if yol.startswith("/giden/"):
-                if yontem not in ("HEAD", "PUT"):
-                    return self._hata(405, "yalnız HEAD ve PUT")
-                cihaz = self._kimlik()
+                cihaz = self._kimlik()              # kimliksiz her istek (yöntem/yol ne olursa olsun) aynı 401
                 if cihaz is None:   # hiçbir şey okunmaz/yazılmaz
                     return self._hata(401, "yetkisiz")
-                m = _YOL_RE.match(yol)
+                if yontem not in ("HEAD", "PUT"):
+                    return self._hata(405, "yalnız HEAD ve PUT")
+                m = _YOL_RE.fullmatch(yol)
                 if not m:
                     return self._hata(400, "geçersiz yol")
                 if m.group(1) != cihaz:
@@ -308,10 +354,7 @@ class _Isleyici(BaseHTTPRequestHandler):
     # --- /eslestir
     def _eslestir(self):
         a = self.server.a
-        try:
-            n = int(self.headers.get("Content-Length") or "-1")
-        except ValueError:
-            n = -1
+        n = self._sayi("Content-Length")
         if n < 0 or n > a.sinirlar["eslestir_govde_en_fazla"]:
             return self._hata(413 if n > 0 else 411, "gövde boyutu geçersiz")
         ham = self._govde_oku(n)
@@ -319,7 +362,7 @@ class _Isleyici(BaseHTTPRequestHandler):
             return
         try:
             govde = json.loads(ham.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, RecursionError):
             return self._hata(400, "geçerli JSON değil")
         try:
             kod, yanit = eslestirme.eslestir(govde, a.kodlar, a.hub.cihaz_ekle, a.pc_adi)
@@ -333,21 +376,22 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     # --- /giden
     def _govde_oku(self, n: int) -> bytes | None:
-        """Tam n bayt ya da None (kopma/zaman aşımı: bağlantı kapatılır, hiçbir şey yazılmaz)."""
-        bitis = time.monotonic() + self.server.a.sinirlar["govde_toplam_zaman_asimi_s"]
+        """Tam n bayt ya da None (kopma/zaman aşımı: bağlantı kapatılır, hiçbir şey yazılmaz).
+        Gövdenin TOPLAM süresi sınırlıdır (bekçi): damla damla gönderen istemci de kesilir."""
+        bekci = _bekci(self.request, self.server.a.sinirlar["govde_toplam_zaman_asimi_s"])
         parcalar, kalan = [], n
         try:
             while kalan > 0:
-                if time.monotonic() > bitis:
-                    raise socket.timeout()
                 b = self.rfile.read(min(kalan, 65536))
                 if not b:
                     raise ConnectionError()
                 parcalar.append(b)
                 kalan -= len(b)
-        except (OSError, ssl.SSLError):
+        except (OSError, ssl.SSLError, ValueError):
             self.close_connection = True
             return None
+        finally:
+            bekci.cancel()
         return b"".join(parcalar)
 
     def _govdeyi_at(self, n: int) -> bool:
@@ -369,19 +413,16 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     def _put(self, cihaz: str, dosya: str):
         a, lim = self.server.a, self.server.a.sinirlar
-        try:
-            uzunluk = int(self.headers.get("Content-Length") or "-1")
-        except ValueError:
-            uzunluk = -1
+        uzunluk = self._sayi("Content-Length")
         if self.headers.get("Transfer-Encoding"):
             return self._hata(501, "Transfer-Encoding desteklenmiyor; Content-Length kullanın")
         if uzunluk <= 0:
-            return self._hata(411, "Content-Length gerekli")
+            return self._hata(411, "Content-Length gerekli (yalnız rakamlar)")
         if uzunluk > lim["parca_en_fazla"]:
             return self._hata(413, "parça çok büyük")
-        m = _ARALIK_RE.match(self.headers.get("Content-Range") or "")
+        m = _ARALIK_RE.fullmatch(self.headers.get("Content-Range") or "")
         sha = (self.headers.get("X-Sha256") or "").strip().lower()
-        if not m or not _SHA_RE.match(sha):
+        if not m or not _SHA_RE.fullmatch(sha):
             return self._hata(400, "Content-Range ya da X-Sha256 geçersiz")
         bas, son, toplam = map(int, m.groups())
         if son - bas + 1 != uzunluk or son >= toplam:
@@ -389,18 +430,34 @@ class _Isleyici(BaseHTTPRequestHandler):
         if toplam > lim["dosya_en_fazla"]:
             return self._hata(413, "dosya çok büyük")
 
-        kilit = a.dosya_kilidi(cihaz, dosya)
-        if not kilit.acquire(blocking=False):   # aynı dosyaya eşzamanlı ikinci yükleme
-            part = a.gecici_klasoru / cihaz / f"{dosya}.part"
-            return self._hata(409, "dosya şu an başka bir istekle yükleniyor", X_Durum="kismi",
-                              X_Alinan=part.stat().st_size if part.is_file() else 0)
+        with a.kilit_al(cihaz, dosya) as kilit:
+            if not kilit.acquire(blocking=False):   # aynı dosyaya eşzamanlı ikinci yükleme
+                part = a.gecici_klasoru / cihaz / f"{dosya}.part"
+                return self._hata(409, "dosya şu an başka bir istekle yükleniyor", X_Durum="kismi",
+                                  X_Alinan=part.stat().st_size if part.is_file() else 0)
+            try:
+                try:
+                    return self._put_kilitli(cihaz, dosya, bas, uzunluk, toplam, sha)
+                except Exception:
+                    # Beklenmeyen hata: yarım dosya ve yan dosyası kalmasın (istemci sıfırdan dener)
+                    d = a.gecici_klasoru / cihaz
+                    (d / f"{dosya}.part").unlink(missing_ok=True)
+                    (d / f"{dosya}.sha").unlink(missing_ok=True)
+                    raise
+            finally:
+                kilit.release()
+
+    @staticmethod
+    def _yan_oku(sha_dosya: Path) -> tuple[str, int]:
         try:
-            return self._put_kilitli(cihaz, dosya, bas, uzunluk, toplam, sha)
-        finally:
-            kilit.release()
+            sha, toplam = sha_dosya.read_text("ascii").split()
+            return sha, int(toplam)
+        except (OSError, ValueError):
+            return "", -1
 
     def _put_kilitli(self, cihaz, dosya, bas, uzunluk, toplam, sha):
         a = self.server.a
+        lim = a.sinirlar
         durum, mevcut = self._durum(cihaz, dosya)
         if durum == "var":
             if not self._govdeyi_at(uzunluk):
@@ -408,23 +465,36 @@ class _Isleyici(BaseHTTPRequestHandler):
             return self._cevap(200, {"durum": "var"}, X_Durum="var", X_Alinan=mevcut)
         dizin = a.gecici_klasoru / cihaz
         part, sha_dosya = dizin / f"{dosya}.part", dizin / f"{dosya}.sha"
-        if mevcut > 0:   # başka içerikle başlamış eski yarım yükleme: sıfırdan
-            eski = sha_dosya.read_text("ascii").strip() if sha_dosya.is_file() else ""
-            if eski != sha:
+        if mevcut > 0:
+            eski_sha, eski_toplam = self._yan_oku(sha_dosya)
+            if eski_sha != sha:       # başka içerikle başlamış eski yarım yükleme: sıfırdan
                 part.unlink(missing_ok=True)
                 sha_dosya.unlink(missing_ok=True)
                 mevcut = 0
+            elif eski_toplam != toplam:    # aynı dosyanın parçalarında toplam değişti: tutarsız
+                part.unlink(missing_ok=True)
+                sha_dosya.unlink(missing_ok=True)
+                _log.warning("toplam boyut değişti: cihaz=%s dosya=%s", cihaz, dosya)
+                return self._hata(422, "Content-Range toplamı parçalar arasında değişti; baştan başlayın",
+                                  X_Durum="yok", X_Alinan=0)
+        if mevcut == 0:
+            ret = a.yeni_yukleme_kotasi(cihaz)
+            if ret:
+                return self._hata(*ret)
         if bas != mevcut:
             if not self._govdeyi_at(uzunluk):
                 return
             return self._cevap(409, {"durum": "kismi" if mevcut else "yok", "alinan": mevcut},
                                X_Durum="kismi" if mevcut else "yok", X_Alinan=mevcut)
+        bos = shutil.disk_usage(a.gecici_klasoru).free
+        if bos < max(2 * (toplam - mevcut), lim["bos_disk_en_az"]):
+            return self._hata(507, "PC'de yeterli boş disk alanı yok")
         veri = self._govde_oku(uzunluk)   # yarım gövde = hiçbir şey yazılmaz
         if veri is None:
             return
-        dizin.mkdir(parents=True, exist_ok=True)
+        _dizin_yap(dizin)
         if mevcut == 0:
-            sha_dosya.write_text(sha, "ascii")
+            sha_dosya.write_text(f"{sha} {toplam}", "ascii")
         with open(part, "ab") as f:
             f.write(veri)
             f.flush()
@@ -446,12 +516,14 @@ class _Isleyici(BaseHTTPRequestHandler):
         gercek = _sha256_dosya(part)
         if not hmac.compare_digest(gercek, beklenen_sha):
             return reddet("SHA-256 uyuşmuyor")
-        try:
-            kayit = dosya_denetle(part, cihaz, dosya, a.sinirlar["satir_en_fazla"])
-        except _Gecersiz as e:
-            return reddet(f"dosya geçersiz: {e}")
+        # TEK doğrulayıcı: içe aktarıcının kendi kuralları (aksi halde alıcı kabul eder, içe aktarıcı reddederdi)
+        from kimlikimport.android_giden import dosya_dogrula
+
+        ok, kayit, neden = dosya_dogrula(part, cihaz, dosya)
+        if not ok:
+            return reddet(f"dosya geçersiz: {neden}")
         hedef_dizin = a.gelen_klasoru / cihaz
-        hedef_dizin.mkdir(parents=True, exist_ok=True)
+        _dizin_yap(hedef_dizin)
         hedef = hedef_dizin / f"{dosya}.jsonl"
         os.replace(part, hedef)          # atomik; önce dosya, sonra tablo (kopma halinde dosya kaybolmaz)
         sha_dosya.unlink(missing_ok=True)
@@ -470,6 +542,7 @@ class _Hub503(Exception):
 
 
 _OTOMATIK = sertifika.OTOMATIK
+YENILENDI_UYARISI = "Güvenlik sertifikası yenilendi; telefonların yeniden eşleştirilmesi gerekir."
 
 
 class AktarimAlici:
@@ -494,9 +567,11 @@ class AktarimAlici:
         self.gecici_klasoru = self.veri / "aktarim" / "gecici"
         self._srv: _Sunucu | None = None
         self._iplik: threading.Thread | None = None
+        self._temizlik: threading.Thread | None = None
+        self._dur = threading.Event()
         self._bulma: Bulma | None = None
         self._sert: sertifika.Sertifika | None = None
-        self._kilitler: dict[str, threading.Lock] = {}
+        self._kilitler: dict[str, list] = {}      # anahtar -> [Lock, kullanıcı sayısı]; boşalınca silinir
         self._kilitler_kilidi = threading.Lock()
         self._alinan = 0
 
@@ -517,9 +592,65 @@ class AktarimAlici:
             adresler = eslestirme.yerel_ipv4_adresleri()
         return eslestirme.eslestirme_metni(adresler, self.port, self.parmak_izi, kod, self.pc_adi)
 
-    def dosya_kilidi(self, cihaz: str, dosya: str) -> threading.Lock:
+    @contextlib.contextmanager
+    def kilit_al(self, cihaz: str, dosya: str):
+        """Dosya başına kilit; kimse kullanmıyorsa sözlükten silinir (sözlük büyümez)."""
+        anahtar = f"{cihaz}/{dosya}"
         with self._kilitler_kilidi:
-            return self._kilitler.setdefault(f"{cihaz}/{dosya}", threading.Lock())
+            g = self._kilitler.setdefault(anahtar, [threading.Lock(), 0])
+            g[1] += 1
+        try:
+            yield g[0]
+        finally:
+            with self._kilitler_kilidi:
+                g[1] -= 1
+                if g[1] <= 0:
+                    self._kilitler.pop(anahtar, None)
+
+    # --- kota / temizlik
+    def yeni_yukleme_kotasi(self, cihaz: str):
+        """Yeni (sıfırdan) yükleme kabul edilebilir mi? Reddedilirse (kod, ileti) döner; mevcutlar sürer."""
+        lim = self.sinirlar
+        d = self.gecici_klasoru / cihaz
+        acik = sum(1 for p in d.glob("*.part")) if d.is_dir() else 0
+        if acik >= lim["cihaz_basina_yarim_yukleme"]:
+            return 429, "bu cihazın açık yarım yükleme sayısı sınırı dolu"
+        toplam = 0
+        for p in self.gecici_klasoru.glob("*/*.part"):
+            try:
+                toplam += p.stat().st_size
+            except OSError:
+                pass
+        if toplam >= lim["gecici_toplam_en_fazla"]:
+            return 507, "PC'deki geçici alan sınırı dolu"
+        return None
+
+    def eski_gecicileri_temizle(self, simdi: float | None = None) -> int:
+        """`gecici_omur_s`'ten eski .part/.sha dosyalarını siler; silinen sayısını döner."""
+        simdi = time.time() if simdi is None else simdi
+        n = 0
+        for p in list(self.gecici_klasoru.glob("*/*")):
+            if p.suffix not in (".part", ".sha"):
+                continue
+            try:
+                if simdi - p.stat().st_mtime > self.sinirlar["gecici_omur_s"]:
+                    p.unlink()
+                    n += 1
+            except OSError:
+                pass
+        for d in self.gecici_klasoru.glob("*"):
+            try:
+                d.rmdir()       # boşsa
+            except OSError:
+                pass
+        return n
+
+    def _temizlik_dongusu(self) -> None:
+        while not self._dur.wait(self.sinirlar["temizlik_araligi_s"]):
+            try:
+                self.eski_gecicileri_temizle()
+            except Exception as e:  # noqa: BLE001
+                _log.warning("geçici temizliği hata verdi (%s)", type(e).__name__)
 
     # --- yaşam döngüsü
     def calisiyor(self) -> bool:
@@ -532,8 +663,15 @@ class AktarimAlici:
         bag = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         bag.minimum_version = ssl.TLSVersion.TLSv1_2
         bag.load_cert_chain(s.sertifika_yolu, s.anahtar_yolu, password=(s.parola.decode() if s.parola else None))
-        self.gelen_klasoru.mkdir(parents=True, exist_ok=True)
-        self.gecici_klasoru.mkdir(parents=True, exist_ok=True)
+        _dizin_yap(self.gelen_klasoru)
+        _dizin_yap(self.gecici_klasoru)
+        try:
+            self.eski_gecicileri_temizle()
+        except Exception as e:  # noqa: BLE001
+            _log.warning("geçici temizliği hata verdi (%s)", type(e).__name__)
+        self._dur.clear()
+        self._temizlik = threading.Thread(target=self._temizlik_dongusu, name="aktarim-temizlik", daemon=True)
+        self._temizlik.start()
         self._srv = _Sunucu((self.adres, self._port_ayar), self, bag)
         self.port = self._srv.server_address[1]
         self._iplik = threading.Thread(target=self._srv.serve_forever, kwargs={"poll_interval": 0.2},
@@ -549,6 +687,7 @@ class AktarimAlici:
         srv, self._srv = self._srv, None
         if srv is None:
             return
+        self._dur.set()
         if self._bulma is not None:
             self._bulma.durdur()
             self._bulma = None
@@ -562,13 +701,17 @@ class AktarimAlici:
 
     def durum(self) -> dict:
         sert = self._sert
+        gecerli, neden = self.kodlar.durum()
+        yenilendi = bool(sert and sert.yeniden_uretildi)
         return {
             "calisiyor": self._srv is not None, "port": self.port,
             "bulma_port": self._bulma.port if self._bulma is not None else 0,
             "parmak_izi": sert.parmak_izi if sert else None,
             "anahtar_sarili": sert.anahtar_sarili if sert else None,
+            "sertifika_yenilendi": yenilendi, "uyari": YENILENDI_UYARISI if yenilendi else None,
             "alinan_dosya": self._alinan, "pc_adi": self.pc_adi,
-            "eslestirme_kodu_gecerli": self.kodlar.gecerli_mi(),
+            # neden: None | "sure_doldu" | "cok_yanlis_deneme" | "kullanildi" | "uretilmedi" | "iptal"
+            "eslestirme_kodu_gecerli": gecerli, "eslestirme_kodu_gecersizlik_nedeni": neden,
         }
 
     def __enter__(self) -> "AktarimAlici":

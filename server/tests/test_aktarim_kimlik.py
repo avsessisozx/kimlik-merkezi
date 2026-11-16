@@ -3,6 +3,7 @@ import hashlib
 import json
 import socket
 import ssl
+import sys
 import uuid
 
 import pytest
@@ -23,9 +24,26 @@ def put_basliklari(cihaz, anahtar, veri, bas=0, toplam=None, sha=None):
             "X-Sha256": sha or hashlib.sha256(veri).hexdigest(), "Content-Length": str(len(veri))}
 
 
-def test_durum_kimliksiz_ve_yalniz_uc_alan(aktarim):
+def test_durum_kimliksiz_yalniz_protokol_kimlikli_ayrinti(aktarim):
     d = Istemci("127.0.0.1", aktarim.alici.port, aktarim.alici.parmak_izi, aktarim.cihaz).pc_durumu()
-    assert set(d) == {"surum", "pc_adi", "protokol"} and d["protokol"] == 1
+    assert d == {"protokol": 1}                         # PC adı/sürüm sızmaz
+    kod, _, govde = ham_istek(aktarim.alici.port, "GET", "/durum", {"Authorization": "Bearer " + "0" * 64,
+                                                                    "X-Cihaz": aktarim.cihaz})
+    assert kod == 200 and json.loads(govde) == {"protokol": 1}     # yanlış kimlik de aynı asgari yanıt
+    i = aktarim.eslesmis()
+    kod, _, govde = ham_istek(aktarim.alici.port, "GET", "/durum", {"Authorization": f"Bearer {i.anahtar}",
+                                                                    "X-Cihaz": aktarim.cihaz})
+    assert json.loads(govde) == {"protokol": 1, "surum": aktarim.alici.surum, "pc_adi": aktarim.alici.pc_adi}
+
+
+@pytest.mark.parametrize("yontem", ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"])
+@pytest.mark.parametrize("yol", ["/giden/x", "/giden/", "/giden/{c}/{d}.jsonl", "/giden/../x"])
+def test_kimliksiz_her_istek_ayni_401(aktarim, yontem, yol):
+    yol = yol.format(c=aktarim.cihaz, d=DOSYA)
+    kod, _, govde = ham_istek(aktarim.alici.port, yontem, yol, {})
+    assert kod == 401
+    if yontem != "HEAD":
+        assert json.loads(govde) == {"hata": "yetkisiz"}
 
 
 def test_eksik_yanlis_iptal_anahtar_401_ve_sifir_bayt(aktarim):
@@ -151,7 +169,12 @@ def test_yavas_istemci_zaman_asimi(tmp_path):
         # el sıkışmayı hiç yapmayan bağlantı: sunucu bırakır, başka istekleri engellemez
         s = socket.create_connection(("127.0.0.1", d.alici.port))
         time.sleep(0.9)
-        assert s.recv(1) in (b"", ) or True
+        s.settimeout(2)
+        try:
+            kapali = s.recv(1) == b""
+        except (ConnectionError, socket.timeout):
+            kapali = isinstance(sys.exc_info()[1], ConnectionError)
+        assert kapali, "el sıkışmayan bağlantı sunucu tarafından kapatılmadı"
         s.close()
         assert i.durum(DOSYA) == ("yok", 0)
         # gövdeyi yarıda bırakan/yavaş istemci: hiçbir şey yazılmaz

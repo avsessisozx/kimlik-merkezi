@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import logging
 import os
 import secrets
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cryptography import x509
@@ -21,6 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
+_log = logging.getLogger("kimlikserver.aktarim")
 OTOMATIK = "otomatik"
 GECERLILIK_YIL = 10
 
@@ -31,7 +34,8 @@ class Sertifika:
     anahtar_yolu: Path
     parmak_izi: str          # sertifika DER'inin SHA-256'sı, küçük harf onaltılık
     anahtar_sarili: bool     # özel anahtar parolası sağlayıcıyla sarılı mı
-    parola: bytes | None     # TLS bağlamını kurmak için (None: anahtar düz)
+    parola: bytes | None = field(repr=False)   # TLS bağlamını kurmak için (None: anahtar düz); günlüğe/repr'e girmez
+    yeniden_uretildi: bool = False   # eski çift açılamadı/eşleşmedi: yenisi üretildi, telefonlar yeniden eşleşmeli
 
 
 def parmak_izi_pem(pem: bytes) -> str:
@@ -55,7 +59,8 @@ def _yaz_ozel(yol: Path, veri: bytes) -> None:
 
 def uret(sertifika_yolu: Path, anahtar_yolu: Path, parola: bytes | None, *,
          ad: str = "Kimlik Merkezi", san_ip: list[str] | None = None) -> str:
-    """Yeni anahtar + sertifika yazar; parmak izini döner."""
+    """Yeni anahtar + sertifika üretir ve çifti ATOMİK yazar: ikisi de önce geçici dosyaya, sonra replace
+    (yarıda kalırsa eşleşmeyen çift açılışta `hazirla` tarafından yakalanır). Parmak izini döner."""
     import ipaddress
 
     anahtar = ec.generate_private_key(ec.SECP256R1())
@@ -73,11 +78,38 @@ def uret(sertifika_yolu: Path, anahtar_yolu: Path, parola: bytes | None, *,
             x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address(a)) for a in san_ip]), critical=False)
     cert = yap.sign(anahtar, hashes.SHA256())
     sifre = (serialization.BestAvailableEncryption(parola) if parola else serialization.NoEncryption())
-    _yaz_ozel(anahtar_yolu, anahtar.private_bytes(
-        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, sifre))
+    anahtar_pem = anahtar.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, sifre)
     pem = cert.public_bytes(serialization.Encoding.PEM)
-    sertifika_yolu.write_bytes(pem)
+    g_anahtar, g_sert = anahtar_yolu.with_name(anahtar_yolu.name + ".yeni"), sertifika_yolu.with_name(sertifika_yolu.name + ".yeni")
+    _yaz_gecici(g_anahtar, anahtar_pem)
+    _yaz_gecici(g_sert, pem)
+    os.replace(g_anahtar, anahtar_yolu)
+    os.replace(g_sert, sertifika_yolu)
     return parmak_izi_pem(pem)
+
+
+def _yaz_gecici(gecici: Path, veri: bytes) -> None:
+    fd = os.open(gecici, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(veri)
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def _cift_gecerli(sert: Path, anahtar: Path, sarili: Path, saglayici):
+    """Sertifika + anahtar eşleşiyor ve anahtar açılabiliyorsa parolayı (ya da None) döner; değilse istisna."""
+    if sarili.is_file():
+        if saglayici is None:
+            raise ValueError("sağlayıcı yok")
+        parola = saglayici.ac(sarili.read_bytes())
+    else:
+        parola = None
+    ozel = serialization.load_pem_private_key(anahtar.read_bytes(), parola)
+    c = x509.load_pem_x509_certificate(sert.read_bytes())
+    ac = serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+    if c.public_key().public_bytes(*ac) != ozel.public_key().public_bytes(*ac):
+        raise ValueError("sertifika ile anahtar eşleşmiyor")
+    return parola
 
 
 def hazirla(veri_klasoru: Path | str, saglayici=OTOMATIK, *, ad: str = "Kimlik Merkezi",
@@ -98,22 +130,24 @@ def hazirla(veri_klasoru: Path | str, saglayici=OTOMATIK, *, ad: str = "Kimlik M
         saglayici = sifreleme.varsayilan_saglayici()
     sert, anahtar, sarili = dizin / "sertifika.pem", dizin / "anahtar.pem", dizin / "anahtar.parola.sarili"
 
-    if sert.is_file() and anahtar.is_file():
+    yeniden = False
+    if sert.exists() or anahtar.exists() or sarili.exists():
         try:
-            if sarili.is_file():
-                if saglayici is None:
-                    raise ValueError("sağlayıcı yok")
-                parola = saglayici.ac(sarili.read_bytes())
-            else:
-                parola = None
-            serialization.load_pem_private_key(anahtar.read_bytes(), parola)
+            parola = _cift_gecerli(sert, anahtar, sarili, saglayici)
             return Sertifika(sert, anahtar, parmak_izi_pem(sert.read_bytes()), parola is not None, parola)
-        except Exception:  # noqa: BLE001 - açılamayan/bozuk anahtar: yeniden üret
-            pass
+        except Exception:  # noqa: BLE001 - açılamayan/eşleşmeyen çift: SESSİZCE değil, eskiyi saklayıp yenile
+            damga = time.strftime("%Y%m%dT%H%M%S")
+            for d in (sert, anahtar, sarili):
+                if d.exists():
+                    os.replace(d, d.with_name(f"{d.name}.eski-{damga}"))
+            yeniden = True
+            _log.warning("aktarım sertifikası açılamadı ya da anahtarıyla eşleşmiyor; eski dosyalar "
+                         "'.eski-%s' olarak saklandı, yenisi üretildi (telefonlar yeniden eşleşmeli)", damga)
 
     parola = secrets.token_bytes(24).hex().encode() if saglayici is not None else None
-    sarili.unlink(missing_ok=True)
     pi = uret(sert, anahtar, parola, ad=ad, san_ip=san_ip)
     if parola is not None:
-        _yaz_ozel(sarili, saglayici.sar(parola))
-    return Sertifika(sert, anahtar, pi, parola is not None, parola)
+        g = sarili.with_name(sarili.name + ".yeni")
+        _yaz_gecici(g, saglayici.sar(parola))
+        os.replace(g, sarili)
+    return Sertifika(sert, anahtar, pi, parola is not None, parola, yeniden)
