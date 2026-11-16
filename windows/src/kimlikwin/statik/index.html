@@ -524,6 +524,24 @@ SF.kaynak=async a=>{
   a.append(kopyaKarti());
 };
 // ------------------------------------------------------------------ ayarlar, hakkında
+const BLOK_DURUM_AD={yazildi:'yazıldı',guncellendi:'güncellendi',degismedi:'güncel (değişiklik yok)',kaldirildi:'bölüm kaldırıldı',bulunamadi:'atlandı (bulunamadı)',bozuk:'DOKUNULMADI (işaretçiler bozuk)',hata:'HATA',yok:'bölüm yok'};
+function yonetilenBlokKarti(s){
+  const liste=h('ul',{class:'ozet-liste',id:'blok-dosyalar'});
+  const ciz=(dosyalar,onizleme)=>{liste.textContent='';(dosyalar||[]).forEach(d=>liste.append(h('li',{class:d.durum==='hata'||d.durum==='bozuk'?'kotu':''},h('b',{},d.ad+': '),(onizleme?d.mesaj:(BLOK_DURUM_AD[d.durum]||d.durum)+(d.durum==='bozuk'||d.durum==='hata'||d.durum==='bulunamadi'?' — '+d.mesaj:'')))));};
+  api('yonetilen_blok_durum').then(d=>ciz(d.dosyalar,!d.yazildi_mi)).catch(()=>{});
+  const kutu=h('input',{type:'checkbox',id:'ayar-blok',checked:s.yonetilen_blok,onchange:async e=>{
+    const r=await api('ayar_yaz',{yonetilen_blok:e.target.checked}).catch(x=>{hataGoster(x);e.target.checked=!e.target.checked;});
+    if(r){ciz(r.yonetilen_blok_sonuc,false);bildir(e.target.checked?'Bölüm yazıldı.':'Bölüm kaldırıldı.');}}});
+  return h('div',{class:'kart',id:'ayar-yonetilen-blok'},h('h3',{},'Yapay zekâ dosyalarına kısa bölüm yaz'),
+    h('div',{class:'satir'},h('label',{},kutu,' Onayladığım bilgileri Claude Code ve Codex dosyalarına yaz')),
+    h('p',{class:'soluk'},'Onayladığın bilgiler Claude Code ve Codex\'in her oturumda okuduğu dosyalara kısa bir bölüm olarak yazılır. Kendi yazdıklarına dokunulmaz, önce yedek alınır.'),
+    h('div',{class:'soluk'},'Yazılan dosyalar (Codex yalnız kuruluysa):'),liste,
+    h('div',{class:'satir'},h('button',{class:'i',id:'blok-onizle',onclick:async()=>{
+      const r=await api('yonetilen_blok_onizle').catch(hataGoster);if(!r)return;
+      const kapat=pencere('Yazılacak bölüm (önizleme)',h('p',{class:'soluk'},'Henüz hiçbir şey yazılmadı. '+r.karakter+' karakter (en çok '+r.sinir+').'),
+        h('textarea',{readonly:'',id:'blok-onizle-metin',style:'min-height:260px'},r.metin),
+        h('ul',{class:'ozet-liste'},r.dosyalar.map(d=>h('li',{},h('b',{},d.ad+': '),d.mesaj))),
+        h('div',{class:'satir'},h('button',{class:'i',onclick:()=>kapat()},'Kapat')));}},'Önizle')));}
 SF.ayar=async a=>{
   const s=await api('ayarlar');
   const tema=h('select',{onchange:async e=>{await api('ayar_yaz',{tema:e.target.value}).catch(hataGoster);temaUygula(e.target.value);}},
@@ -534,6 +552,7 @@ SF.ayar=async a=>{
     h('div',{class:'satir'},h('label',{},oto,' Windows açılışında otomatik başlat (tepside)')),
     h('div',{},'Veri klasörü: ',s.veri_klasoru),h('div',{class:'soluk'},'Veri klasörünü değiştirmek için uygulamayı kapatıp ayar dosyasını silin ya da destek rehberine bakın; veriler taşınmaz.')),
     guncAyarKarti(s),
+    yonetilenBlokKarti(s),
     h('div',{class:'kart'},h('button',{class:'t',onclick:async()=>{if(!confirm('Uygulama kapatılsın mı? Tepsi simgesi de kalkar.'))return;await api('cikis');document.body.textContent='Kimlik Merkezi kapatıldı. Bu sekmeyi kapatabilirsiniz.';}},'Uygulamadan çık')));
 };
 SF.hakkinda=async a=>{

@@ -22,6 +22,10 @@ class SahteArkaUc:
 def ayar_ortami(tmp_path, monkeypatch):
     monkeypatch.setenv("KIMLIK_AYAR_DIZINI", str(tmp_path / "ayar"))
     monkeypatch.delenv("KIMLIK_VERI", raising=False)
+    ev = tmp_path / "ev"                      # gerçek ev klasörüne (CLAUDE.md/AGENTS.md) hiçbir test yazmasın
+    ev.mkdir(exist_ok=True)
+    monkeypatch.setenv("HOME", str(ev))
+    monkeypatch.setenv("USERPROFILE", str(ev))
 
 
 @pytest.fixture

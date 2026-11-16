@@ -13,7 +13,7 @@ from typing import Any
 
 from kimlikcore import AnahtarGerekli, KimlikError
 
-from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_raporu, saglik, veri_klasoru
+from . import APP_AD, __version__, claude_ayar, harita_kopru, gunluk, hata_raporu, saglik, veri_klasoru, yonetilen_blok
 from .ayarlar import Ayarlar
 from .guncelleme import Guncelleme, GuncellemeHatasi
 from .baslangic import Otomatik, veri_yolunu_kaydet
@@ -29,6 +29,10 @@ UYGULAMA_API = frozenset({
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "izin_toplu", "erisim_kaydi",
     "baglanti_bilgisi", "claude_ekle", "kopya_baslat", "kopya_durum", "harita", "harita_bolge", "harita_hassas", "harita_kayitlar", "harita_ayrinti",
 })
+
+# Persona bilgisini değiştirebilen işlemler: yönetilen blok açıksa bunlardan sonra yeniden üretilir.
+BLOK_TETIKLEYEN = frozenset({"persona_ekle", "persona_guncelle", "persona_sil", "persona_sure_kontrol", "oneri_onayla",
+                             "oneri_duzelt", "celiski_coz", "kaynak_kaldir", "kaynak_sil"})
 
 
 def sec_dialog(tur: str) -> str | None:
@@ -56,7 +60,10 @@ class Yonetici:
     def __init__(self, ayarlar: Ayarlar | None = None, otomatik: Otomatik | None = None,
                  secici: Callable[[str], str | None] = sec_dialog,
                  claude_yolu: Callable[[], Path | None] = claude_ayar.bul,
-                 guncelleme: Guncelleme | None = None):
+                 guncelleme: Guncelleme | None = None,
+                 ev_klasoru: Callable[[], Path] = yonetilen_blok.ev_klasoru):
+        self.ev_klasoru = ev_klasoru          # yönetilen blok hedefleri (~/.claude, ~/.codex); testte geçici klasör
+        self._blok_son: list[dict] | None = None
         self.ayarlar = ayarlar or Ayarlar()
         # Ağ politikası ASLA buradan verilmez (varsayılan: yalnız https + GitHub). Testler hazır nesne enjekte eder.
         self.guncelleme = guncelleme or Guncelleme(self.ayarlar.dizin / "guncelleme")
@@ -89,6 +96,7 @@ class Yonetici:
             if kilit is None:
                 raise
             self.uygulama, self.kilit = None, kilit
+        self.blok_guncelle("acilis")
 
     def uygulama_olustur(self, klasor: str, parola: str | None = None) -> Uygulama:
         """Klasörü yazan olarak açar. Parola verilmediyse bellekteki (bu oturumda girilmiş) parola kullanılır."""
@@ -131,6 +139,37 @@ class Yonetici:
                 raise IslemHatasi(f"{kisi['ad']} açılamadı: {e}", "kisi_acilamadi") from None
             raise
         self.ayarlar.guncelle(secili_kisi=kisi["id"], veri_klasoru=kisi["klasor"])
+        self.blok_guncelle("kisi")
+
+    # ------------------------------------------------------------------ yönetilen blok (CLAUDE.md / AGENTS.md)
+    def _blok_icerik(self) -> str:
+        if self.uygulama is None:
+            raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
+        return yonetilen_blok.icerik_uret(self.uygulama.persona)
+
+    def blok_guncelle(self, neden: str = "") -> list[dict] | None:
+        """Ayar açıksa bloğu yeniden üretir (içerik aynıysa dosyaya dokunmaz). Hata asıl işlemi bozmaz."""
+        if not self.ayarlar["yonetilen_blok"] or self.uygulama is None:
+            return None
+        try:
+            self._blok_son = yonetilen_blok.uygula(self.ev_klasoru(), self._blok_icerik())
+            gunluk.log().info("yönetilen blok (%s): %s", neden, ", ".join(d["durum"] for d in self._blok_son))
+        except Exception as e:
+            gunluk.log().error("yönetilen blok güncellenemedi: %s", type(e).__name__)
+        return self._blok_son
+
+    def api_yonetilen_blok_durum(self) -> dict:
+        acik = bool(self.ayarlar["yonetilen_blok"])
+        dosyalar = self._blok_son
+        if dosyalar is None:
+            dosyalar = yonetilen_blok.onizle(self.ev_klasoru(), self._blok_icerik() if (acik and self.uygulama) else None)
+        return {"acik": acik, "dosyalar": dosyalar, "yazildi_mi": self._blok_son is not None}
+
+    def api_yonetilen_blok_onizle(self) -> dict:
+        """Yazılacak metni ve her dosyada ne olacağını gösterir; HİÇBİR ŞEY yazmaz."""
+        icerik = self._blok_icerik()
+        return {"metin": "\n".join([yonetilen_blok.BASLA, icerik, yonetilen_blok.BITIR]), "karakter": len(icerik),
+                "sinir": yonetilen_blok.BLOK_UST_SINIR, "dosyalar": yonetilen_blok.onizle(self.ev_klasoru(), icerik)}
 
     def api_kisi_sec(self, kisi_id: str, parola: str | None = None) -> dict:
         kisi = next((k for k in self.ayarlar["kisiler"] if k["id"] == kisi_id), None)
@@ -236,7 +275,10 @@ class Yonetici:
         if ad in UYGULAMA_API:
             if self.uygulama is None:
                 raise IslemHatasi("Önce ilk açılış sihirbazını tamamlayın.", "sihirbaz_gerekli")
-            return getattr(self.uygulama, ad)(**girdi)
+            sonuc = getattr(self.uygulama, ad)(**girdi)
+            if ad in BLOK_TETIKLEYEN:
+                self.blok_guncelle(ad)
+            return sonuc
         raise IslemHatasi("Bilinmeyen işlem.", "yok")
 
     def api_acilis(self) -> dict:
@@ -314,11 +356,25 @@ class Yonetici:
         return {"tema": self.ayarlar["tema"], "otomatik_baslat": self.otomatik.etkin_mi(),
                 "otomatik_destek": self.otomatik.desteklenir, "veri_klasoru": self.ayarlar["veri_klasoru"],
                 "port": self.ayarlar["port"], "guncelleme_otomatik": self.ayarlar["guncelleme_otomatik"],
-                "guncelleme_onsurum": self.ayarlar["guncelleme_onsurum"], "surum": __version__}
+                "guncelleme_onsurum": self.ayarlar["guncelleme_onsurum"], "surum": __version__,
+                "yonetilen_blok": bool(self.ayarlar["yonetilen_blok"])}
 
     def api_ayar_yaz(self, tema: str | None = None, otomatik_baslat: bool | None = None,
-                     guncelleme_otomatik: bool | None = None, guncelleme_onsurum: bool | None = None) -> dict:
+                     guncelleme_otomatik: bool | None = None, guncelleme_onsurum: bool | None = None,
+                     yonetilen_blok: bool | None = None) -> dict:
         uyari = None
+        blok = None
+        if yonetilen_blok is not None:        # açınca hemen yazar, kapatınca bloğu kaldırır (yedekli); yol parametresi YOK
+            from . import yonetilen_blok as _yb
+            yonetilen_blok = bool(yonetilen_blok)
+            if yonetilen_blok:
+                icerik = self._blok_icerik()
+                self.ayarlar.guncelle(yonetilen_blok=True)
+                self._blok_son = blok = _yb.uygula(self.ev_klasoru(), icerik)
+            else:
+                self.ayarlar.guncelle(yonetilen_blok=False)
+                self._blok_son = blok = _yb.uygula(self.ev_klasoru(), None)
+            gunluk.log().info("yönetilen blok %s: %s", "açıldı" if yonetilen_blok else "kapatıldı", ", ".join(d["durum"] for d in blok))
         if guncelleme_otomatik is not None:   # kullanıcı Ayarlar'da seçimi gördü: ayrıca bilgilendirme gerekmez
             self.ayarlar.guncelle(guncelleme_otomatik=bool(guncelleme_otomatik), guncelleme_bilgi_goruldu=True)
         if guncelleme_onsurum is not None:
@@ -332,7 +388,7 @@ class Yonetici:
             uyari = self._otomatik_uygula(bool(otomatik_baslat))
             if uyari is None:
                 self.ayarlar.guncelle(otomatik_baslat=bool(otomatik_baslat))
-        return {**self.api_ayarlar(), "uyari": uyari}
+        return {**self.api_ayarlar(), "uyari": uyari, "yonetilen_blok_sonuc": blok}
 
     # ------------------------------------------------------------------ güncelleme (ağ kodu: guncelleme.py)
     def acilista_guncelleme(self) -> None:
