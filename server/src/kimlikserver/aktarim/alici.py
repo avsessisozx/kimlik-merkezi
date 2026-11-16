@@ -38,7 +38,7 @@ from .eslestirme import UUID_RE, EslestirmeKodlari, yerel_adres_mi
 
 _log = logging.getLogger("kimlikserver.aktarim")
 
-VARSAYILAN_PORT = 47821
+VARSAYILAN_PORT = 47823   # 47821 Windows uygulamasının yerel arayüz portudur
 PROTOKOL = 1
 GELEN_KLASOR = "gelen_aktarim"
 _U = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -64,6 +64,7 @@ SINIRLAR = {
     "cihaz_basina_yarim_yukleme": 8,
     "gecici_toplam_en_fazla": 1024 * 1024 * 1024,   # tüm yarım yüklemelerin toplam baytı
     "bos_disk_en_az": 500 * 1024 * 1024,   # ve boş alan >= 2 x kalan bayt
+    "bosaltma_zaman_asimi_s": 5.0,         # hata yanıtından önce gövdeyi boşaltma süre üst sınırı
     "gecici_omur_s": 7 * 24 * 3600.0,      # bundan eski .part/.sha temizlenir
     "temizlik_araligi_s": 24 * 3600.0,
 }
@@ -282,8 +283,33 @@ class _Isleyici(BaseHTTPRequestHandler):
             self.close_connection = True
 
     def _hata(self, kod: int, ileti: str, **basliklar):
-        # Gövde okunmadıysa bağlantı yeniden kullanılamaz: kapat.
+        # Gövde okunmadıysa bağlantı yeniden kullanılamaz: kapat. Ama istemci gövdeyi yazarken bağlantı
+        # sıfırlanıp yanıt kodu görülmesin diye (kimlikli PUT'ta) gövde SINIRLI boşaltılır.
+        self._bosalt()
         self._cevap(kod, {"hata": ileti}, kapat=True, **basliklar)
+
+    _bosaltilacak = 0
+
+    def _bosalt(self) -> None:
+        n, self._bosaltilacak = self._bosaltilacak, 0
+        lim = self.server.a.sinirlar
+        n = min(n, lim["parca_en_fazla"])
+        if n <= 0:
+            return
+        bitis = time.monotonic() + lim["bosaltma_zaman_asimi_s"]
+        try:
+            while n > 0:
+                kalan = bitis - time.monotonic()
+                if kalan <= 0:
+                    break
+                self.request.settimeout(kalan)
+                b = self.rfile.read(min(n, 65536))
+                if not b:
+                    break
+                n -= len(b)
+        except (OSError, ssl.SSLError, ValueError):
+            pass
+        self.close_connection = True
 
     # --- kimlik
     def _kimlik(self) -> str | None:
@@ -378,6 +404,7 @@ class _Isleyici(BaseHTTPRequestHandler):
     def _govde_oku(self, n: int) -> bytes | None:
         """Tam n bayt ya da None (kopma/zaman aşımı: bağlantı kapatılır, hiçbir şey yazılmaz).
         Gövdenin TOPLAM süresi sınırlıdır (bekçi): damla damla gönderen istemci de kesilir."""
+        self._bosaltilacak = 0
         bekci = _bekci(self.request, self.server.a.sinirlar["govde_toplam_zaman_asimi_s"])
         parcalar, kalan = [], n
         try:
@@ -408,12 +435,14 @@ class _Isleyici(BaseHTTPRequestHandler):
         return "yok", 0
 
     def _head(self, cihaz, dosya):
+        self.server.a.tam_boyutlu_kurtar_kilitli(cihaz, dosya)
         d, n = self._durum(cihaz, dosya)
         self._cevap(200, {"durum": d, "alinan": n}, X_Durum=d, X_Alinan=n)
 
     def _put(self, cihaz: str, dosya: str):
         a, lim = self.server.a, self.server.a.sinirlar
         uzunluk = self._sayi("Content-Length")
+        self._bosaltilacak = uzunluk if not self.headers.get("Transfer-Encoding") else 0
         if self.headers.get("Transfer-Encoding"):
             return self._hata(501, "Transfer-Encoding desteklenmiyor; Content-Length kullanın")
         if uzunluk <= 0:
@@ -458,6 +487,7 @@ class _Isleyici(BaseHTTPRequestHandler):
     def _put_kilitli(self, cihaz, dosya, bas, uzunluk, toplam, sha):
         a = self.server.a
         lim = a.sinirlar
+        a.tam_boyutlu_kurtar(cihaz, dosya)     # kilit elimizde
         durum, mevcut = self._durum(cihaz, dosya)
         if durum == "var":
             if not self._govdeyi_at(uzunluk):
@@ -506,34 +536,9 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     def _tamamla(self, cihaz, dosya, part: Path, sha_dosya: Path, beklenen_sha: str):
         a = self.server.a
-
-        def reddet(neden: str):
-            part.unlink(missing_ok=True)
-            sha_dosya.unlink(missing_ok=True)
-            _log.warning("dosya reddedildi: cihaz=%s dosya=%s neden=%s", cihaz, dosya, neden)
-            self._cevap(422, {"hata": neden, "alinan": 0}, X_Durum="yok", X_Alinan=0)
-
-        gercek = _sha256_dosya(part)
-        if not hmac.compare_digest(gercek, beklenen_sha):
-            return reddet("SHA-256 uyuşmuyor")
-        # TEK doğrulayıcı: içe aktarıcının kendi kuralları (aksi halde alıcı kabul eder, içe aktarıcı reddederdi)
-        from kimlikimport.android_giden import dosya_dogrula
-
-        ok, kayit, neden = dosya_dogrula(part, cihaz, dosya)
+        ok, neden, hedef = a.tamamla(cihaz, dosya, part, sha_dosya, beklenen_sha)
         if not ok:
-            return reddet(f"dosya geçersiz: {neden}")
-        hedef_dizin = a.gelen_klasoru / cihaz
-        _dizin_yap(hedef_dizin)
-        hedef = hedef_dizin / f"{dosya}.jsonl"
-        os.replace(part, hedef)          # atomik; önce dosya, sonra tablo (kopma halinde dosya kaybolmaz)
-        sha_dosya.unlink(missing_ok=True)
-        a.hub.dosya_kaydet(cihaz, dosya, gercek, kayit)
-        a._alinan += 1
-        _log.info("dosya alındı: cihaz=%s dosya=%s bayt=%d kayit=%d", cihaz, dosya, hedef.stat().st_size, kayit)
-        try:
-            a.hub.tamamlandi(hedef)
-        except Exception as e:  # noqa: BLE001 - geri çağrı hatası aktarımı bozmaz
-            _log.warning("tamamlandı geri çağrısı hata verdi (%s)", type(e).__name__)
+            return self._cevap(422, {"hata": neden, "alinan": 0}, X_Durum="yok", X_Alinan=0)
         self._cevap(201, {"durum": "var"}, X_Durum="var", X_Alinan=hedef.stat().st_size)
 
 
@@ -607,6 +612,68 @@ class AktarimAlici:
                 if g[1] <= 0:
                     self._kilitler.pop(anahtar, None)
 
+    # --- tamamlama (SHA + doğrulayıcı); işleyiciden ve kurtarmadan çağrılır
+    def tamamla(self, cihaz, dosya, part: Path, sha_dosya: Path, beklenen_sha: str):
+        """(ok, neden, hedef). Başarısızsa geçici dosyalar silinir."""
+
+        def reddet(neden: str):
+            part.unlink(missing_ok=True)
+            sha_dosya.unlink(missing_ok=True)
+            _log.warning("dosya reddedildi: cihaz=%s dosya=%s neden=%s", cihaz, dosya, neden)
+            return False, neden, None
+
+        gercek = _sha256_dosya(part)
+        if not hmac.compare_digest(gercek, beklenen_sha):
+            return reddet("SHA-256 uyuşmuyor")
+        # TEK doğrulayıcı: içe aktarıcının kendi kuralları (aksi halde alıcı kabul eder, içe aktarıcı reddederdi)
+        from kimlikimport.android_giden import dosya_dogrula
+
+        ok, kayit, neden = dosya_dogrula(part, cihaz, dosya)
+        if not ok:
+            return reddet(f"dosya geçersiz: {neden}")
+        hedef_dizin = self.gelen_klasoru / cihaz
+        _dizin_yap(hedef_dizin)
+        hedef = hedef_dizin / f"{dosya}.jsonl"
+        os.replace(part, hedef)          # atomik; önce dosya, sonra tablo (kopma halinde dosya kaybolmaz)
+        sha_dosya.unlink(missing_ok=True)
+        self.hub.dosya_kaydet(cihaz, dosya, gercek, kayit)
+        self._alinan += 1
+        _log.info("dosya alındı: cihaz=%s dosya=%s bayt=%d kayit=%d", cihaz, dosya, hedef.stat().st_size, kayit)
+        try:
+            self.hub.tamamlandi(hedef)
+        except Exception as e:  # noqa: BLE001 - geri çağrı hatası aktarımı bozmaz
+            _log.warning("tamamlandı geri çağrısı hata verdi (%s)", type(e).__name__)
+        return True, "", hedef
+
+    def tam_boyutlu_kurtar(self, cihaz: str, dosya: str) -> None:
+        """Dosya kilidi ELDEYKEN: .part boyutu bildirilen toplama eşitse (tamamlama öncesi ölüm) tamamlamayı
+        yeniden dener; tutmazsa geçici dosyalar silinir."""
+        dizin = self.gecici_klasoru / cihaz
+        part, sha_dosya = dizin / f"{dosya}.part", dizin / f"{dosya}.sha"
+        try:
+            if not part.is_file():
+                return
+            sha, toplam = _Isleyici._yan_oku(sha_dosya)
+            if toplam < 0 or not _SHA_RE.fullmatch(sha) or part.stat().st_size != toplam:
+                return
+            self.tamamla(cihaz, dosya, part, sha_dosya, sha.lower())
+        except Exception as e:  # noqa: BLE001
+            _log.warning("tam boyutlu geçici dosya kurtarılamadı (%s)", type(e).__name__)
+
+    def tam_boyutlu_kurtar_kilitli(self, cihaz: str, dosya: str) -> None:
+        with self.kilit_al(cihaz, dosya) as kilit:
+            if not kilit.acquire(blocking=False):
+                return
+            try:
+                self.tam_boyutlu_kurtar(cihaz, dosya)
+            finally:
+                kilit.release()
+
+    def baslangic_kurtarma(self) -> None:
+        for p in list(self.gecici_klasoru.glob("*/*.part")):
+            if UUID_RE.fullmatch(p.parent.name) and UUID_DOSYA_RE.fullmatch(p.stem + ".jsonl"):
+                self.tam_boyutlu_kurtar_kilitli(p.parent.name, p.stem)
+
     # --- kota / temizlik
     def yeni_yukleme_kotasi(self, cihaz: str):
         """Yeni (sıfırdan) yükleme kabul edilebilir mi? Reddedilirse (kod, ileti) döner; mevcutlar sürer."""
@@ -669,6 +736,10 @@ class AktarimAlici:
             self.eski_gecicileri_temizle()
         except Exception as e:  # noqa: BLE001
             _log.warning("geçici temizliği hata verdi (%s)", type(e).__name__)
+        try:
+            self.baslangic_kurtarma()
+        except Exception as e:  # noqa: BLE001
+            _log.warning("başlangıç kurtarması hata verdi (%s)", type(e).__name__)
         self._dur.clear()
         self._temizlik = threading.Thread(target=self._temizlik_dongusu, name="aktarim-temizlik", daemon=True)
         self._temizlik.start()

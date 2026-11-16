@@ -128,7 +128,7 @@ aynı şey değildir, bu yüzden açıkça yazılır.
 | Konu | Kural | Nerede kilitli |
 |---|---|---|
 | Giden bağlantı | yok: modüllerde `connect`, `create_connection`, `urlopen`, HTTP istemcisi, URL yok | `test_aktarim_alicisi_istisnasi_dar` (statik) |
-| Dinleme | yalnız Windows uygulaması açıkken ve "Telefon aktarımı" açıkken (`baslat()`/`durdur()`); varsayılan TCP 47821 (TLS 1.2+), UDP 47822 bulma | `test_yasam_dongusu_durum`, `test_tls12_alti_reddedilir_ve_yalniz_tls` |
+| Dinleme | yalnız Windows uygulaması açıkken ve "Telefon aktarımı" açıkken (`baslat()`/`durdur()`); varsayılan TCP 47823; doluysa işletim sisteminin verdiği boş port (TLS 1.2+), UDP 47822 bulma | `test_yasam_dongusu_durum`, `test_tls12_alti_reddedilir_ve_yalniz_tls` |
 | Kaynak adres | yalnız RFC1918 + link-local + loopback (`::ffff:` eşlemeli dahil); diğerleri bağlantı düzeyinde, el sıkışmadan kapatılır. İnternete yönlendirme/UPnP yapılmaz | `test_adres_suzgeci_*`, `test_acik_internet_adresi_baglanti_duzeyinde_reddedilir` |
 | Kimlik | eşleştirmede tek kullanımlık kod (10 dk, 5 yanlış denemede iptal) → 32 baytlık cihaz anahtarı (yalnız SHA-256 özeti saklanır); her istekte `Bearer` + `X-Cihaz`; iptal PC'den; kimliksiz istekte hiçbir bayt okunmaz/yazılmaz | `test_aktarim_eslestirme.py`, `test_aktarim_kimlik.py` |
 | Sertifika | kendinden imzalı (EC P-256, 10 yıl); telefon parmak izini sabitler. Özel anahtar veri klasöründe `aktarim/` altındadır; Windows'ta DPAPI ile sarılan bir parolayla şifrelenir, sağlayıcı yoksa (ör. Linux) **düz durur** | `test_sertifika_*` |
