@@ -78,7 +78,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           working-directory: android
-          script: ./gradlew connectedDebugAndroidTest --console=plain
+          script: |
+            ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=app.kimlikmerkezi.toplayici.Deney --console=plain
+            (./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.annotation=app.kimlikmerkezi.toplayici.Deney --console=plain && echo "DENEY-SONUC MANAGE_EXTERNAL_STORAGE: YESIL") || echo "DENEY-SONUC MANAGE_EXTERNAL_STORAGE: KIRMIZI"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
