@@ -217,7 +217,8 @@ def _kapsam(tz: YerelSaat, hub, cats: list[str]) -> tuple[list[str], list[str]]:
         "SELECT category, COUNT(*), MIN(CASE WHEN COALESCE(json_extract(payload,'$.zaman_kaynagi'),"
         "'') <> 'dosya_tarihi' THEN ts END), MAX(CASE WHEN COALESCE(json_extract(payload,"
         "'$.zaman_kaynagi'),'') <> 'dosya_tarihi' THEN ts END) FROM events WHERE hidden = 0 AND "
-        f"category IN ({','.join('?' * len(cats))}) GROUP BY category ORDER BY 2 DESC", cats)
+        f"category IN ({','.join('?' * len(cats))}) AND hassas_konu IS NULL "
+        "GROUP BY category ORDER BY 2 DESC", cats)
     var = {r[0] for r in rows}
     satir = [f"{k}: {n} kayıt" + (f", {_tarih(a, tz)} - {_tarih(b, tz)}" if a else "")
              for k, n, a, b in rows]
@@ -254,7 +255,7 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
         if not kl:
             continue
         saatler = [0] * 24
-        for saat, sayi in tg.say("saat", kategoriler=kl)["satirlar"]:   # [["05", 12], ...]
+        for saat, sayi in tg.say("saat", kategoriler=kl, isaretli_haric=True)["satirlar"]:   # [["05", 12], ...]
             saatler[int(saat[:2])] += sayi
         p = _pencere(saatler)
         if p:
@@ -285,7 +286,7 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
         if kanal:
             s.append(f"- {L}En çok izlenen kanallar (izleme sayısı): {_liste(kanal, 5)}")
         abone = tg.hub.query("SELECT COUNT(*) FROM events WHERE hidden = 0 AND "
-                             "kind = 'youtube.abonelik'")[0][0]
+                             "kind = 'youtube.abonelik' AND hassas_konu IS NULL")[0][0]
         if abone:
             s.append(f"- {L}Abone olunan kanal sayısı: {abone}")
         ekle("video", s)
@@ -302,7 +303,13 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
     # --- sosyal
     if var("sosyal"):
         sub = tg.ham_top("subreddit", ["sosyal"], limit=6)
-        ekle("sosyal", [f"- {L}En çok yazılan subredditler: {_liste(sub, 5)}"] if sub else [])
+        s = [f"- {L}En çok yazılan subredditler: {_liste(sub, 5)}"] if sub else []
+        # Beğeni/takip gibi düşük önemli kayıtlar ilgi/özet satırı üretmez; en çok tek sayı satırı.
+        dusuk = tg.hub.query("SELECT COUNT(*) FROM events WHERE hidden = 0 AND category = 'sosyal' "
+                             "AND onem = 0 AND hassas_konu IS NULL")[0][0]
+        if dusuk:
+            s.append(f"- {dusuk} beğeni/takip kaydı (düşük önem, özetlenmedi)")
+        ekle("sosyal", s)
     # --- dosya / uygulama
     s = []
     if var("dosyalar"):
@@ -321,7 +328,7 @@ def _ozetler(tg: Toplulastirici, tz: YerelSaat, cats: list[str], simdi: datetime
     n_son = tg.hub.query(
         "SELECT COUNT(*) FROM events WHERE hidden = 0 AND ts >= ? AND category IN "
         f"({','.join('?' * len(cats))}) AND COALESCE(json_extract(payload,'$.zaman_kaynagi'),'') "
-        "<> 'dosya_tarihi'", [since, *cats])[0][0] if cats else 0
+        "<> 'dosya_tarihi' AND hassas_konu IS NULL", [since, *cats])[0][0] if cats else 0
     if n_son >= 5:
         sk = [c for c in ("tarama", "video") if var(c)]
         kel = _kelimeler(tg.ham_top("terim", sk, since=since, limit=2000)) if sk else []
