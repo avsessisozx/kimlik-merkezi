@@ -1,0 +1,97 @@
+name: karar-a-olcum
+
+# GEÇİCİ ölçüm dalı (main'e girmez): telefon -> PC aktarım adayları. Bkz. spikes/karar_a/NOTLAR.md
+on:
+  push:
+    branches: [spike/karar-a]
+    paths:
+      - 'spikes/karar_a/**'
+      - '.github/workflows/karar-a.yml'
+
+concurrency:
+  group: karar-a-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: utf-8
+  SYNCTHING_SURUM: v1.30.0
+
+jobs:
+  olcum:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: spikes/karar_a
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Kurulum
+        run: |
+          python -m pip install pytest
+          python --version
+          (openssl version || "/c/Program Files/Git/usr/bin/openssl.exe" version) || true
+          mkdir -p cikti
+
+      - name: Syncthing ikilisini indir ve SHA256 doğrula
+        id: st
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import hashlib, os, sys, tarfile, urllib.request, zipfile
+          surum = os.environ["SYNCTHING_SURUM"]
+          win = os.environ["RUNNER_OS"] == "Windows"
+          ad = f"syncthing-windows-amd64-{surum}.zip" if win else f"syncthing-linux-amd64-{surum}.tar.gz"
+          taban = f"https://github.com/syncthing/syncthing/releases/download/{surum}/"
+          veri = urllib.request.urlopen(taban + ad, timeout=300).read()
+          sums = urllib.request.urlopen(taban + "sha256sum.txt.asc", timeout=60).read().decode()
+          beklenen = next(l.split()[0] for l in sums.splitlines() if l.strip().endswith(ad))
+          gercek = hashlib.sha256(veri).hexdigest()
+          print(f"SYNCTHING {surum} {ad} sha256={gercek} beklenen={beklenen} bayt={len(veri)}")
+          if gercek != beklenen:
+              sys.exit("SHA256 UYUSMUYOR")
+          os.makedirs("st_bin", exist_ok=True)
+          with open("st_bin/arsiv", "wb") as f:
+              f.write(veri)
+          if win:
+              zipfile.ZipFile("st_bin/arsiv").extractall("st_bin")
+          else:
+              tarfile.open("st_bin/arsiv").extractall("st_bin")
+          ikili = [os.path.join(k, d) for k, _, ds in os.walk("st_bin") for d in ds if d in ("syncthing", "syncthing.exe")]
+          assert ikili, "ikili bulunamadı"
+          yol = os.path.abspath(ikili[0])
+          os.chmod(yol, 0o755)
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"SYNCTHING_BIN={yol}\n")
+          print("SYNCTHING_BIN=" + yol)
+          PY
+          "$SYNCTHING_BIN" --version || true
+
+      - name: Aday 1 doğrudan HTTPS
+        if: always()
+        run: python -m pytest -c pytest.ini dogrudan -s -v --junitxml=cikti/junit-dogrudan.xml 2>&1 | tee cikti/gunluk-dogrudan.txt
+
+      - name: Aday 3 elle aktarım
+        if: always()
+        run: python -m pytest -c pytest.ini elle -s -v --junitxml=cikti/junit-elle.xml 2>&1 | tee cikti/gunluk-elle.txt
+
+      - name: Aday 2 Syncthing
+        if: always() && steps.st.outcome == 'success'
+        env:
+          SYNCTHING_ZORUNLU: '1'
+        run: python -m pytest -c pytest.ini syncthing -s -v --junitxml=cikti/junit-syncthing.xml 2>&1 | tee cikti/gunluk-syncthing.txt
+
+      - name: Özet
+        if: always()
+        run: python ozet.py cikti
