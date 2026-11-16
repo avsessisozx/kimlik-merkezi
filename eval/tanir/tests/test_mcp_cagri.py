@@ -82,7 +82,7 @@ def test_kapali_kategori_reddedilir_ve_sizmaz(kurulu):
 
 def test_hatali_yapilandirma_turkce_hata(tmp_path):
     p = subprocess.run([sys.executable, str(YARDIMCI), "--yapilandirma", str(tmp_path / "yok.json"), "ara"],
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert p.returncode == 2 and "bulunamadı" in json.loads(p.stdout)["hata"]
 
 
