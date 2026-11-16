@@ -243,6 +243,16 @@ def test_saat_dilimi_cozumleme_ve_uyari(monkeypatch):
     assert k.uyari and "çözülemedi" in k.bilgi(SIMDI)["uyari"]
 
 
+def test_ayarsiz_sistem_adi_bulunamazsa_uyari_yok_sabit_fark(monkeypatch):
+    """Windows benzetimi: kullanıcı saat dilimi vermedi, sistem adı bulunamıyor -> sd_uyari YOK."""
+    from kimlikserver import yerelsaat
+    monkeypatch.setattr(yerelsaat, "_sistem_adi", lambda: None)
+    monkeypatch.delenv("KIMLIK_SAAT_DILIMI", raising=False)
+    sd = YerelSaat.cozumle()
+    assert sd.uyari is None and "sd_uyari" not in sd.kisa()
+    assert "sabit fark" in sd.kaynak and "sd" in sd.kisa()
+
+
 def test_ciktilarda_yerel_zaman_ve_zaman_dilimi_aciklik(dunya):
     r = svc(dunya).ara("fedora", genislet=False)
     k = r["kayitlar"][0]

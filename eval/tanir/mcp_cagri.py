@@ -142,4 +142,6 @@ def ana(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    for _akim in (sys.stdout, sys.stderr):   # Windows konsol kodlaması (cp1252) Türkçe karakterde çökmesin
+        _akim.reconfigure(encoding="utf-8")
     sys.exit(ana())

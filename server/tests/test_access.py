@@ -120,7 +120,7 @@ def test_her_istek_kayda_girer(world):
 def test_erisim_kaydi_yazilamazsa_reddedilir_gelen_klasoru_acilamiyor(world):
     (world["root"] / "gelen").mkdir(exist_ok=True)
     (world["root"] / "gelen").rmdir()
-    (world["root"] / "gelen").write_text("klasör yerine dosya: kayıt bırakılamaz")
+    (world["root"] / "gelen").write_text("klasör yerine dosya: kayıt bırakılamaz", encoding="utf-8")
     with pytest.raises(ServiceError) as e:
         svc(world).ara("kahve", "notlar")
     assert "reddedildi" in str(e.value) and "kahve" not in str(e.value)

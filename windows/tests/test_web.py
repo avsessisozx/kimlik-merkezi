@@ -215,6 +215,8 @@ def test_mcp_stdio_uygulamanin_urettigi_anahtarla(ist, veri):
     env = {"KIMLIK_VERI": str(veri), "KIMLIK_ANAHTAR": r["anahtar"]}
     if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
         env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    if "KIMLIK_SAHTE_SAGLAYICI" in os.environ:   # çocuk süreç aynı sahte sağlayıcıyı görsün
+        env["KIMLIK_SAHTE_SAGLAYICI"] = os.environ["KIMLIK_SAHTE_SAGLAYICI"]
     p = StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
     async def go():

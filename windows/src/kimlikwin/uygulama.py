@@ -185,6 +185,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{modul}: var")
             except ImportError:
                 print(f"{modul}: YOK")
+        try:                                         # IANA saat dilimi verisi (Windows'ta tzdata paketi) pakette olmalı
+            from zoneinfo import ZoneInfo
+            ZoneInfo("Europe/Istanbul")
+            print("saat dilimi verisi: var")
+        except Exception as e:
+            print(f"saat dilimi verisi: YOK ({type(e).__name__})")
         try:                                         # çekirdek paket verisi (importlib.resources); pakette olmalı
             from kimlikserver.access import list_topics
             print(f"hassas konu listesi: var ({len(list_topics())} konu)")

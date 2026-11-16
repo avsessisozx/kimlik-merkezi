@@ -280,10 +280,12 @@ def test_claude_ekle_yazilamazsa_eski_anahtar_korunur(kurulu, tmp_path, monkeypa
     gercek = os.replace
 
     def bozuk(a, b):
+        if os.path.abspath(b) != os.path.abspath(f):   # yalnız Claude ayar dosyası yazılamasın (şifreli veritabanı yazımı sürsün)
+            return gercek(a, b)
         raise OSError("yazılamadı")
-    monkeypatch.setattr(os, "replace", bozuk)
-    r = kurulu.api("claude_ekle", {})
-    monkeypatch.setattr(os, "replace", gercek)
+    with monkeypatch.context() as m:
+        m.setattr(os, "replace", bozuk)
+        r = kurulu.api("claude_ekle", {})
     assert r["durum"] == "hata"
     assert f.read_text(encoding="utf-8") == once
     assert {a["id"]: a["iptal"] for a in _claude_anahtarlari(kurulu)}[ilk] is False

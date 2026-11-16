@@ -61,6 +61,7 @@ if BEKLENEN_SURUM:
 kontrol(r.returncode == 0 and "ijson arka ucu: yajl2_c" in r.stdout, "pakette ijson C uzantısı (yajl2_c) var")
 kontrol("pypdf: var" in r.stdout and "docx: var" in r.stdout, "pakette pypdf ve python-docx (belge okuyucular) var")
 
+kontrol("saat dilimi verisi: var" in r.stdout, "pakette saat dilimi verisi (tzdata, Europe/Istanbul) çözülebiliyor")
 _m = re.search(r"hassas konu listesi: var \((\d+) konu\)", r.stdout)
 kontrol(bool(_m) and int(_m.group(1)) >= 5, "pakette çekirdek verisi (kimlikcore/veri/hassas_konular.json) okunuyor, en az 5 konu")
 kontrol("telefon aktarımı: hazır" in r.stdout, "pakette telefon aktarımı modülleri (kimlikserver.aktarim, android_giden) içe aktarılabiliyor (alıcı dinletilmedi)")

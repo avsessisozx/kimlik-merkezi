@@ -44,6 +44,8 @@ def _mcp(root, key):
     env = {"KIMLIK_VERI": str(root), "KIMLIK_ANAHTAR": key}
     if "PYTHONPATH" in os.environ:   # çocuk süreç bu çalışma ağacındaki kodu kullansın
         env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    if "KIMLIK_SAHTE_SAGLAYICI" in os.environ:   # çocuk süreç test sürecindeki sahte sağlayıcıyı görsün (Windows: DPAPI'ye düşmesin)
+        env["KIMLIK_SAHTE_SAGLAYICI"] = os.environ["KIMLIK_SAHTE_SAGLAYICI"]
     return StdioServerParameters(command=sys.executable, args=["-m", "kimlikserver.mcp"], env=env)
 
 

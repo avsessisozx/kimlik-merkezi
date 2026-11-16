@@ -109,7 +109,7 @@ def _bul(bulma_port, mesaj):
     try:
         s.sendto(mesaj, ("127.0.0.1", bulma_port))
         return s.recvfrom(100)[0]
-    except socket.timeout:
+    except (socket.timeout, ConnectionResetError):   # Windows: kapalı UDP portu ICMP ile ConnectionResetError verir = yanıt yok
         return None
     finally:
         s.close()

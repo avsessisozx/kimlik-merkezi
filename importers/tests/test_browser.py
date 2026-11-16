@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from conftest import FIX, count_events
 from kimlikcore import FormatError
-from kimlikimport import registry
+from kimlikimport import browser, registry
 from kimlikimport.base import ImportFormatError
 from kimlikimport.browser import WEBKIT_OFFSET_US, BrowserHistory, default_locations
 from kimlikimport.run import run
@@ -145,6 +145,12 @@ def test_kilitli_dosya_anlasilir_hata(hub, tmp_path, monkeypatch):
         return real(s, d, *a, **k)
 
     monkeypatch.setattr(shutil, "copyfile", locked)
+
+    def paylasimli_kilitli(src):  # Windows'ta ürün tam paylaşımlı yedeğe düşer; o da kilitli olsun
+        raise PermissionError(13, "kilitli")
+
+    if hasattr(browser, "_win_open_shared"):
+        monkeypatch.setattr(browser, "_win_open_shared", paylasimli_kilitli)
     with pytest.raises(FormatError) as ei:
         run(hub, h, "browser_history")
     assert "kilitli" in str(ei.value) and "Tarayıcıyı" in str(ei.value)
