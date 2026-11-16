@@ -270,8 +270,29 @@ def v5_adimi(veri_klasoru=None):
     return lambda conn: _v5(conn, veri_klasoru)
 
 
+def _v6(conn: sqlite3.Connection) -> None:
+    """v6: telefon aktarımı (docs/AKTARIM.md). `devices`e eşleştirme alanları, `aktarim_dosyalari` tablosu.
+    Yalnız eklemeli; yeniden çalıştırılırsa bozulmaz."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(devices)")}
+    if "key_hash" not in cols:
+        conn.execute("ALTER TABLE devices ADD COLUMN key_hash TEXT")
+    if "paired_at" not in cols:
+        conn.execute("ALTER TABLE devices ADD COLUMN paired_at TEXT")
+    if "revoked" not in cols:
+        conn.execute("ALTER TABLE devices ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS aktarim_dosyalari (
+        device_id TEXT NOT NULL,
+        dosya_id TEXT NOT NULL,
+        sha256 TEXT NOT NULL,
+        kayit_sayisi INTEGER NOT NULL,
+        alindi TEXT NOT NULL,
+        PRIMARY KEY (device_id, dosya_id)
+    )""")
+
+
 MIGRATIONS: dict[int, Statements | Callable[[sqlite3.Connection], None]] = {
-    1: _V1, 2: _V2, 3: _V3, 4: _V4, 5: _v5,
+    1: _V1, 2: _V2, 3: _V3, 4: _V4, 5: _v5, 6: _v6,
 }
 SCHEMA_VERSION = max(MIGRATIONS)
 

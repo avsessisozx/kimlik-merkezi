@@ -29,7 +29,7 @@ if TYPE_CHECKING:  # pragma: no cover
 FORMAT = "kimlikmerkezi-jsonl"
 FORMAT_VERSION = 1
 _MOD = 1 << 256
-_SONRADAN_EKLENEN = "konu_izni"   # v5'te eklendi; eski dışa aktarımlarda yok
+_SONRADAN_EKLENEN = ("konu_izni", "aktarim_dosyasi")   # v5/v6'da eklendi; eski dışa aktarımlarda yok
 
 # (kayıt türü, tablo) — sıra dış anahtar bağımlılığına uygundur.
 TYPES: list[tuple[str, str]] = [
@@ -41,11 +41,13 @@ TYPES: list[tuple[str, str]] = [
     ("app_key", "app_keys"),
     ("permission", "permissions"),
     ("konu_izni", "konu_izinleri"),
+    ("aktarim_dosyasi", "aktarim_dosyalari"),
     ("fact", "facts"),
     ("contradiction", "contradictions"),
     ("event", "events"),
 ]
 _TABLE_OF = dict(TYPES)
+_DEVICE_FIELDS = ("device_id", "name", "platform", "created", "last_seen", "paired_at", "revoked")
 _EVENT_FIELDS = (
     "event_id", "event_key", "source_id", "device_id", "ts", "kind", "category", "payload",
     "text", "schema_version", "hidden", "ingested_at",
@@ -90,6 +92,8 @@ def iter_records(conn: sqlite3.Connection) -> Iterator[tuple[str, dict[str, Any]
     for t, table in TYPES:
         if t == "event":
             cur = conn.execute(f"SELECT {', '.join(_EVENT_FIELDS)} FROM events ORDER BY seq")
+        elif t == "device":   # anahtar özeti dışa aktarılmaz: yedekten dönen kurulumda telefonlar yeniden eşleşir
+            cur = conn.execute(f"SELECT {', '.join(_DEVICE_FIELDS)} FROM devices ORDER BY rowid")
         else:
             cur = conn.execute(f"SELECT * FROM {table} ORDER BY rowid")
         cols = [d[0] for d in cur.description]
@@ -149,7 +153,8 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
     cols_of: dict[str, set[str]] = {}
     for _t, table in TYPES:
         cols_of[table] = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
-    acc = _Acc()
+    acc = _Acc()       # dosyadaki kayıtlar olduğu gibi (footer karşılaştırması)
+    acc_db = _Acc()    # veritabanına girecek biçim (key_hash atılmış; summarize ile karşılaştırma)
     header: dict[str, Any] | None = None
     footer: dict[str, Any] | None = None
     verified = False
@@ -184,6 +189,9 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
             if unknown:
                 raise FormatError(f"{n}. satır: bilinmeyen alanlar: {', '.join(sorted(unknown))}")
             acc.add(t, rec)
+            if t == "device":
+                rec = {k: v for k, v in rec.items() if k != "key_hash"}   # eski dosyadaki anahtar özeti yok sayılır
+            acc_db.add(t, rec)
             try:
                 if t == "event":
                     vals = dict(rec)
@@ -213,7 +221,7 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
         if header is None or footer is None:
             raise FormatError("Dosya eksik ya da kesik (header/footer yok).")
         got = acc.result()
-        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni` türü için (0 kayıt ve footer'da yok);
+        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni`/`aktarim_dosyasi` türleri için (0 kayıt ve footer'da yok);
         # başka bir türün özeti eksikse ya da farklıysa dosya reddedilir.
         fc, fd = footer.get("counts"), footer.get("digests")
         if not isinstance(fc, dict) or not isinstance(fd, dict):
@@ -222,10 +230,10 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
                 or any(
                     (fc.get(t) != got["counts"][t] or fd.get(t) != got["digests"][t])
                     for t in got["counts"]
-                    if not (t == _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
+                    if not (t in _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
-            if summarize(c) != got:
+            if summarize(c) != acc_db.result():
                 raise FormatError("Geri yüklenen veri özeti dosyadakiyle uyuşmuyor.")
             verified = True
     missing = sum(

@@ -145,6 +145,16 @@ IZINLI_ISTISNALAR = {
     ("windows/src/kimlikwin/guncelleme.py", "urllib.request"):
         "UYGULAMANIN TEK DIŞ AĞ YOLU: GitHub sürüm denetimi/indirme (api.github.com + release dosyaları); "
         "kullanıcı kapatabilir, indirme/kurulum yalnız onayla. Sınırları test_guncelleme_istisnasi_dar kilitler",
+    # Telefon aktarımı alıcısı (docs/AG-GARANTISI.md "Telefon aktarımı alıcısı"): GİDEN bağlantı yok; yalnız
+    # kullanıcı açınca yerel ağdan GELEN bağlantı dinler. Sınırları test_aktarim_alicisi_istisnasi_dar kilitler.
+    ("server/src/kimlikserver/aktarim/alici.py", "ssl"):
+        "TLS (1.2+) sunucu bağlamı; yerel ağdan gelen aktarımı dinler, dışarıya bağlanmaz",
+    ("server/src/kimlikserver/aktarim/alici.py", "socket"):
+        "dinleyen sunucu soketi + kaynak adres süzgeci (RFC1918/link-local/loopback); connect yok",
+    ("server/src/kimlikserver/aktarim/bulma.py", "socket"):
+        "UDP 47822 yanıtlayıcı: yalnız yerel kaynak adreslere, doğru parmak izi önekine yanıt",
+    ("server/src/kimlikserver/aktarim/eslestirme.py", "socket"):
+        "yalnız socket.gethostname()/getaddrinfo(kendi adı) ile bu bilgisayarın yerel IPv4 adresleri",
     ("windows/src/kimlikwin/uygulama.py", "webbrowser"):
         "yalnız kendi yerel adresini (sunucu.url = http://127.0.0.1:<port>/) kullanıcının tarayıcısında açar",
 }
@@ -217,7 +227,28 @@ def test_istisna_dosyalari_yalniz_yerel_kullaniyor():
     assert cagrilar and all("127.0.0.1" in c for c in cagrilar), cagrilar
 
 
-# Sunucu bağlama adresleri: yalnız 127.0.0.1 (ya da hiç sunucu yok).
+def test_aktarim_alicisi_istisnasi_dar():
+    """Alıcı yalnız dinler: giden bağlantı/istek yok, UDP yanıtı yalnız bulma.py'de, adres süzgeci ve TLS 1.2 şart."""
+    d = KOK / "server/src/kimlikserver/aktarim"
+    kodlar = {y.name: y.read_text(encoding="utf-8") for y in d.glob("*.py")}
+    for ad, kod in kodlar.items():
+        assert not re.search(r"\.connect\(|\.connect_ex\(|create_connection|urlopen|gethostbyname|HTTPSConnection", kod), ad
+        assert not re.search(r"https?://", kod), ad
+        if ad != "eslestirme.py":
+            assert "getaddrinfo" not in kod, ad
+        if ad != "bulma.py":
+            assert "sendto" not in kod and "SOCK_DGRAM" not in kod, ad
+    eslestirme = kodlar["eslestirme.py"]
+    assert re.search(r"getaddrinfo\(\s*ad\b", eslestirme) and "gethostname()" in eslestirme
+    alici = kodlar["alici.py"]
+    assert "TLSVersion.TLSv1_2" in alici and "def verify_request" in alici and "yerel_adres_mi(client_address[0])" in alici
+    assert "ThreadingHTTPServer" in alici and "PROTOCOL_TLS_SERVER" in alici and "PROTOCOL_TLS_CLIENT" not in alici
+    assert '"0.0.0.0"' in alici and re.search(r"yalniz_yerel: bool = True", alici)       # varsayılan: yerel ağ süzgeci AÇIK
+    assert "yerel_adres_mi(kaynak[0])" in kodlar["bulma.py"]
+
+
+# Sunucu bağlama adresleri: yalnız 127.0.0.1 (ya da hiç sunucu yok). İstisna: telefon alıcısı (varsayılan 0.0.0.0 + yerel
+# ağ süzgeci); sınırları test_aktarim_alicisi_istisnasi_dar kilitler.
 def test_sunucular_yalniz_127_dinler():
     bulunan = []
     for yol in _py_dosyalari():

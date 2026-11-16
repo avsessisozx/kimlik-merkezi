@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import hmac
 import itertools
 import json
 import os
@@ -1060,6 +1061,65 @@ class Hub:
         except sqlite3.OperationalError:
             pass
         self._kalici_yaz()
+
+    # ------------------------------------------------------------------ telefon aktarımı (şema v6)
+    @_write_only
+    def cihaz_ekle(self, device_id: str, name: str, platform: str | None, key_hash: str) -> None:
+        """Eşleştirilen cihazı kaydeder (yalnız anahtar özeti). Aynı kimlik yeniden eşleşirse anahtar yenilenir
+        ve iptal kalkar."""
+        now = now_iso()
+        with self._tx() as c:
+            c.execute(
+                "INSERT INTO devices(device_id, name, platform, created, key_hash, paired_at, revoked) "
+                "VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, "
+                "platform = excluded.platform, key_hash = excluded.key_hash, paired_at = excluded.paired_at, "
+                "revoked = 0", (device_id, name, platform, now, key_hash, now))
+
+    @_write_only
+    def cihaz_iptal(self, device_id: str) -> bool:
+        """Cihazın anahtarını iptal eder; cihaz kaydı ve olayları kalır. Cihaz yoksa False."""
+        with self._tx() as c:
+            return c.execute("UPDATE devices SET revoked = 1 WHERE device_id = ?", (device_id,)).rowcount > 0
+
+    @_locked
+    def cihazlar(self) -> list[dict[str, Any]]:
+        """Cihazlar (anahtar özeti DÖNMEZ)."""
+        return [
+            {"device_id": r[0], "name": r[1], "platform": r[2], "created": r[3], "last_seen": r[4],
+             "paired_at": r[5], "revoked": bool(r[6]), "eslesmis": r[7] is not None}
+            for r in self._conn.execute(
+                "SELECT device_id, name, platform, created, last_seen, paired_at, revoked, key_hash "
+                "FROM devices ORDER BY created, device_id")
+        ]
+
+    @_locked
+    def cihaz_dogrula(self, device_id: str, key_hash: str) -> bool:
+        """Özet kayıtlıysa ve cihaz iptal edilmemişse True (sabit zamanlı karşılaştırma)."""
+        r = self._conn.execute(
+            "SELECT key_hash, revoked FROM devices WHERE device_id = ?", (device_id,)).fetchone()
+        if r is None or not r[0] or r[1]:
+            return False
+        return hmac.compare_digest(str(r[0]), str(key_hash))
+
+    @_write_only
+    def cihaz_goruldu(self, device_id: str, ts: str | None = None) -> None:
+        with self._tx() as c:
+            c.execute("UPDATE devices SET last_seen = ? WHERE device_id = ?", (ts or now_iso(), device_id))
+
+    @_write_only
+    def aktarim_dosyasi_kaydet(self, device_id: str, dosya_id: str, sha256: str, kayit_sayisi: int) -> None:
+        """Tam alınan dosyayı işler (idempotent; ilk kayıt korunur)."""
+        with self._tx() as c:
+            c.execute(
+                "INSERT OR IGNORE INTO aktarim_dosyalari(device_id, dosya_id, sha256, kayit_sayisi, alindi) "
+                "VALUES (?, ?, ?, ?, ?)", (device_id, dosya_id, sha256, int(kayit_sayisi), now_iso()))
+
+    @_locked
+    def aktarim_dosyasi_var(self, device_id: str, dosya_id: str) -> str | None:
+        r = self._conn.execute(
+            "SELECT sha256 FROM aktarim_dosyalari WHERE device_id = ? AND dosya_id = ?",
+            (device_id, dosya_id)).fetchone()
+        return r[0] if r else None
 
     # ------------------------------------------------------------------ dışa/içe aktarım
     @_locked
