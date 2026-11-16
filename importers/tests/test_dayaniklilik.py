@@ -42,6 +42,7 @@ CASES = [
     ("chatgpt", "gercekci/chatgpt_parcali", "conversations-000.json"),
     ("claude", "chat_claude", "conversations.json"),
     ("chat_file", "chat_generic", "deepseek_elle.json"),
+    ("android_giden", "android_giden", "11111111-1111-4111-8111-111111111111.jsonl"),
 ]
 IDS = [f"{t}:{Path(f).name}" for t, _, f in CASES]
 

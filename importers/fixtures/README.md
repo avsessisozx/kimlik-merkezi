@@ -8,3 +8,4 @@ Hepsi sentetik, uydurma içerik; gerçek kişisel veri yok.
 - gercekci/: `uret_gercekci.py` ile üretilen, gerçeğe yakın BİÇİMLİ uydurma dosyalar (Türkçe adlı Takeout + BOM + konum +
   Gemini, yeni Timeline.json, parçalı ChatGPT, yeni Instagram adları, 2024 Spotify adları). Biçimler BICIM-DENETIMI.md'ye göre;
   Türkçe klasör adları ve bazı alanlar VARSAYIMDIR. Koordinatlar/kişiler/metinler uydurmadır; IP'ler belgeleme aralığındandır (203.0.113.0/24).
+- android_giden: `uret_android.py` ile üretilen giden kutusu dosyaları (sağlam, kapanışsız, sayısı tutmayan, yarım satır, bozuk JSON, `bicim: 2`, bilinmeyen tür, karışık zip); AKTARIM.md §1 biçimi, tümü sentetik.
