@@ -157,9 +157,10 @@ class _Sunucu(ThreadingHTTPServer):
     def __init__(self, adres, a: "AktarimAlici", bag: ssl.SSLContext):
         self.a = a
         self.bag = bag
-        self._sem = threading.BoundedSemaphore(a.sinirlar["eszamanli_baglanti"])
+        self._toplam = 0
         self._acik: dict[socket.socket, str] = {}
         self._ip_sayac: dict[str, int] = {}
+        self._bosta: dict[socket.socket, float] = {}   # yanıtı bitmiş, yeni istek bekleyen bağlantılar (zaman damgası)
         self._acik_kilit = threading.Lock()
         super().__init__(adres, _Isleyici)
 
@@ -176,13 +177,21 @@ class _Sunucu(ThreadingHTTPServer):
     def process_request(self, request, client_address):
         ip = _ip(client_address[0])
         with self._acik_kilit:
-            if self._ip_sayac.get(ip, 0) >= self.a.sinirlar["ip_basina_baglanti"]:
-                kabul = False
-            elif not self._sem.acquire(blocking=False):
-                kabul = False
-            else:
-                kabul = True
+            ip_dolu = self._ip_sayac.get(ip, 0) >= self.a.sinirlar["ip_basina_baglanti"]
+            toplam_dolu = self._toplam >= self.a.sinirlar["eszamanli_baglanti"]
+            kabul = not (ip_dolu or toplam_dolu)
+            if not kabul:
+                # Sınır dolu: EN ESKİ BOŞTA bağlantı (IP doluysa o IP'ninki) kapatılır; aktif istek/yükleme ve
+                # el sıkışan bağlantılar etkilenmez. Yeni bağlantı kabul edilir (sayaç eskisi bitince düşer).
+                aday = [(t, k) for k, t in self._bosta.items() if not ip_dolu or self._acik.get(k) == ip]
+                if aday:
+                    _, eski = min(aday, key=lambda x: x[0])
+                    self._bosta.pop(eski, None)
+                    _kes(eski)
+                    kabul = True
+            if kabul:
                 self._ip_sayac[ip] = self._ip_sayac.get(ip, 0) + 1
+                self._toplam += 1
                 self._acik[request] = ip
         if not kabul:
             self.shutdown_request(request)
@@ -195,21 +204,44 @@ class _Sunucu(ThreadingHTTPServer):
 
     def _biraktir(self, request) -> None:
         with self._acik_kilit:
+            self._bosta.pop(request, None)
             ip = self._acik.pop(request, None)
             if ip is None:
                 return
+            self._toplam -= 1
             n = self._ip_sayac.get(ip, 1) - 1
             if n <= 0:
                 self._ip_sayac.pop(ip, None)
             else:
                 self._ip_sayac[ip] = n
-        self._sem.release()
 
     def process_request_thread(self, request, client_address):
+        # Sayaçlar soket kapanmadan ÖNCE düşer: istemci kapanmayı görüp hemen yeniden bağlandığında eski
+        # bağlantı hâlâ sayılmasın (Windows/Linux zamanlama farkı). Yanıt gövdesi okunmadan kapatılan
+        # bağlantıda (401 vb.) Windows okunmamış veriyle close'ta RST üretip yanıtı siler: kısa süre atılarak boşaltılır.
         try:
-            super().process_request_thread(request, client_address)
+            self.finish_request(request, client_address)
+        except Exception:
+            self.handle_error(request, client_address)
         finally:
             self._biraktir(request)
+            self._nazik_kapat(request)
+
+    def _nazik_kapat(self, request) -> None:
+        try:
+            socket.socket.shutdown(request, socket.SHUT_WR)     # SSL katmanına dokunmadan: yanıt iletildi
+            bitis = time.monotonic() + 2.0
+            while True:
+                kalan = bitis - time.monotonic()
+                if kalan <= 0:
+                    break
+                request.settimeout(kalan)
+                if not socket.socket.recv(request, 65536):
+                    break
+        except (OSError, ValueError):
+            pass
+        finally:
+            self.shutdown_request(request)
 
     def handle_error(self, request, client_address):
         pass    # kopan bağlantı/sertifika reddi gürültü yapmasın (içerik zaten günlüğe girmez)
@@ -227,7 +259,9 @@ class _Isleyici(BaseHTTPRequestHandler):
 
     def setup(self):
         s = self.server.a.sinirlar
-        self.request.settimeout(s["soket_zaman_asimi_s"])
+        # El sıkışma bu sürede bitmezse okuma kendiliğinden zaman aşımına düşer (bekçinin başka iş parçacığından
+        # yaptığı kesme Windows'ta engelli okumayı her zaman uyandırmayabilir; yuva geç boşalır).
+        self.request.settimeout(min(s["soket_zaman_asimi_s"], s["el_sikisma_zaman_asimi_s"]))
         bekci = _bekci(self.request, s["el_sikisma_zaman_asimi_s"])      # el sıkışmanın TOPLAM süresi
         try:
             self.request.do_handshake()
@@ -244,9 +278,15 @@ class _Isleyici(BaseHTTPRequestHandler):
         s = self.server.a.sinirlar
         try:
             self.request.settimeout(s["bosta_zaman_asimi_s"])
-            if not self.rfile.peek(1):
-                self.close_connection = True
-                return
+            with self.server._acik_kilit:
+                self.server._bosta[self.request] = time.monotonic()
+            try:
+                if not self.rfile.peek(1):
+                    self.close_connection = True
+                    return
+            finally:
+                with self.server._acik_kilit:
+                    self.server._bosta.pop(self.request, None)
             self.request.settimeout(s["soket_zaman_asimi_s"])
         except (OSError, ssl.SSLError, ValueError):
             self.close_connection = True

@@ -45,6 +45,14 @@ def kapandi(s, en_gec=4.0):
         return True
 
 
+def sayaclar_bosalsin(d, en_gec=5.0):
+    """Koşul bekleme (sabit sleep yok): istemci kapanmayı görünce sunucu iş parçacığı sayacı henüz düşürmemiş olabilir."""
+    bitis = time.monotonic() + en_gec
+    while d.alici._srv._toplam and time.monotonic() < bitis:
+        time.sleep(0.02)
+    return d.alici._srv._toplam == 0
+
+
 def yeni(tmp_path, **sinirlar):
     return AktarimDunyasi(tmp_path, sinirlar=sinirlar)
 
@@ -81,6 +89,7 @@ def test_ip_basina_dort_baglanti_besinci_reddedilir(tmp_path):
         besinci = tls(d.alici.port, el_sik=False)
         assert kapandi(besinci, 1.0)                                  # hemen kapatılır (kabul edilmez)
         assert all(kapandi(s, 4) for s in tutan)                      # el sıkışma sınırı: 2 sn'de kesilir
+        assert sayaclar_bosalsin(d), f"sayaç boşalmadı: toplam={d.alici._srv._toplam} ip={d.alici._srv._ip_sayac}"
         assert i.durum(DOSYA) == ("yok", 0)
         i.kapat()
         for _ in range(40):                                           # kapanan bağlantılar sayaçtan düşer
@@ -101,6 +110,7 @@ def test_toplam_32_baglanti_sinirinda_33uncu_reddedilir(tmp_path):
         fazla = tls(d.alici.port, el_sik=False)
         assert kapandi(fazla, 1.0)                                    # 33. bağlantı kabul edilmez
         assert all(kapandi(s, 5) for s in tutan)
+        assert sayaclar_bosalsin(d), f"sayaç boşalmadı: toplam={d.alici._srv._toplam} ip={d.alici._srv._ip_sayac}"
         assert i.durum(DOSYA) == ("yok", 0)                           # yer açılınca geçerli istemci hizmet alır
     finally:
         d.kapat()
@@ -550,5 +560,23 @@ def test_401de_govde_okunmaz(tmp_path):
             m._Isleyici._bosalt = eski
         assert kod == 401
         assert okunan == [0]       # kimliksizde boşaltılacak bayt kaydı bile yok
+    finally:
+        d.kapat()
+
+
+def test_bosta_keepalive_baglantilar_ip_sinirini_tuketmez(tmp_path):
+    """4 el sıkışmış, boşta bağlantı varken 5. geçerli istek hizmet alır (en eski boşta bağlantı kapatılır)."""
+    d = yeni(tmp_path)
+    try:
+        i = d.eslesmis()
+        bostalar = [tls(d.alici.port) for _ in range(4)]
+        for _ in range(100):                      # hepsi boşta (istek bekler) duruma geçsin
+            if len(d.alici._srv._bosta) >= 4:
+                break
+            time.sleep(0.05)
+        assert i.durum(DOSYA) == ("yok", 0)
+        assert kapandi(bostalar[0], 3)            # en eskisi kapatıldı
+        for s in bostalar:
+            s.close()
     finally:
         d.kapat()
