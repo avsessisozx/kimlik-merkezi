@@ -27,13 +27,13 @@ Türler ve kategoriler (kategori kimlikleri INTERFACES §2):
 PC tarafında olay anahtarı: `event_key = stable_key("android", cihaz_id, kayit.id)`; `kind = "android." + tür`; `device_id = cihaz_id`. Rol, önem ve hassas konu işareti çekirdekte (şema v5) içe alma anında hesaplanır; telefon bunları hesaplamaz. `not.hizli` ve `paylasim.*` kullanıcının kendi içeriğidir (kategori `notlar` → önem 2).
 
 ## 2. Eşleştirme
-- PC (Windows uygulaması, "Telefon ekle"): 10 dakika geçerli tek kullanımlık kod üretir ve hem metin hem QR olarak gösterir: `km1:` + base64url(JSON `{"a":["192.168.1.20"],"p":47821,"f":"<sertifika SHA-256 hex>","k":"<tek kullanımlık gizli>","n":"<PC adı>"}`).
+- PC (Windows uygulaması, "Telefon ekle"): 10 dakika geçerli tek kullanımlık kod üretir ve hem metin hem QR olarak gösterir: `km1:` + base64url(JSON `{"a":["192.168.1.20"],"p":47823,"f":"<sertifika SHA-256 hex>","k":"<tek kullanımlık gizli>","n":"<PC adı>"}`).
 - Telefon kodu okur/yapıştırır, sertifika parmak izini SABİTLER (başka sertifikaya bağlanmaz) ve `POST /eslestir` gönderir: `{"cihaz_id","ad","platform":"android","model","kod":"<k>"}`.
 - PC kodu doğrular (tek kullanım, süre), 32 baytlık `cihaz_anahtari` üretir, yalnız SHA-256 özetini saklar (`devices` tablosu, şema v6: `key_hash`, `paired_at`, `revoked`) ve anahtarı bir kez döner. Telefon anahtarı Keystore ile şifreli saklar.
 - Cihaz iptali PC'den yapılır; iptal edilen anahtar 401 alır.
 
 ## 3. Aktarım (HTTPS, yalnız yerel ağ)
-- PC alıcısı YALNIZ Windows uygulaması açıkken ve "Telefon aktarımı" açıkken dinler. Varsayılan TCP 47821. Kendinden imzalı sertifika ilk açılışta üretilir (`cryptography`), veri klasöründe durur. Kaynak adresi RFC1918, link-local ya da loopback olmayan bağlantı kabul edilmez. İnternete açılmaz, yönlendirme yapılmaz.
+- PC alıcısı YALNIZ Windows uygulaması açıkken ve "Telefon aktarımı" açıkken dinler. Varsayılan TCP 47823. Kendinden imzalı sertifika ilk açılışta üretilir (`cryptography`), veri klasöründe durur. Kaynak adresi RFC1918, link-local ya da loopback olmayan bağlantı kabul edilmez. İnternete açılmaz, yönlendirme yapılmaz.
 - Kimlik: `Authorization: Bearer <cihaz_anahtari>` ve `X-Cihaz: <cihaz_id>`. Yanlış/eksik/iptal → 401, hiçbir bayt yazılmaz.
 - `GET /durum` → `{"surum","pc_adi","protokol":1}`.
 - `HEAD /giden/<cihaz_id>/<dosya_id>.jsonl` → `X-Durum: yok|kismi|var`, `X-Alinan: <bayt>`.
