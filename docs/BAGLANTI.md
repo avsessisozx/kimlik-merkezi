@@ -20,6 +20,9 @@ adımı çalıştığı varsayma.
   Düz anahtar yalnızca bir kez yazılır; veritabanında yalnız hash'i durur. Hassas kategoriler
   (`eposta`, `mesaj`, `konum`, `sohbet`) için ayrıca `--hassas-onay` gerekir ve toplu açmaya dahil değildir.
   Varsayılan olarak hiçbir kategori açık değildir. İptal: `anahtar-iptal --app-id ...`.
+- **Hassas konu izni ayrıdır:** sağlık, hukuk, finans, din/siyaset, cinsellik gibi konularla işaretli kayıtlar,
+  kategorisi açık olsa bile, o konu için ayrıca izin verilmedikçe dönmez; varsayılan kapalıdır ve toplu açmaya dahil değildir.
+- İşaretleme yalnız bir sözcük listesidir (bağlamı anlamaz, yanılabilir; ayrıntı: docs/SEMA.md §13); bunu bir güvenlik garantisi saymayın.
 - **Saat dilimi (isteğe bağlı üçüncü ortam değişkeni):** `KIMLIK_SAAT_DILIMI` (ör. `Europe/Istanbul` ya da
   `UTC+03:00`). Yoksa MCP sürecinin çalıştığı bilgisayarın yerel saati kullanılır. Araç çıktılarında kayıtlardaki `zaman`
   YEREL saattir (ofsetli, ör. `2026-11-09T15:00:00+03:00`) ve `say` saat/gün/ay/yıl dağılımları da bu dilimdedir; cevaplarda

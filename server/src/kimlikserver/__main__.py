@@ -36,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
                 for cat in args.izin:
                     km.grant(app_id, cat, expires_at=args.bitis,
                              confirmed_sensitive=args.hassas_onay and cat in Category.SENSITIVE)
+                if not args.izin:
+                    print("Uyarı: Bu anahtarın hiçbir kategori izni yok; hiçbir şeyi göremez.",
+                          file=sys.stderr)
                 print(f"app_id: {app_id}")
                 print(f"anahtar: {plain}")
                 print("Bu anahtar bir daha gösterilmez.", file=sys.stderr)

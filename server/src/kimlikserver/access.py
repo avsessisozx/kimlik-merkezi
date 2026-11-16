@@ -22,6 +22,7 @@ from pathlib import Path
 
 from kimlikcore import Category, FormatError, Hub, KimlikError, NotFoundError, PermissionDenied
 from kimlikcore import HubNotFoundError, norm_ts
+from kimlikcore import hassas as _hassas
 from kimlikcore.gelen import GelenKutusu
 
 from ._db import Clock, iso, utc_now
@@ -31,6 +32,10 @@ KEY_PREFIX = "kim_"
 
 class SensitiveConfirmationRequired(KimlikError):
     """Hassas kategori (eposta/mesaj/konum) ayrı onay işareti olmadan açılamaz."""
+
+
+class UnknownTopic(FormatError):
+    """Bilinmeyen hassas konu kimliği."""
 
 
 class AccessLogError(KimlikError):
@@ -54,6 +59,31 @@ class Grant:
     granted_at: str
     expires_at: str | None
     confirmed_sensitive: bool
+
+
+def list_topics(veri_klasoru: Path | str | None = None) -> list[str]:
+    """Bilinen hassas konu kimlikleri (alfabetik): paket listesi + veri klasöründeki ek dosya
+    (`kimlikcore.hassas`). Ek dosya bozuksa yalnız paket listesi."""
+    sn, _uyari = _hassas.yukle(veri_klasoru)
+    return sorted(sn.konu_idleri)
+
+
+def konu_kosulu(izinli: Iterable[str], sutun: str = "events.hassas_konu") -> tuple[str, list[str]]:
+    """SQL koşulu (+ bağımsız değişkenler): kayıt, `hassas_konu` içindeki HER konu `izinli`de
+    ise geçer. İzinli küme boşsa `sutun IS NULL`. Değer alfabetik virgüllü konu kimlikleridir;
+    özyinelemeli CTE ile virgülden ayrılır (JSON kurulmaz: kimlikte tırnak/ters bölü olsa da çalışır; küme büyüklüğünden bağımsız)."""
+    izin = sorted(set(izinli))
+    if not izin:
+        return f"{sutun} IS NULL", []
+    return (f"({sutun} IS NULL OR NOT EXISTS (WITH RECURSIVE _k(v, r) AS (SELECT '', {sutun} || ',' "
+            "UNION ALL SELECT substr(r, 1, instr(r, ',') - 1), substr(r, instr(r, ',') + 1) "
+            "FROM _k WHERE r <> '') SELECT 1 FROM _k WHERE v <> '' AND v NOT IN "
+            f"({','.join('?' * len(izin))})))", izin)
+
+
+def konu_izinli_mi(isaret: str | None, izinli: Iterable[str]) -> bool:
+    """`konu_kosulu`nun Python karşılığı (tek kayıt için)."""
+    return not isaret or set(isaret.split(",")) <= set(izinli)
 
 
 def _check_category(category: str) -> str:
@@ -126,6 +156,44 @@ class KeyManager:
             self.grant(app_id, cat, expires_at=expires_at)
         return cats
 
+    def grant_topic(self, app_id: str, konu: str, *, expires_at: str | datetime | None = None,
+                    confirmed: bool) -> None:
+        """Hassas KONU izni (kategori izninden ayrı; varsa günceller). Onay bayrağı (`confirmed=True`)
+        olmadan yazılamaz. `grant_all_non_sensitive` konu izni VERMEZ."""
+        if not confirmed:
+            raise SensitiveConfirmationRequired(
+                f"'{konu}' hassas bir konudur; ayrı onay olmadan açılamaz.")
+        if konu not in list_topics(self.hub.root):
+            raise UnknownTopic(f"Bilinmeyen hassas konu: {konu!r}")
+        exp = None if expires_at is None else norm_ts(expires_at, assume_utc=True)
+        now = iso(self._clock())
+        with self.hub.transaction() as c:
+            row = c.execute("SELECT revoked FROM app_keys WHERE app_id = ?", (app_id,)).fetchone()
+            if row is None:
+                raise NotFoundError(f"Uygulama yok: {app_id}")
+            if row[0]:
+                raise FormatError("İptal edilmiş anahtara izin verilemez.")
+            c.execute(
+                "INSERT INTO konu_izinleri(app_id, konu, granted_at, expires_at) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(app_id, konu) DO UPDATE SET granted_at = excluded.granted_at, "
+                "expires_at = excluded.expires_at", (app_id, konu, now, exp))
+
+    def revoke_topic(self, app_id: str, konu: str) -> None:
+        with self.hub.transaction() as c:
+            c.execute("DELETE FROM konu_izinleri WHERE app_id = ? AND konu = ?", (app_id, konu))
+
+    def list_topic_grants(self, app_id: str | None = None) -> list[tuple[str, str, str, str | None]]:
+        """(app_id, konu, granted_at, expires_at)."""
+        sql = "SELECT app_id, konu, granted_at, expires_at FROM konu_izinleri"
+        args: tuple = ()
+        if app_id:
+            sql += " WHERE app_id = ?"
+            args = (app_id,)
+        return [tuple(r) for r in self.hub.query(sql + " ORDER BY app_id, konu", args)]
+
+    def list_topics(self) -> list[str]:
+        return list_topics(self.hub.root)
+
     def revoke_grant(self, app_id: str, category: str) -> None:
         with self.hub.transaction() as c:
             c.execute("DELETE FROM permissions WHERE app_id = ? AND category = ?",
@@ -147,6 +215,7 @@ class Authorizer:
     def __init__(self, hub: Hub, *, clock: Clock = utc_now):
         self.hub = hub
         self._clock = clock
+        self.konular: set[str] = set()   # çağıran (`QueryService._run`) doldurur
 
     def authenticate(self, plain_key: str | None) -> AppIdentity:
         if not plain_key or not plain_key.startswith(KEY_PREFIX):
@@ -173,6 +242,20 @@ class Authorizer:
                 continue
             out[cat] = exp
         return out
+
+
+    def allowed_topics(self, app_id: str, now: str | datetime | None = None) -> set[str]:
+        """İzinli ve süresi dolmamış hassas konular. Her çağrıda yeniden okunur (önbellek yok).
+        `now` verilmezse saat. Anahtarın iptali `authenticate` ile zaten reddedilir."""
+        if now is None:
+            now = self._clock()
+        now_s = now if isinstance(now, str) else iso(now)
+        rows = self.hub.query("SELECT konu, expires_at FROM konu_izinleri WHERE app_id = ?",
+                              (app_id,))
+        return {k for k, exp in rows if exp is None or exp > now_s}
+
+    def list_topics(self) -> list[str]:
+        return list_topics(self.hub.root)
 
 
 class AccessLog:

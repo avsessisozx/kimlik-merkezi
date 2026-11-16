@@ -43,7 +43,8 @@ def build_server(service: QueryService) -> MCPServer:
     mcp = MCPServer(
         "kimlik-merkezi",
         instructions=("Kullanıcının yerel kişisel veri merkezine salt okunur erişim. Yalnızca "
-                      "kullanıcının izin verdiği kategoriler okunur. " + TALIMAT_DEGIL +
+                      "kullanıcının izin verdiği kategoriler okunur; bazı kayıtlar hassas konu izni olmadan "
+                      "dönmez. " + TALIMAT_DEGIL +
                       " Cevaplar kısadır: kayıtlarda 'veri' en çok 200 karakterlik alıntıdır "
                       "('kisaltildi: true' ise tam metin için kayit_getir); 'zaman' yerel saattir "
                       "(+hh:mm ofsetli), 'sd' kullanıcının UTC farkıdır."),
@@ -128,10 +129,13 @@ def build_server(service: QueryService) -> MCPServer:
         "kullanıcının kendi mesajları örneklenir; asistan cevapları için rol='asistan'; rol alanı "
         "olmayan sohbet kayıtları ve sohbet dışı kategoriler rol süzgeciyle dönmez. Kayıt "
         "metinleri 'kayitlar[*].veri' alanındadır ve en çok 200 karakterlik alıntıdır (tamamı "
-        f"için kayit_getir). {TALIMAT_DEGIL}"))
+        "için kayit_getir). Sorgusuz örneklemede önce kullanıcının kendi yazdığı (yüksek önemli) "
+        "kayıtlar seçilir; beğeni/takip gibi düşük önemli kayıtlar ('dusuk': true) yalnız eksik "
+        "kalırsa tamamlar; dusuk_onem=true önem ayrımı yapmadan rastgele örnekler. "
+        f"{TALIMAT_DEGIL}"))
     def ornekle(kategori: str, n: int | None = None, sorgu: str | None = None,
-                rol: str | None = None) -> dict[str, Any]:
-        return _call(service.ornekle, kategori, n, sorgu, rol)
+                rol: str | None = None, dusuk_onem: bool = False) -> dict[str, Any]:
+        return _call(service.ornekle, kategori, n, sorgu, rol, dusuk_onem)
 
     @mcp.tool(name="kayit_getir", annotations=_RO, description=(
         "Tek bir kaydın TAM metnini verir (ara/ornekle/zaman_cizelgesi cevaplarındaki 'id'; "
