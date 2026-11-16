@@ -852,7 +852,12 @@ class Hub:
         Veri klasöründeki ek liste yeniden okunur. `{"incelenen", "degisen"}` döner.
         `progress(incelenen)` her grupta çağrılır.
         """
-        self._hassas_yukle()
+        sn, uyari = _hassas.yukle(self.root)
+        if uyari:
+            raise FormatError(
+                f"Yeniden işaretleme yapılmadı, hiçbir olay değiştirilmedi: {uyari} "
+                f"(dosya: {self.root / _hassas.EK_DOSYA})")
+        self._siniflandirici = sn
         with self._tx() as c:
             inc, deg = _schema.geri_isaretle(c, self._siniflandirici, progress)
         return {"incelenen": inc, "degisen": deg}

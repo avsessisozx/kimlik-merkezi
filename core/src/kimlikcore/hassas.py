@@ -57,6 +57,20 @@ def _paket_ham() -> dict[str, Any]:
         resources.files("kimlikcore").joinpath("veri", "hassas_konular.json").read_bytes(), "paket listesi")
 
 
+_YUMUSAMA = {"p": "b", "t": "d", "k": "g"}
+
+
+def kok_bicimleri(kok: str) -> list[str]:
+    """Kökün Türkçe ünsüz yumuşamasıyla oluşan biçimleri (katlanmış): klinik -> klinig, sanik -> sanig,
+    mezhep -> mezheb, renk -> reng. ç->c ve ğ->g katlamayla zaten eşit olduğundan ayrıca gerekmez."""
+    out = [kok]
+    if kok.endswith("nk"):
+        out.append(kok[:-2] + "ng")
+    elif kok[-1:] in _YUMUSAMA:
+        out.append(kok[:-1] + _YUMUSAMA[kok[-1]])
+    return out
+
+
 class Siniflandirici:
     """Derlenmiş eşleştirici. Bir kez kurulur; `konular(metin)` hızlıdır."""
 
@@ -76,9 +90,11 @@ class Siniflandirici:
                     if len(w[0]) < MIN_KOK:
                         raise HassasListeHatasi(
                             f"{kid}: tek sözcüklü terim en az {MIN_KOK} harf olmalı (kısaysa 'tam' listesine): {t!r}")
-                    self._onek.setdefault(w[0][:MIN_KOK], []).append((w[0], kid))
+                    for kok in kok_bicimleri(w[0]):
+                        self._onek.setdefault(kok[:MIN_KOK], []).append((kok, kid))
                 else:
-                    self._oz.setdefault(w[0], []).append((tuple(w[1:]), kid))
+                    for son in kok_bicimleri(w[-1]):
+                        self._oz.setdefault(w[0], []).append((tuple(w[1:-1]) + (son,), kid))
             for t in tam:
                 w = tokens(t)
                 if len(w) != 1:
@@ -140,7 +156,8 @@ def yukle(veri_klasoru: Path | str | None) -> tuple[Siniflandirici, str | None]:
                 return _derle(_paket_ham(), _oku_json(yol.read_bytes(), f"{EK_DOSYA} (ek liste)")), None
             except (HassasListeHatasi, OSError, UnicodeDecodeError) as e:
                 return paket_siniflandirici(), (
-                    f"{EK_DOSYA} kullanılamadı ({e}); yalnız paket listesi kullanılıyor.")
+                    f"{EK_DOSYA} ek listesi okunamadı ({e}); yalnız paket listesi kullanıldı. "
+                    "Düzeltip `yeniden-isaretle` çalıştırın.")
     return paket_siniflandirici(), None
 
 

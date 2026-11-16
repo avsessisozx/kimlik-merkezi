@@ -5,7 +5,8 @@ import time
 
 import pytest
 
-from kimlikcore import EventIn, Hub, SchemaTooOld, hassas, onem
+from kimlikcore import EventIn, FormatError, Hub, SchemaTooOld, donusum, hassas, onem
+from kimlikcore import sifreleme as sif
 from kimlikcore import schema
 from kimlikcore.hassas import hassas_konulari, paket_siniflandirici
 from kimlikcore.onem import onem_hesapla
@@ -114,7 +115,7 @@ def test_paket_listesi_gecerli_ve_boyutlu():
     assert set(ham["konular"]) == {"saglik", "hukuk", "finans", "din_siyaset", "cinsellik"}
     for kid, v in ham["konular"].items():
         n = len(v["terimler"]) + len(v.get("tam", []))
-        assert 40 <= n <= 80, (kid, n)
+        assert n >= 40, (kid, n)
     assert paket_siniflandirici().konu_idleri == sorted(ham["konular"])
 
 
@@ -328,3 +329,189 @@ def test_goc_20000_olay_performans(tmp_path, capsys):
     print(f"\nGOC_20000_SURE={sure:.2f}s")
     assert sure < 30
     assert c.execute("SELECT count(*) FROM events WHERE hassas_konu='saglik'").fetchone()[0] == len(range(0, 20000, 7))
+
+
+# ----------------------------------------------------------------------------- gözden geçirme düzeltmeleri
+@pytest.mark.parametrize("konu,metin", [
+    # ünsüz yumuşaması / ünlü düşmesi / kök
+    ("saglik", "kliniğe gittim"), ("saglik", "Klinik randevusu"),
+    ("hukuk", "sanığı dinlediler"), ("din_siyaset", "mezhebi farklıymış"),
+    ("hukuk", "dün tutuklandı"), ("hukuk", "tutuklular serbest"),
+    ("saglik", "gebe kaldım"), ("saglik", "doğum yaptım"),
+    # kesme işareti (düz ve kıvrık)
+    ("din_siyaset", "Kur'an okudum"), ("din_siyaset", "Kur\u2019an-ı Kerim"), ("din_siyaset", "Kuran-ı Kerim"),
+    ("din_siyaset", "Allah'a şükür"), ("din_siyaset", "Allah\u2019a şükür"),
+    ("din_siyaset", "CHP'ye oy"), ("din_siyaset", "CHP\u2019ye oy"), ("din_siyaset", "AKP'liler"),
+    ("din_siyaset", "DEM Parti'nin"), ("din_siyaset", "İYİ Parti'ye"),
+    ("din_siyaset", "incil okudum"), ("din_siyaset", "Church service"),
+    # yeni terimler
+    ("saglik", "sağlık sorunum"), ("saglik", "tahlil"), ("saglik", "intihar düşüncesi"),
+    ("saglik", "kendimi öldüreceğim"), ("saglik", "uyuşturucu"), ("saglik", "esrar içti"),
+    ("saglik", "bağımlılık"), ("saglik", "kürtaj"), ("saglik", "grip oldum"), ("saglik", "covid"),
+    ("saglik", "korona"), ("saglik", "diş hekimi"), ("saglik", "dişçiye gittim"), ("saglik", "tümör"),
+    ("saglik", "biyopsi"), ("saglik", "insülin"), ("saglik", "epilepsi"), ("saglik", "otizm"),
+    ("saglik", "bipolar"), ("saglik", "şizofreni"), ("saglik", "kaygı bozukluğu"), ("saglik", "panik atak"),
+    ("saglik", "ambulans"), ("saglik", "acil servis"), ("saglik", "yoğun bakım"), ("saglik", "nefes darlığı"),
+    ("saglik", "kan testi"), ("saglik", "yüksek ateş"), ("saglik", "ateşim var"), ("saglik", "diş ağrısı"),
+    ("saglik", "antidepresan"), ("saglik", "psikolog"),
+    ("hukuk", "hukuk bürosu"), ("hukuk", "hukuki süreç"), ("hukuk", "polis geldi"), ("hukuk", "karakola gittik"),
+    ("hukuk", "hakim karar verdi"), ("hukuk", "yargıç"), ("hukuk", "cezaevi"), ("hukuk", "hapis yattı"),
+    ("hukuk", "sabıka kaydı"), ("hukuk", "taciz"), ("hukuk", "tecavüz"), ("hukuk", "şiddet gördüm"),
+    ("hukuk", "gözaltına alındı"), ("hukuk", "ifade verdim"), ("hukuk", "suç duyurusu"),
+    ("finans", "kira ödedim"), ("finans", "vergi"), ("finans", "banka"), ("finans", "bütçe"),
+    ("finans", "fatura"), ("finans", "sigorta"), ("finans", "bitcoin"), ("finans", "kripto aldım"),
+    ("finans", "dolar yükseldi"), ("finans", "euro"), ("finans", "SGK'dan"), ("finans", "borsa"),
+    ("finans", "hisse senedi"), ("finans", "yatırım"), ("finans", "birikim"), ("finans", "emekli maaşı"),
+    ("din_siyaset", "siyaset"), ("din_siyaset", "siyasi"), ("din_siyaset", "referandum"),
+    ("din_siyaset", "seçmen"), ("din_siyaset", "oy pusulası"), ("din_siyaset", "hükümet"),
+    ("din_siyaset", "protesto"), ("din_siyaset", "müslüman"), ("din_siyaset", "hristiyan"),
+    ("din_siyaset", "yahudi"), ("din_siyaset", "alevi"), ("din_siyaset", "sünni"), ("din_siyaset", "tanrı"),
+    ("din_siyaset", "başörtüsü"), ("din_siyaset", "türban"), ("din_siyaset", "hac"), ("din_siyaset", "umre"),
+    ("din_siyaset", "mevlit"), ("din_siyaset", "laik"), ("din_siyaset", "atatürkçü"),
+    ("din_siyaset", "muhalefet"), ("din_siyaset", "cumhurbaşkanı"), ("din_siyaset", "Cumhurbaşkanlığı"),
+    ("din_siyaset", "milletvekili"), ("din_siyaset", "sandık başı"),
+    ("cinsellik", "trans"), ("cinsellik", "transseksüel"), ("cinsellik", "cinsiyet kimliği"),
+    ("cinsellik", "cinsel kimlik"), ("cinsellik", "seks"), ("cinsellik", "cinsel ilişki"),
+    ("cinsellik", "mastürbasyon"), ("cinsellik", "prezervatif"), ("cinsellik", "doğum kontrol"),
+    ("cinsellik", "biseksüel"), ("cinsellik", "lezbiyen"),
+])
+def test_hassas_gozden_gecirme_pozitif(konu, metin):
+    assert konu in hassas_konulari(metin)
+
+
+@pytest.mark.parametrize("metin", [
+    "şirketi kuran kişi", "inciler taktı", "Churchill konuştu", "ateş yaktık", "diş fırçası aldım",
+    "Europe turu", "kirazlar olgunlaştı", "kriptografi dersi", "esrarengiz olay", "transfer yaptı",
+])
+def test_hassas_gozden_gecirme_negatif(metin):
+    assert hassas_konulari(metin) == []
+
+
+def test_yumusama_algoritmasi_kural_olarak():
+    assert hassas.kok_bicimleri("klinik") == ["klinik", "klinig"]
+    assert hassas.kok_bicimleri("mezhep") == ["mezhep", "mezheb"]
+    assert hassas.kok_bicimleri("tedavi") == ["tedavi"]
+    assert hassas.kok_bicimleri("renk") == ["renk", "reng"]
+
+
+def test_yeniden_isaretle_bozuk_ekte_hicbir_sey_degistirmez(root):
+    with Hub.open(root, write=True) as h:
+        sid = h.add_source("deneme", "1", None)
+        h.add_events(sid, [_ev(1, "btc aldım"), _ev(2, "doktor")])
+        (root / "hassas_konular.json").write_text("{bozuk", encoding="utf-8")
+        with h.transaction() as c:
+            c.execute("UPDATE events SET hassas_konu = NULL")
+        with pytest.raises(FormatError, match="hiçbir olay değiştirilmedi"):
+            h.yeniden_isaretle()
+        assert h.query("SELECT count(*) FROM events WHERE hassas_konu IS NOT NULL") == [(0,)]
+
+
+def test_bozuk_ek_goc_uyarisi_yeniden_isaretle_der(root):
+    root.mkdir()
+    (root / "hassas_konular.json").write_text("{bozuk", encoding="utf-8")
+    with Hub.open(root, write=True) as h:
+        assert any("ek listesi okunamadı" in u and "`yeniden-isaretle` çalıştırın" in u for u in h.goc_uyarilari)
+
+
+def test_cli_yeniden_isaretle_bozuk_ekte_hata_kodu(root, child_env):
+    import subprocess, sys
+    with Hub.open(root, write=True):
+        pass
+    (root / "hassas_konular.json").write_text("[]x", encoding="utf-8")
+    r = subprocess.run([sys.executable, "-m", "kimlikcore", "--veri", str(root), "yeniden-isaretle"],
+                       env=child_env, capture_output=True, encoding="utf-8")
+    assert r.returncode != 0 and "hiçbir olay değiştirilmedi" in r.stderr
+
+
+# ----------------------------------------------------------------------------- footer
+def _jsonl_disa(tmp_path):
+    with Hub.open(tmp_path / "a", write=True) as a:
+        sid = a.add_source("deneme", "1", None)
+        a.add_events(sid, [_ev(1, "avukat")])
+        a.export_jsonl(tmp_path / "e.jsonl")
+    return [json.loads(x) for x in (tmp_path / "e.jsonl").read_text(encoding="utf-8").splitlines()]
+
+
+def _yaz(tmp_path, kayitlar, ad):
+    yol = tmp_path / ad
+    yol.write_text("\n".join(json.dumps(k, ensure_ascii=False, separators=(",", ":")) for k in kayitlar) + "\n",
+                   encoding="utf-8")
+    return yol
+
+
+def test_footer_eski_dosya_konu_izni_olmadan_kabul(tmp_path):
+    k = _jsonl_disa(tmp_path)
+    k[-1]["counts"].pop("konu_izni")
+    k[-1]["digests"].pop("konu_izni")
+    k[0]["schema_version"] = 4
+    with Hub.open(tmp_path / "b", write=True) as b:
+        r = b.import_jsonl(_yaz(tmp_path, k, "eski.jsonl"))
+        assert r.counts["event"] == 1
+
+
+@pytest.mark.parametrize("tur", ["event", "source", "fact", "app_key"])
+def test_footer_baska_turun_ozeti_eksikse_reddedilir(tmp_path, tur):
+    k = _jsonl_disa(tmp_path)
+    k[-1]["counts"].pop(tur)
+    with Hub.open(tmp_path / "b", write=True) as b:
+        with pytest.raises(FormatError):
+            b.import_jsonl(_yaz(tmp_path, k, "x.jsonl"))
+    k = _jsonl_disa(tmp_path)
+    k[-1]["digests"].pop(tur)
+    with Hub.open(tmp_path / "c", write=True) as b:
+        with pytest.raises(FormatError):
+            b.import_jsonl(_yaz(tmp_path, k, "y.jsonl"))
+
+
+# ----------------------------------------------------------------------------- şifreli göç
+@pytest.fixture
+def sahte_saglayici():
+    sif.saglayici_ayarla(sif.SahteSaglayici("birinci"))
+    yield
+    sif.saglayici_ayarla(None)
+
+
+def _v4_sifreli(root):
+    root.mkdir()
+    (root / "arsiv").mkdir()
+    con = sqlite3.connect(root / "kimlik.db", isolation_level=None)
+    schema.migrate(con, migrations={v: schema.MIGRATIONS[v] for v in (1, 2, 3, 4)})
+    con.execute("INSERT INTO sources VALUES ('s','jsonl','1',NULL,'2026-01-01T00:00:00Z',NULL,NULL)")
+    con.execute(
+        "INSERT INTO events(event_id,event_key,source_id,ts,kind,category,payload,text,schema_version,hidden,ingested_at)"
+        " VALUES ('e1','k1','s','2026-01-01T00:00:00Z','x.y','notlar','{}','doktor randevusu',4,0,'x')")
+    con.close()
+    donusum.sifrele(root)
+    assert sif.db_durumu(root / "kimlik.db") == "sifreli"
+
+
+def test_sifreli_hub_v4ten_v5e_goc(root, sahte_saglayici):
+    _v4_sifreli(root)
+    with Hub.open(root, write=True) as h:
+        assert h.schema_version == 5
+        e = h.get_event("e1")
+        assert (e.onem, e.hassas_konu) == (2, ("saglik",))
+    assert sif.db_durumu(root / "kimlik.db") == "sifreli"
+    with Hub.open(root, write=False) as r:
+        assert r.get_event("e1").hassas_konu == ("saglik",)
+
+
+def test_sifreli_hub_v5_gocu_yarida_hata_eski_dosya_kalir(root, monkeypatch, sahte_saglayici):
+    _v4_sifreli(root)
+    once = (root / "kimlik.db").read_bytes()
+    gercek = schema._v5
+
+    def yarida(conn, *a, **k):
+        gercek(conn, *a, **k)
+        raise RuntimeError("göç yarıda kesildi")
+
+    monkeypatch.setattr(schema, "_v5", yarida)
+    with pytest.raises(RuntimeError):
+        Hub.open(root, write=True)
+    monkeypatch.undo()
+    assert (root / "kimlik.db").read_bytes() == once        # şifreli dosya dokunulmadı
+    assert not (root / "hub.lock").exists()
+    with pytest.raises(SchemaTooOld):
+        Hub.open(root, write=False)                          # hâlâ sürüm 4
+    with Hub.open(root, write=True) as h:                    # sonra düzgün göç eder
+        assert h.schema_version == 5

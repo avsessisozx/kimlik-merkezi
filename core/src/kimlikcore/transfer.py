@@ -29,6 +29,7 @@ if TYPE_CHECKING:  # pragma: no cover
 FORMAT = "kimlikmerkezi-jsonl"
 FORMAT_VERSION = 1
 _MOD = 1 << 256
+_SONRADAN_EKLENEN = "konu_izni"   # v5'te eklendi; eski dışa aktarımlarda yok
 
 # (kayıt türü, tablo) — sıra dış anahtar bağımlılığına uygundur.
 TYPES: list[tuple[str, str]] = [
@@ -212,13 +213,16 @@ def import_jsonl(hub: "Hub", src: Path, progress: Callable[[int], None] | None) 
         if header is None or footer is None:
             raise FormatError("Dosya eksik ya da kesik (header/footer yok).")
         got = acc.result()
-        # Eski dışa aktarımlarda sonradan eklenen kayıt türleri (ör. konu_izni) yoktur: yalnız
-        # dosyadakiler karşılaştırılır; dosyada olmayan türde kayıt çıkmamış olmalıdır.
-        fc, fd = footer.get("counts") or {}, footer.get("digests") or {}
-        if (not isinstance(fc, dict) or not isinstance(fd, dict)
-                or any(got["counts"][t] != fc.get(t, 0) for t in got["counts"])
-                or any(got["digests"][t] != fd[t] for t in got["digests"] if t in fd)
-                or any(t not in got["counts"] for t in fc)):
+        # Tolerans YALNIZ eski dosyalarda bulunmayan `konu_izni` türü için (0 kayıt ve footer'da yok);
+        # başka bir türün özeti eksikse ya da farklıysa dosya reddedilir.
+        fc, fd = footer.get("counts"), footer.get("digests")
+        if not isinstance(fc, dict) or not isinstance(fd, dict):
+            fc = fd = None
+        if (fc is None or any(t not in got["counts"] for t in (*fc, *fd))
+                or any(
+                    (fc.get(t) != got["counts"][t] or fd.get(t) != got["digests"][t])
+                    for t in got["counts"]
+                    if not (t == _SONRADAN_EKLENEN and t not in fc and t not in fd and got["counts"][t] == 0))):
             raise FormatError("Dosyanın içerik özeti footer ile uyuşmuyor (bozuk ya da kesik dosya).")
         if header["schema_version"] == hub.schema_version:
             if summarize(c) != got:
