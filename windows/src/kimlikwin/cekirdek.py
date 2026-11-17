@@ -162,6 +162,16 @@ class Uygulama:
     def harita_ayrinti(self, olay_id: str) -> dict[str, Any]:
         return self._kopru(harita_kopru.ayrinti, olay_id, self.hassas_acik)
 
+    def galaksi(self) -> dict[str, Any]:
+        return self._kopru(harita_kopru.galaksi)
+
+    def galaksi_kayitlar(self, grup: str, bas: int | None = None, bit: int | None = None, limit: int = 50,
+                         offset: int = 0, arama: str | None = None, tur: str | None = None) -> dict[str, Any]:
+        return self._kopru(harita_kopru.galaksi_kayitlar, grup, bas, bit, limit, offset, arama, tur)
+
+    def kimlik_ozeti(self) -> dict[str, Any]:
+        return self._kopru(harita_kopru.kimlik_ozeti)
+
     def harita_hassas(self, bolge_id: str, ac: bool, onay: bool = False) -> dict[str, Any]:
         """Hassas bölgenin SAYILARINI açar/kapatır; açmak için ayrı onay şart, içerik hiçbir zaman gösterilmez."""
         if bolge_id not in harita_kopru.HASSAS:

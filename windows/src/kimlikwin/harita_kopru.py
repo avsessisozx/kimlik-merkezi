@@ -169,3 +169,26 @@ def ayrinti(hub, event_id: str, ac_hassas: set[str]) -> dict[str, Any]:
         veri["alanlar"] = []
         veri["icerik_gizli"] = True
     return veri
+
+
+# ------------------------------------------------------------------ galaksi (v0.3.0, yalnız sahibin yerel arayüzü)
+def _galaksi_modulu():
+    try:
+        import kimlikserver.galaksi as m  # type: ignore[import-not-found]
+        return m
+    except ImportError as e:
+        raise HaritaYok("Galaksi modülü (kimlikserver.galaksi) bu sürümde yok.") from e
+
+
+def galaksi(hub) -> dict[str, Any]:
+    return _galaksi_modulu().galaksi(hub, sahip=SAHIP)
+
+
+def galaksi_kayitlar(hub, grup: str, bas: int | None = None, bit: int | None = None, limit: int = 50,
+                     offset: int = 0, arama: str | None = None, tur: str | None = None) -> dict[str, Any]:
+    return _galaksi_modulu().kayitlar(hub, str(grup), bas=bas, bit=bit, sahip=SAHIP, limit=limit, offset=offset,
+                                      arama=(arama or None), tur=(tur or None))
+
+
+def kimlik_ozeti(hub) -> dict[str, Any]:
+    return _galaksi_modulu().ozet(hub, sahip=SAHIP, kayma=yerel_kayma())

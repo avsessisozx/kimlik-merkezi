@@ -7,7 +7,7 @@ const fs = require('fs');
 let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) { process.stderr.write('playwright yok: ' + e.message + '\n'); process.exit(77); }
 const ayar = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const SAYFALAR = [['Anasayfa', 'Ana sayfa'], ['Harita', 'Harita'], ['İçe aktar', 'İçe aktar'], ['Arama', 'Arama'],
+const SAYFALAR = [['Galaksi', 'Galaksi'], ['Sen kimsin', 'Sen kimsin'], ['Anasayfa', 'Ana sayfa'], ['Harita', 'Harita'], ['İçe aktar', 'İçe aktar'], ['Arama', 'Arama'],
   ['Zaman çizelgesi', 'Zaman çizelgesi'], ['Persona', 'Persona'], ['Erişim', 'Erişim'], ['Kaynaklar', 'Kaynaklar'], ['Güvenlik', 'Güvenlik'], ['Ayarlar', 'Ayarlar'], ['Hakkında', 'Hakkında']];
 const bekle = ms => new Promise(r => setTimeout(r, ms));
 // CSP (script-src bez 'unsafe-eval') altında page.waitForFunction çalışmaz; koşulu Node tarafında yoklarız (evaluate CSP'ye takılmaz).
@@ -60,6 +60,32 @@ async function sonuclariTopla(b) {
       if (id === 'Zaman çizelgesi' || id === 'Arama' || id === 'Persona') sonuc.sayfalar[id].metin = o.metin;
       if (id === 'Hakkında') sonuc.sayfalar[id].metin = o.metin;
     }
+    // Galaksi: yıldızlar çiziliyor mu, kümeye tıkla -> panel, içine gir -> alt türler, hâl seçimi tahminden üstün
+    await git(p, 'Galaksi');
+    sonuc.galaksi = await p.evaluate(async () => {
+      const S = GALAKSI.durum, o = {};
+      await new Promise(r => setTimeout(r, 600));
+      o.kume_sayisi = S.kumeler.length; o.cizilen = S.cizilen; o.toplam_metin = document.querySelector('.gal-sayi').innerText;
+      o.insan_figuru_yok = !document.querySelector('svg.figur, .figur');
+      document.querySelector('.gal-cip').click(); await new Promise(r => setTimeout(r, 200));
+      o.panel_secili = document.getElementById('gal-panel').innerText;
+      [...document.querySelectorAll('#gal-panel button')].find(b => b.textContent === 'İçine gir').click(); await new Promise(r => setTimeout(r, 300));
+      o.panel_icinde = document.getElementById('gal-panel').innerText; o.tur_dugmesi = document.querySelectorAll('.gal-tur').length;
+      document.querySelector('.gal-tur').click(); await new Promise(r => setTimeout(r, 1500));
+      o.kayit_listesi = document.querySelectorAll('.gal-kayit').length;
+      [...document.querySelectorAll('#gal-panel button')].find(b => b.textContent.includes('Tüm galaksi')).click();
+      const k = document.getElementById('gal-yil'); const kay = document.querySelector('.gal-yilkap input'); kay.value = S.yilMin; kay.dispatchEvent(new Event('input'));
+      o.yil_etiketi = k.textContent; await new Promise(r => setTimeout(r, 200)); o.yil_cizilen = S.cizilen; kay.value = S.yilMax; kay.dispatchEvent(new Event('input'));
+      o.hal_tahmin_notu = document.querySelector('.gal-hal-not').innerText;
+      [...document.querySelectorAll('.gal-hal-dugme')].find(b => b.textContent === 'Odak').click();
+      o.hal_secim_notu = document.querySelector('.gal-hal-not').innerText; o.hal_id = GALAKSI.halId(S);
+      [...document.querySelectorAll('.gal-hal-dugme')].find(b => b.textContent === 'Otomatiğe dön').click();
+      o.hal_otomatik_notu = document.querySelector('.gal-hal-not').innerText;
+      return o;
+    });
+    sonuc.galaksi.bildirimler = await bildirimHatalari(p);
+    await git(p, 'Sen kimsin');
+    sonuc.sen_kimsin = await p.evaluate(() => document.querySelector('#ana').innerText);
     // Harita: "Bu harita nedir?" kutusu görünür mü
     await git(p, 'Harita');
     sonuc.harita_nedir = await p.evaluate(() => { const d = document.querySelector('details.nedir'); return d ? { acik: d.open, metin: d.innerText } : null; });

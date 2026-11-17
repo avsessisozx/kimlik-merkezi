@@ -21,7 +21,7 @@ def test_ortak_js_SAYI_tanimlar():
 def test_ortak_adlar_baska_yerde_yeniden_bildirilmez():
     for ad in _ortak_adlar():
         kalip = re.compile(rf"\b(?:const|let|var|function)\s+{re.escape(ad)}\b")
-        for dosya in ("figur.js", "harita.js", "index.html"):
+        for dosya in ("figur.js", "harita.js", "galaksi.js", "senkimsin.js", "index.html"):
             assert not kalip.search(_metin(dosya)), f"{dosya} içinde {ad} yeniden bildirilmiş; tek tanım ortak.js'te olmalı"
 
 

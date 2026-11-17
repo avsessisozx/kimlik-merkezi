@@ -1,0 +1,48 @@
+/* Galaksi ve "Sen kimsin" (v0.3.0). Koyu uzay teması sabit: parlayan noktalar açık zeminde okunmaz. */
+.gal-kap{display:flex;flex-wrap:wrap;border:1px solid var(--cizgi);border-radius:10px;overflow:hidden;background:#0B1020;color:#EDEAF5;margin:0 0 14px}
+.gal-sahne{position:relative;flex:999 1 560px;min-width:0;height:min(72vh,680px);min-height:420px;overflow:hidden}
+.gal-tuval{position:absolute;inset:0;display:block;touch-action:manipulation}
+.gal-baslik{position:absolute;left:24px;top:18px;pointer-events:none}
+.gal-ust{font-size:13px;color:#A9A6BD;letter-spacing:.06em;text-transform:uppercase}
+.gal-sayi{font-family:Georgia,"Times New Roman",serif;font-size:40px;line-height:1.05;letter-spacing:-.02em}
+.gal-alt{font-size:14px;color:#A9A6BD}
+.gal-hal{position:absolute;right:16px;top:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;max-width:62%;z-index:2}
+.gal-hal-ad{font-size:12px;color:#A9A6BD;margin-right:2px}
+.gal-hal-dugme{border:1px solid rgba(255,255,255,.25);background:rgba(11,16,32,.6);color:#EDEAF5;border-radius:999px;padding:3px 11px;font:inherit;font-size:13px;cursor:pointer}
+.gal-hal-dugme.secili{background:#EDEAF5;color:#10162A;border-color:#EDEAF5;font-weight:600}
+.gal-hal-dugme.otomatik{border-style:dashed}
+.gal-hal-not{flex-basis:100%;text-align:right;font-size:12px;color:#A9A6BD}
+.gal-cubuk{position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:center;gap:14px;padding:10px 18px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);z-index:2}
+.gal-oynat{flex:0 0 auto;width:38px;height:38px;border:0;border-radius:50%;background:#EDEAF5;color:#10162A;font:inherit;cursor:pointer}
+.gal-yilkap{flex:1 1 120px;min-width:0}.gal-yilkap input{width:100%;accent-color:#F6A596}
+.gal-yiluc{display:flex;justify-content:space-between;font-size:12px;color:#A9A6BD}
+.gal-yil{flex:0 0 auto;font-family:Georgia,serif;font-size:30px;min-width:70px;text-align:right}
+.gal-panel{flex:0 1 330px;padding:22px 24px;background:rgba(255,255,255,.05);border-left:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:8px;max-height:min(72vh,680px);overflow:auto}
+.gal-panel p{margin:4px 0;color:#CFCCE0}.gal-panel .soluk{color:#A9A6BD}
+.gal-etiket{font-size:13px;color:#A9A6BD;letter-spacing:.06em;text-transform:uppercase}
+.gal-ad{font-family:Georgia,serif;font-size:26px;line-height:1.15}
+.gal-buyuk{font-family:Georgia,serif;font-size:44px;line-height:1}
+.gal-panel button.d{align-self:flex-start;background:#EDEAF5;color:#10162A;border-color:#EDEAF5;border-radius:999px;padding:9px 18px}
+.gal-panel button.i{align-self:flex-start;background:transparent;color:#EDEAF5;border-color:#A9A6BD;border-radius:999px}
+.gal-geri{align-self:flex-start;margin-top:8px;border:1px solid #A9A6BD;background:transparent;color:#EDEAF5;border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
+.gal-turler{display:flex;flex-direction:column;gap:5px;margin:6px 0}
+.gal-tur,.gal-cip{display:flex;align-items:center;gap:8px;text-align:left;border:1px solid rgba(255,255,255,.2);background:rgba(11,16,32,.55);color:#EDEAF5;border-radius:8px;padding:5px 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.gal-tur i,.gal-cip i{width:10px;height:10px;border-radius:50%;background:var(--renk);flex:0 0 auto}
+.gal-tur.secili,.gal-cip.secili{border-color:var(--renk);box-shadow:0 0 0 1px var(--renk) inset}
+.gal-kayitlar{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.gal-kayit{text-align:left;border:0;border-bottom:1px solid rgba(255,255,255,.1);background:none;color:#EDEAF5;padding:6px 2px;font:inherit;font-size:13.5px;cursor:pointer;word-break:break-word}
+.gal-kayit:hover{background:rgba(255,255,255,.06)}
+.gal-liste-kap h3{margin:0 0 6px}
+.gal-cipler{display:flex;flex-wrap:wrap;gap:8px}
+.gal-liste-kap .gal-cip{background:var(--panel);color:var(--yazi);border-color:var(--cizgi)}
+.gal-liste-kap .gal-cip .soluk{color:var(--soluk)}
+@media(max-width:700px){.gal-panel{flex-basis:100%;max-height:none;border-left:0;border-top:1px solid rgba(255,255,255,.12)}.gal-hal{max-width:100%;left:12px;right:12px;top:78px;justify-content:flex-start}.gal-hal-not{text-align:left}.gal-sahne{min-height:480px}}
+@media(prefers-reduced-motion:reduce){.gal-hal-dugme{transition:none}}
+/* Sen kimsin */
+.sk-liste{margin:8px 0;padding-left:20px}.sk-liste li{margin:5px 0}.sk-kanit{font-size:12.5px}
+.sk-kaynaklar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sk-rozet{display:inline-block;margin-left:10px;font-size:12px;font-weight:600;border-radius:10px;padding:1px 9px;vertical-align:middle}
+.sk-rozet.gercek{background:rgba(63,181,160,.18);color:var(--ok)}
+.sk-rozet.senin{background:rgba(110,160,240,.18);color:var(--vurgu)}
+.sk-rozet.yorum{background:rgba(240,176,74,.2);color:var(--uyari)}
+.sk-yorum{border-left:4px dashed var(--uyari)}.sk-gercek{border-left:4px solid var(--ok)}.sk-senin{border-left:4px solid var(--vurgu)}

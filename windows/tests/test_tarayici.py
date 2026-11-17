@@ -107,7 +107,7 @@ def sonuc(tmp_path_factory):
     return json.loads(p.stdout.strip().splitlines()[-1])
 
 
-SAYFALAR = ["Anasayfa", "Harita", "İçe aktar", "Arama", "Zaman çizelgesi", "Persona", "Erişim", "Kaynaklar", "Güvenlik", "Ayarlar", "Hakkında"]
+SAYFALAR = ["Galaksi", "Sen kimsin", "Anasayfa", "Harita", "İçe aktar", "Arama", "Zaman çizelgesi", "Persona", "Erişim", "Kaynaklar", "Güvenlik", "Ayarlar", "Hakkında"]
 
 
 @pytest.mark.parametrize("ad", SAYFALAR)
@@ -174,3 +174,29 @@ def test_dosya_denetle_dugmesi_rapor_ve_kopyala(sonuc):
     assert t["eklenen_kayit"] == 0, "denetim bir şey içe aktardı"
     assert t["temizlendi"], "Raporu temizle çalışmadı"
     assert t["bos_yol_hatasi"], "yol boşken anlaşılır hata verilmedi"
+
+
+def test_galaksi_cizer_ve_gezinir(sonuc):
+    g = sonuc["galaksi"]
+    assert g["bildirimler"] == [], g["bildirimler"]
+    assert g["kume_sayisi"] >= 2 and g["cizilen"] > 50, g
+    assert "kayıt" in g["toplam_metin"] and g["insan_figuru_yok"]
+    assert "İçine gir" in g["panel_secili"] and "arşivin %" in g["panel_secili"]
+    assert "ÇİNDESİN" in g["panel_icinde"].upper() and g["tur_dugmesi"] >= 1
+    assert g["kayit_listesi"] >= 1, "tür seçilince kayıt listesi gelmedi"
+    assert g["yil_cizilen"] <= g["cizilen"]
+
+
+def test_hal_kullanici_secimi_tahminden_ustun(sonuc):
+    g = sonuc["galaksi"]
+    assert g["hal_tahmin_notu"].startswith("Tahmin:"), g["hal_tahmin_notu"]       # otomatik: açıkça tahmin ve gerekçe
+    assert g["hal_id"] == "odak" and g["hal_secim_notu"] == "Hâli sen seçtin."
+    assert g["hal_otomatik_notu"].startswith("Tahmin:")
+
+
+def test_sen_kimsin_uc_bolum_ayri(sonuc):
+    m = sonuc["sen_kimsin"]
+    for b in ("Verinden çıkan gerçekler", "Senin söylediklerin", "Yapay zekânın yorumları"):
+        assert b in m, b
+    assert "Windows 11 bilgisayarım var" in m          # kullanıcının onaylı bilgisi "senin söylediklerin"de
+    assert "undefined" not in m and "NaN" not in m

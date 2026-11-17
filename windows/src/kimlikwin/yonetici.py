@@ -29,6 +29,7 @@ UYGULAMA_API = frozenset({
     "persona_sil", "persona_sure_kontrol", "oneri_listele", "oneri_kanit", "oneri_onayla", "oneri_duzelt", "oneri_reddet", "oneri_hic_dogru_degil", "oneri_toplu_reddet", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "konu_izin_ver", "konu_izin_kaldir", "izin_toplu", "erisim_kaydi",
     "baglanti_bilgisi", "claude_ekle", "kopya_baslat", "kopya_durum", "harita", "harita_bolge", "harita_hassas", "harita_kayitlar", "harita_ayrinti",
+    "galaksi", "galaksi_kayitlar", "kimlik_ozeti",
 })
 
 # Persona bilgisini değiştirebilen işlemler: yönetilen blok açıksa bunlardan sonra yeniden üretilir.
