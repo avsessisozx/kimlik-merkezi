@@ -1,5 +1,7 @@
 # Kimlik Merkezi
 
+> ⬇️ **İndir:** [Windows kurulum dosyası (EXE)](https://github.com/avsessisozx/kimlik-merkezi/releases) (en üstteki sürümün `Kurulum` dosyası)
+
 Kendi dijital izlerinizi (arama ve izleme geçmişi, sohbetler, müzik, kod, notlar...) **kendi bilgisayarınızda**
 tek bir yerde toplayan, aramanıza ve zaman çizelgesinde görmenize izin veren, isterseniz yapay zekâ
 uygulamalarına **yalnızca sizin seçtiğiniz kategorilerden ve salt okunur** erişim veren açık kaynaklı bir
