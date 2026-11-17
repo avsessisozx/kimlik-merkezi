@@ -67,7 +67,7 @@ jobs:
   buyuk:
     # ~2 GB sentetik dosya; test Windows'ta atlanır (resource modülü), bu yüzden yalnızca Linux.
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

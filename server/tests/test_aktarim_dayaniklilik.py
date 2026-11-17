@@ -478,7 +478,13 @@ def test_tam_boyutlu_part_gecerliyse_var_olur(tmp_path, giris):
                                     put_basliklari(d.cihaz, anahtar, veri), veri)
             assert kod == 200 and bas["X-Durum"] == "var"
         else:
-            assert d.istemci(anahtar=anahtar).durum(DOSYA) == ("var", len(veri))
+            # başlangıç kurtarması arka planda çalışır; bitene kadar HEAD geçici olarak "kismi" görebilir
+            bitis = time.time() + 15
+            durum = d.istemci(anahtar=anahtar).durum(DOSYA)
+            while durum != ("var", len(veri)) and time.time() < bitis:
+                time.sleep(0.2)
+                durum = d.istemci(anahtar=anahtar).durum(DOSYA)
+            assert durum == ("var", len(veri))
         assert (d.veri / "gelen_aktarim" / d.cihaz / f"{DOSYA}.jsonl").read_bytes() == veri
         assert d.hub.aktarim_dosyasi_var(d.cihaz, DOSYA) is not None
         assert not d.dosyalar("aktarim/gecici")
