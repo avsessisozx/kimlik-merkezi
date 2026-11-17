@@ -192,3 +192,7 @@ def galaksi_kayitlar(hub, grup: str, bas: int | None = None, bit: int | None = N
 
 def kimlik_ozeti(hub) -> dict[str, Any]:
     return _galaksi_modulu().ozet(hub, sahip=SAHIP, kayma=yerel_kayma())
+
+
+def kaynak_adlari(hub) -> list[str]:
+    return _galaksi_modulu().kaynak_adlari(hub, sahip=SAHIP)

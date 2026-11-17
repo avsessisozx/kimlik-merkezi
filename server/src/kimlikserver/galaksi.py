@@ -114,13 +114,17 @@ def kayitlar(hub: Hub, grup: str, *, bas: int | None = None, bit: int | None = N
              limit: int = 50, offset: int = 0, arama: str | None = None, tur: str | None = None) -> dict[str, Any]:
     """Bir kaynak kümesindeki kayıtlar (yeniden eskiye). `bas`/`bit`: epoch saniye (bit hariç)."""
     kos, args = _kategori_kosulu(sahip)
-    kodlar = _grup_kodlari(hub, grup, kos, args)
-    if not kodlar:
+    kodlar = _grup_kodlari(hub, grup, kos, args) if grup else None      # boş grup: tüm kaynaklar
+    if kodlar is not None and not kodlar:
         return {"grup": grup, "toplam": 0, "kayitlar": []}
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
-    where = f"hidden = 0 AND {kos} AND ({GRUP_SQL}) IN ({','.join('?' * len(kodlar))})"
-    a: list[Any] = [*args, *kodlar]
+    where = f"hidden = 0 AND {kos}"
+    a: list[Any] = list(args)
+    if kodlar is not None:
+        where += f" AND ({GRUP_SQL}) IN ({','.join('?' * len(kodlar))})"
+        a += kodlar
+    where += f" AND {_GERCEK_ZAMAN}" if (bas is not None or bit is not None) else ""
     if bas is not None:
         where += " AND ts >= strftime('%Y-%m-%dT%H:%M:%SZ', ?, 'unixepoch')"
         a.append(int(bas))
@@ -175,3 +179,10 @@ def ozet(hub: Hub, *, sahip: bool = False, kayma: int = 0) -> dict[str, Any]:
     ]
     return {"toplam": toplam, "ilk": ilk, "son": son, "maddeler": maddeler, "kaynaklar": kaynaklar,
             "not": "Her madde veriden bir sayımdır; yorum ya da çıkarım içermez."}
+
+
+def kaynak_adlari(hub: Hub, *, sahip: bool = False) -> list[str]:
+    """Veride bulunan kaynak kümelerinin adları (sesli aramanın "ChatGPT'de" gibi sözcükleri eşleştirmesi için)."""
+    kos, args = _kategori_kosulu(sahip)
+    kodlar = [r[0] for r in hub.query(f"SELECT DISTINCT {GRUP_SQL} FROM events NOT INDEXED WHERE hidden = 0 AND {kos}", args)]
+    return sorted({grup_adi(k) for k in kodlar})

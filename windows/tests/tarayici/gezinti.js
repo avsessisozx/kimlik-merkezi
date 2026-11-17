@@ -81,6 +81,15 @@ async function sonuclariTopla(b) {
       o.hal_secim_notu = document.querySelector('.gal-hal-not').innerText; o.hal_id = GALAKSI.halId(S);
       [...document.querySelectorAll('.gal-hal-dugme')].find(b => b.textContent === 'Otomatiğe dön').click();
       o.hal_otomatik_notu = document.querySelector('.gal-hal-not').innerText;
+      const gi = document.getElementById('gal-ara-girdi'); gi.value = 'chrome 2025'; gi.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); await new Promise(r => setTimeout(r, 1500));
+      o.ara_notu = document.getElementById('gal-ara-not').innerText; o.ara_panel = document.getElementById('gal-panel').innerText; o.ara_kume = S.sorgu ? S.sorgu.kume : null;
+      [...document.querySelectorAll('#gal-panel button')].find(b => b.textContent.includes('Aramayı temizle')).click();
+      o.ara_temizlendi = S.sorgu === null;
+      gi.value = 'blabla'; gi.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); await new Promise(r => setTimeout(r, 800));
+      o.ara_sonuc2 = S.sorgu ? S.sorgu.anlasilan : null;
+      [...document.querySelectorAll('#gal-panel button')].find(b => b.textContent.includes('Aramayı temizle')).click();
+      document.getElementById('gal-mik').click(); await new Promise(r => setTimeout(r, 1500));
+      o.mik_paneli = document.getElementById('gal-panel').innerText;
       return o;
     });
     sonuc.galaksi.bildirimler = await bildirimHatalari(p);

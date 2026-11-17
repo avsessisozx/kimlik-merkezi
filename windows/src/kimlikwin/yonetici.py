@@ -19,6 +19,7 @@ from .guncelleme import Guncelleme, GuncellemeHatasi
 from .baslangic import Otomatik, veri_yolunu_kaydet
 from .cekirdek import IslemHatasi, Uygulama
 from .tanila_is import TanilaIsi
+from .ses import SesHatasi, SesMotoru
 from .telefon import TelefonAktarimi
 from .guvenlik import DEGERLENDIRICILER, GUVENLIK_API, KILITLI_IZINLI, MESGUL_IZINLI, Guvenlik
 
@@ -29,7 +30,7 @@ UYGULAMA_API = frozenset({
     "persona_sil", "persona_sure_kontrol", "oneri_listele", "oneri_kanit", "oneri_onayla", "oneri_duzelt", "oneri_reddet", "oneri_hic_dogru_degil", "oneri_toplu_reddet", "celiskiler", "celiski_coz", "kimlik_karti", "erisim",
     "anahtar_uret", "anahtar_iptal", "izin_ver", "izin_kaldir", "konu_izin_ver", "konu_izin_kaldir", "izin_toplu", "erisim_kaydi",
     "baglanti_bilgisi", "claude_ekle", "kopya_baslat", "kopya_durum", "harita", "harita_bolge", "harita_hassas", "harita_kayitlar", "harita_ayrinti",
-    "galaksi", "galaksi_kayitlar", "kimlik_ozeti",
+    "galaksi", "galaksi_kayitlar", "kimlik_ozeti", "ses_sorgu",
 })
 
 # Persona bilgisini değiştirebilen işlemler: yönetilen blok açıksa bunlardan sonra yeniden üretilir.
@@ -82,6 +83,7 @@ class Yonetici:
         self.mesgul: str | None = None        # "donusum": şifreleme dönüşümü sürüyor, veritabanı kapalı
         self.tanila: TanilaIsi | None = None  # 'Dosyayı denetle' işi (salt okunur, veritabanına dokunmaz)
         self.guvenlik = Guvenlik(self)
+        self.ses = SesMotoru(self.ayarlar.dizin / "ses")
         self._api_kilit = threading.RLock()   # kişi değişimi ve sorgular aynı SQLite bağlantısında çakışmasın
 
     @property
@@ -287,6 +289,7 @@ class Yonetici:
 
     def kapat(self) -> None:
         self.telefon.durdur()                 # alıcı Hub kapanmadan ÖNCE durur
+        self.ses.kapat()                      # varsa ses (Whisper) süreci
         if self.uygulama:
             self.uygulama.kapat()
             self.uygulama = None
@@ -295,6 +298,8 @@ class Yonetici:
     def api(self, ad: str, girdi: dict[str, Any]) -> Any:
         if ad == "sec":                       # dosya penceresi dakikalarca açık kalabilir; kilit tutma
             return self.api_sec(**girdi)
+        if ad == "ses_tani":                  # model yükleme/tanıma saniyeler sürer; veritabanına dokunmaz, kilit tutma
+            return self.api_ses_tani(**girdi)
         with self._api_kilit:
             return self._api(ad, girdi)
 
@@ -504,6 +509,19 @@ class Yonetici:
 
     def api_telefon_cihaz_kaldir(self, device_id: str = "") -> dict:
         return self.telefon.cihaz_kaldir(device_id)
+
+    # ------------------------------------------------------------------ sesli arama (ses.py; ses bu bilgisayardan çıkmaz)
+    def api_ses_durum(self) -> dict:
+        return self.ses.durum()
+
+    def api_ses_kur(self) -> dict:
+        return self.ses.kur_baslat()
+
+    def api_ses_tani(self, pcm: str = "") -> dict:
+        try:
+            return {"metin": self.ses.tani(str(pcm))}
+        except SesHatasi as e:
+            raise IslemHatasi(str(e), "ses_" + e.kod) from None
 
     def api_saglik(self) -> dict:
         veri = self.ayarlar["veri_klasoru"]

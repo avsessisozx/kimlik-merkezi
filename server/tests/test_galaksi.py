@@ -73,3 +73,8 @@ def test_kimlik_ozeti_yalniz_sayim(hub):
 def test_kayit_listesi_tur_suzgeci(hub):
     r = kayitlar(hub, "Meta", sahip=True, tur="facebook.yorum")
     assert r["toplam"] == 1 and r["kayitlar"][0]["kind"] == "facebook.yorum"
+
+
+def test_bos_grup_tum_kaynaklar_ve_tarih_araligi(hub):
+    r = kayitlar(hub, "", sahip=True, bas=1704067200, bit=1735689600)   # 2024
+    assert r["toplam"] == 3                       # facebook + 2 sohbet (dosya tarihli kayıt aralıkta sayılmaz)

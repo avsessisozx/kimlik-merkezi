@@ -200,3 +200,12 @@ def test_sen_kimsin_uc_bolum_ayri(sonuc):
         assert b in m, b
     assert "Windows 11 bilgisayarım var" in m          # kullanıcının onaylı bilgisi "senin söylediklerin"de
     assert "undefined" not in m and "NaN" not in m
+
+
+def test_galaksi_yazili_arama_ve_ses_paneli(sonuc):
+    g = sonuc["galaksi"]
+    assert g["ara_notu"].startswith("Anladığım:") and "2025" in g["ara_notu"] and "Chrome" in g["ara_notu"], g["ara_notu"]
+    assert "Anladığım" in g["ara_panel"] and "kayıt bulundu" in g["ara_panel"].replace("\n", " ")
+    assert g["ara_kume"] is not None and g["ara_temizlendi"] is True
+    assert g["ara_sonuc2"] == ["içinde geçen: «blabla»"]            # anlamadığını uydurmaz: sözcük olarak arar
+    assert "Sesle arama" in g["mik_paneli"] and "kurulur" in g["mik_paneli"].replace("\n", " ")   # motor yokken açık kurulum paneli

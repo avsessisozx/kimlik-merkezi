@@ -117,7 +117,11 @@ const GALAKSI = {
     const oynat = h('button', { class: 'gal-oynat', 'aria-label': 'Yılları oynat', onclick: () => GALAKSI.oynat(S, oynat, kaydirici, yilEtiket) }, '▶');
     const alt = h('div', { class: 'gal-cubuk' }, oynat, h('div', { class: 'gal-yilkap' }, kaydirici, h('div', { class: 'gal-yiluc' }, h('span', {}, S.yilMin), h('span', {}, S.yilMax))), yilEtiket);
     const hal = h('div', { class: 'gal-hal', id: 'gal-hal' });
-    const sahne = h('section', { class: 'gal-sahne' }, tuval, baslik, hal, alt);
+    const girdi = h('input', { type: 'text', id: 'gal-ara-girdi', placeholder: 'Ara: "geçen yaz ChatGPT" ya da mikrofona bas', 'aria-label': 'Galakside ara',
+      onkeydown: e => { if (e.key === 'Enter') GALAKSI.sorgula(S, e.target.value); } });
+    const mik = h('button', { class: 'gal-mik', id: 'gal-mik', 'aria-label': 'Sesle ara', title: 'Sesle ara (konuş, bitince tekrar bas)', onclick: () => GALAKSI.dinle(S) }, '🎤');
+    const araCubuk = h('div', { class: 'gal-ara' }, girdi, h('button', { class: 'gal-ara-d', onclick: () => GALAKSI.sorgula(S, girdi.value) }, 'Ara'), mik, h('div', { class: 'gal-ara-not soluk', id: 'gal-ara-not' }));
+    const sahne = h('section', { class: 'gal-sahne' }, tuval, baslik, araCubuk, hal, alt);
     a.append(h('div', { class: 'gal-kap' }, sahne, panel), h('div', { class: 'gal-liste-kap' }, h('h3', {}, 'Kaynaklar'), cip));
     GALAKSI.cipleriCiz(S, cip); GALAKSI.halCiz(S, hal); GALAKSI.panelCiz(S, panel); GALAKSI.ustMetin(S);
     S.tuval = tuval; S.g = tuval.getContext('2d');
@@ -151,7 +155,7 @@ const GALAKSI = {
     if (S.halSecim) el.append(h('button', { class: 'gal-hal-dugme otomatik', onclick: () => { S.halSecim = null; try { localStorage.removeItem(GAL_ANAHTAR); } catch (_) { /* yok */ } GALAKSI.halCiz(S, el); } }, 'Otomatiğe dön'));
     el.append(h('div', { class: 'gal-hal-not soluk' }, S.halSecim ? 'Hâli sen seçtin.' : (tahmin ? `Tahmin: ${GAL_HALLER[tahmin.id].ad}. ${tahmin.neden}` : 'Hâl için yeterli veri yok.')));
   },
-  sec(S, i) { S.secili = i; GALAKSI.cipleriCiz(S, document.querySelector('.gal-cipler')); GALAKSI.panelCiz(S, document.getElementById('gal-panel')); },
+  sec(S, i) { S.sorgu = null; S.secili = i; GALAKSI.cipleriCiz(S, document.querySelector('.gal-cipler')); GALAKSI.panelCiz(S, document.getElementById('gal-panel')); },
   gir(S) { if (S.secili == null) return; S.icinde = S.secili; S.tur = null; const k = S.kumeler[S.icinde];
     S.camHedef = { x: k.cx, y: k.cy, s: Math.min(4, Math.max(1.6, 300 / k.r)) }; GALAKSI.ustMetin(S); GALAKSI.panelCiz(S, document.getElementById('gal-panel')); },
   geri(S) { S.icinde = null; S.tur = null; S.camHedef = { x: GAL_W / 2, y: GAL_H / 2, s: 1 }; GALAKSI.ustMetin(S); GALAKSI.panelCiz(S, document.getElementById('gal-panel')); },
@@ -219,7 +223,9 @@ const GALAKSI = {
       const [cx, cy] = GALAKSI.ekranXY(S, k.cx, k.cy), x = cx + px * kamS, y = cy + py * kamS;
       if (x < -6 || y < -6 || x > S.w + 6 || y > S.h + 6) continue;
       const tw = S.azHareket ? 1 : .75 + .25 * Math.sin(zt * 2 + s.faz);
-      g.globalAlpha = (bas ? .05 : s.o * tw) * Math.min(1, H.parlak);
+      const sq = S.sorgu, ic2 = sq && sq.bas != null && s.t >= sq.bas && s.t < sq.bit, sqKume = sq && sq.kume != null && sq.kume !== s.g;
+      const sorguCarpan = !sq ? 1 : (sqKume ? .08 : (sq.bas == null || ic2 ? 1 : .12));
+      g.globalAlpha = (bas ? .05 : s.o * tw * sorguCarpan) * Math.min(1, H.parlak);
       const key = renk + '|' + H.ton; let c = rkCache[key]; if (!c) c = rkCache[key] = galRenkKaydir(renk, H.ton, H.parlak);
       g.fillStyle = c; const b = s.boy * Math.min(2.2, Math.sqrt(S.cam.s));
       if (b < 2.6) g.fillRect(x - b / 2, y - b / 2, b, b); else { g.beginPath(); g.arc(x, y, b / 2, 0, 6.283); g.fill(); }
@@ -237,6 +243,7 @@ const GALAKSI = {
   panelCiz(S, el) {
     if (!el) return; el.textContent = '';
     const v = S.veri;
+    if (S.sorgu) { GALAKSI.sorguPaneli(S, el); return; }
     if (S.icinde != null) {
       const k = S.kumeler[S.icinde], al = S.alt[S.icinde], tek = S.tur != null ? al[S.tur] : null;
       el.append(h('div', { class: 'gal-etiket' }, 'İçindesin'), h('div', { class: 'gal-ad' }, k.ad), h('div', { class: 'gal-buyuk' }, SAYI(k.sayi)), h('div', { class: 'soluk' }, 'kayıt'),
@@ -257,11 +264,66 @@ const GALAKSI = {
       ...[v.tarihsiz ? h('p', { class: 'soluk' }, `${SAYI(v.tarihsiz)} kaydın gerçek tarihi yok; sayılırlar ama yıl çubuğunda yer almazlar.`) : null,
         v.seyreltme > 1 ? h('p', { class: 'soluk' }, `Çizimde her ${v.seyreltme} kayıttan biri gösterilir; sayılar tamdır.`) : null].filter(Boolean));
   },
+  // ---- arama (yazılı ya da sesli): kurallarla çözülür, galaksi sonuca uçar
+  async sorgula(S, metin) {
+    metin = String(metin || '').trim(); if (!metin) return;
+    const not = document.getElementById('gal-ara-not'); not.textContent = 'Aranıyor…';
+    let r; try { r = await api('ses_sorgu', { metin }); } catch (e) { not.textContent = ''; hataGoster(e); return; }
+    if (r.bos) { not.textContent = 'Ne aradığını anlayamadım. Tarih, kaynak ya da bir sözcük söyle (ör. "geçen yaz ChatGPT").'; return; }
+    const kume = r.kaynak ? S.kumeler.find(k => k.ad === r.kaynak) : null;
+    S.sorgu = { ...r, kume: kume ? kume.i : null }; S.secili = kume ? kume.i : null; S.icinde = null; S.tur = null; S.kayitSayfa = 0;
+    S.camHedef = kume ? { x: kume.cx, y: kume.cy, s: 1.8 } : { x: GAL_W / 2, y: GAL_H / 2, s: 1 };
+    if (r.bit != null) { const y = Math.max(S.yilMin, Math.min(S.yilMax, new Date((r.bit - 1) * 1000).getUTCFullYear())); S.yil = y;
+      const kay = document.querySelector('.gal-yilkap input'); if (kay) kay.value = y; const et = document.getElementById('gal-yil'); if (et) et.textContent = y; }
+    not.textContent = 'Anladığım: ' + r.anlasilan.join(' · ');
+    GALAKSI.cipleriCiz(S, document.querySelector('.gal-cipler')); GALAKSI.ustMetin(S); GALAKSI.panelCiz(S, document.getElementById('gal-panel'));
+  },
+  sorguPaneli(S, el) {
+    const q = S.sorgu;
+    el.append(h('div', { class: 'gal-etiket' }, 'Arama'), h('div', { class: 'gal-ad' }, '«' + q.metin + '»'),
+      h('div', { class: 'soluk' }, 'Anladığım:'), h('ul', { class: 'gal-anlasilan' }, q.anlasilan.map(x => h('li', {}, x))),
+      h('button', { class: 'gal-geri', onclick: () => { S.sorgu = null; S.secili = null; S.camHedef = { x: GAL_W / 2, y: GAL_H / 2, s: 1 }; document.getElementById('gal-ara-not').textContent = '';
+        document.getElementById('gal-ara-girdi').value = ''; GALAKSI.cipleriCiz(S, document.querySelector('.gal-cipler')); GALAKSI.ustMetin(S); GALAKSI.panelCiz(S, el); } }, '← Aramayı temizle'));
+    GALAKSI.kayitListesi(S, el, q.kume != null ? S.kumeler[q.kume] : null, null);
+  },
+  // ---- mikrofon: tarayıcıda 16 kHz mono PCM kaydı -> yerel Whisper (ses internete gitmez)
+  async dinle(S) {
+    const mik = document.getElementById('gal-mik'), not = document.getElementById('gal-ara-not');
+    if (S.kayit) { S.kayit.bitir(); return; }
+    let d; try { d = await api('ses_durum'); } catch (e) { hataGoster(e); return; }
+    if (!d.motor_kurulu) { GALAKSI.sesKurPaneli(S, d); return; }
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { not.textContent = 'Bu pencerede mikrofon kullanılamıyor. Yazarak arayabilirsin.'; return; }
+    let akim; try { akim = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true } }); } catch (e) { not.textContent = 'Mikrofon izni verilmedi ya da mikrofon yok. Yazarak arayabilirsin.'; return; }
+    const AC = window.AudioContext || window.webkitAudioContext, ac = new AC({ sampleRate: 16000 }), kaynak = ac.createMediaStreamSource(akim), isl = ac.createScriptProcessor(4096, 1, 1), parcalar = [];
+    isl.onaudioprocess = e => parcalar.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    kaynak.connect(isl); isl.connect(ac.destination);
+    mik.classList.add('kayitta'); not.textContent = 'Dinliyorum… (bitince tekrar mikrofona bas)';
+    const bitir = async () => {
+      if (!S.kayit) return; clearTimeout(zm); S.kayit = null; mik.classList.remove('kayitta');
+      try { isl.disconnect(); kaynak.disconnect(); akim.getTracks().forEach(t => t.stop()); await ac.close(); } catch (_) { /* kapanmış */ }
+      const n = parcalar.reduce((a, p) => a + p.length, 0), pcm = new Int16Array(n); let o = 0;
+      parcalar.forEach(p => { for (let i = 0; i < p.length; i++) pcm[o++] = Math.max(-32768, Math.min(32767, Math.round(p[i] * 32767))); });
+      let ikili = ''; const b = new Uint8Array(pcm.buffer); for (let i = 0; i < b.length; i += 8192) ikili += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+      not.textContent = 'Çözümlüyorum… (ilk seferde model yüklenirken biraz sürer)';
+      try { const r = await api('ses_tani', { pcm: btoa(ikili) }); document.getElementById('gal-ara-girdi').value = r.metin; if (r.metin) await GALAKSI.sorgula(S, r.metin); else not.textContent = 'Bir şey duyamadım.'; }
+      catch (e) { not.textContent = ''; hataGoster(e); }
+    };
+    const zm = setTimeout(bitir, 12000); S.kayit = { bitir };
+  },
+  sesKurPaneli(S, d) {
+    const el = document.getElementById('gal-panel'); el.textContent = '';
+    el.append(h('div', { class: 'gal-ad' }, 'Sesle arama'), h('p', {}, d.aciklama));
+    const durum = h('div', { class: 'soluk', id: 'ses-kur-durum' }, d.kurulum && d.kurulum.mesaj || '');
+    if (d.python_var) el.append(h('button', { class: 'd', onclick: async () => { try { await api('ses_kur'); } catch (e) { hataGoster(e); return; }
+      const yokla = async () => { const x = await api('ses_durum').catch(() => null); if (!x) return; durum.textContent = x.kurulum.mesaj; if (x.kurulum.durum === 'calisiyor' && GALAKSI.durum === S) setTimeout(yokla, 3000); }; yokla(); } }, 'Ses motorunu kur'));
+    el.append(durum, h('p', { class: 'soluk' }, 'Kurulana kadar yukarıdaki kutuya yazarak arayabilirsin.'),
+      h('button', { class: 'gal-geri', onclick: () => GALAKSI.panelCiz(S, el) }, 'Kapat'));
+  },
   async kayitListesi(S, el, k, tur) {
     const kutu = h('div', { class: 'gal-kayitlar' }, h('div', { class: 'soluk' }, 'Yükleniyor…')); el.append(kutu);
-    const bit = Math.floor(Date.UTC(S.yil + 1, 0, 1) / 1000);
-    let r; try { r = await api('galaksi_kayitlar', { grup: k.ad, bit, tur: tur && tur.tur ? tur.tur : null, limit: 20, offset: S.kayitSayfa * 20 }); } catch (e) { kutu.textContent = ''; hataGoster(e); return; }
-    kutu.textContent = ''; kutu.append(h('div', { class: 'soluk' }, `${SAYI(r.toplam)} kayıt (${S.yil} sonuna kadar), yeniden eskiye`));
+    const q = S.sorgu, bit = q && q.bit != null ? q.bit : Math.floor(Date.UTC(S.yil + 1, 0, 1) / 1000);
+    let r; try { r = await api('galaksi_kayitlar', { grup: k ? k.ad : '', bas: q && q.bas != null ? q.bas : null, bit, arama: q ? q.arama : null, tur: tur && tur.tur ? tur.tur : null, limit: 20, offset: S.kayitSayfa * 20 }); } catch (e) { kutu.textContent = ''; hataGoster(e); return; }
+    kutu.textContent = ''; kutu.append(h('div', { class: 'soluk' }, S.sorgu ? `${SAYI(r.toplam)} kayıt bulundu, yeniden eskiye` : `${SAYI(r.toplam)} kayıt (${S.yil} sonuna kadar), yeniden eskiye`));
     r.kayitlar.forEach(x => kutu.append(h('button', { class: 'gal-kayit', onclick: () => { if (typeof kayitAc === 'function') kayitAc(x.event_id); } },
       h('div', { class: 'soluk' }, tarih(x.ts) + ' · ' + galTurAdi(x.kind)), h('div', {}, x.baslik || x.ozet || '(metin yok)'))));
     if (r.toplam > (S.kayitSayfa + 1) * 20) kutu.append(h('button', { class: 'i', onclick: () => { S.kayitSayfa++; GALAKSI.panelCiz(S, document.getElementById('gal-panel')); } }, 'Daha eski kayıtlar'));

@@ -38,6 +38,14 @@
 .gal-liste-kap .gal-cip .soluk{color:var(--soluk)}
 @media(max-width:700px){.gal-panel{flex-basis:100%;max-height:none;border-left:0;border-top:1px solid rgba(255,255,255,.12)}.gal-hal{max-width:100%;left:12px;right:12px;top:78px;justify-content:flex-start}.gal-hal-not{text-align:left}.gal-sahne{min-height:480px}}
 @media(prefers-reduced-motion:reduce){.gal-hal-dugme{transition:none}}
+.gal-ara{position:absolute;left:24px;top:104px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:min(520px,calc(100% - 48px));z-index:2}
+.gal-ara input{flex:1 1 220px;min-width:150px;background:rgba(11,16,32,.72);color:#EDEAF5;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 14px}
+.gal-ara-d,.gal-mik{border:1px solid rgba(255,255,255,.3);background:rgba(11,16,32,.72);color:#EDEAF5;border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+.gal-mik.kayitta{background:#F6A596;color:#10162A;animation:gal-nabiz 1s infinite}
+@keyframes gal-nabiz{50%{opacity:.55}}
+.gal-ara-not{flex-basis:100%;font-size:12.5px;color:#CFCCE0;text-shadow:0 1px 3px #000}
+.gal-anlasilan{margin:4px 0 8px;padding-left:18px;color:#CFCCE0}
+@media(prefers-reduced-motion:reduce){.gal-mik.kayitta{animation:none}}
 /* Sen kimsin */
 .sk-liste{margin:8px 0;padding-left:20px}.sk-liste li{margin:5px 0}.sk-kanit{font-size:12.5px}
 .sk-kaynaklar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}

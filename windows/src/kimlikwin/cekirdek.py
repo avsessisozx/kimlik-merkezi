@@ -169,6 +169,13 @@ class Uygulama:
                          offset: int = 0, arama: str | None = None, tur: str | None = None) -> dict[str, Any]:
         return self._kopru(harita_kopru.galaksi_kayitlar, grup, bas, bit, limit, offset, arama, tur)
 
+    def ses_sorgu(self, metin: str = "") -> dict[str, Any]:
+        """Sesli/yazılı aramayı kurallarla çözer (tarih, kaynak, anahtar sözcük); yapay zekâ yok."""
+        from . import ses_sorgu
+        metin = str(metin or "")[:300]
+        kaynaklar = self._kopru(harita_kopru.kaynak_adlari)
+        return ses_sorgu.coz(metin, kaynaklar=kaynaklar, kayma=harita_kopru.yerel_kayma())
+
     def kimlik_ozeti(self) -> dict[str, Any]:
         return self._kopru(harita_kopru.kimlik_ozeti)
 
