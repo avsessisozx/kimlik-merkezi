@@ -201,9 +201,9 @@ def main(argv: list[str] | None = None) -> int:
             from kimlikimport import registry
             if "android_giden" not in registry.names():
                 raise ImportError("android_giden içe aktarıcısı yok")
-            print("telefon aktarımı: hazır")
+            print("telefon aktarimi: hazir")
         except Exception as e:
-            print(f"telefon aktarımı: YOK ({type(e).__name__})")
+            print(f"telefon aktarimi: YOK ({type(e).__name__})")
         return 0
     if a.komut == "tanila":
         return tanila_komutu(a.yol, a.adlari_goster, a.ayrinti)
