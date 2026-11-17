@@ -1,0 +1,4439 @@
+{
+ "_aciklama": "Sentetik ornek (importers/fixtures + elle persona). UI mock verisi; kimlikserver.harita API cikti bicimi. 'harita' ve 'bolge' hassas bolgeler (kalp, karin, ayak, zihin) kilitliyken, '*_hassas_acik' acikken. Grafiklerdeki 'anahtarlar' ve en_cok[*].anahtar, bolge(filtre={alan: deger}) olarak geri gonderilebilir.",
+ "harita": {
+  "profil": {
+   "ad": "Ornek Kisi",
+   "olay": 51,
+   "ilk": "2022-01-02T03:04:05Z",
+   "son": "2024-04-02T08:00:00Z"
+  },
+  "bolgeler": [
+   {
+    "id": "bas",
+    "ad": "Baş: ilgi ve merak",
+    "kategoriler": [
+     "tarama"
+    ],
+    "olay_sayisi": 6,
+    "ilk": "2024-03-01T10:00:00Z",
+    "son": "2024-04-02T08:00:00Z",
+    "kilitli": false,
+    "ozet": "6 kayıt, 2024-03-01 ile 2024-04-02 arası (veriden sayım)"
+   },
+   {
+    "id": "zihin",
+    "ad": "Zihin: yapay zekâ sohbetleri",
+    "kategoriler": [
+     "sohbet"
+    ],
+    "olay_sayisi": null,
+    "ilk": null,
+    "son": null,
+    "kilitli": true,
+    "ozet": "Kilitli"
+   },
+   {
+    "id": "goz",
+    "ad": "Gözler: izledikleri",
+    "kategoriler": [
+     "video"
+    ],
+    "olay_sayisi": 10,
+    "ilk": "2024-03-01T10:00:00Z",
+    "son": "2024-03-07T14:00:00Z",
+    "kilitli": false,
+    "ozet": "10 kayıt, 2024-03-01 ile 2024-03-07 arası (veriden sayım)"
+   },
+   {
+    "id": "kulak",
+    "ad": "Kulaklar: dinledikleri",
+    "kategoriler": [
+     "muzik"
+    ],
+    "olay_sayisi": 14,
+    "ilk": "2023-03-01T00:00:00Z",
+    "son": "2023-05-06T07:00:00Z",
+    "kilitli": false,
+    "ozet": "14 kayıt, 2023-03-01 ile 2023-05-06 arası (veriden sayım)"
+   },
+   {
+    "id": "agiz",
+    "ad": "Ağız: yazdıkları/söyledikleri",
+    "kategoriler": [
+     "sosyal"
+    ],
+    "olay_sayisi": 12,
+    "ilk": "2023-01-10T08:00:00Z",
+    "son": "2023-02-01T10:00:00Z",
+    "kilitli": false,
+    "ozet": "12 kayıt, 2023-01-10 ile 2023-02-01 arası (veriden sayım)"
+   },
+   {
+    "id": "el",
+    "ad": "Eller: üretim ve iş",
+    "kategoriler": [
+     "kod",
+     "dosyalar",
+     "notlar"
+    ],
+    "olay_sayisi": 9,
+    "ilk": "2022-01-02T03:04:05Z",
+    "son": "2022-06-07T08:09:10Z",
+    "kilitli": false,
+    "ozet": "9 kayıt, 2022-01-02 ile 2022-06-07 arası (veriden sayım)"
+   },
+   {
+    "id": "kalp",
+    "ad": "Kalp: kişisel (hassas)",
+    "kategoriler": [
+     "mesaj"
+    ],
+    "olay_sayisi": null,
+    "ilk": null,
+    "son": null,
+    "kilitli": true,
+    "ozet": "Kilitli"
+   },
+   {
+    "id": "karin",
+    "ad": "Karın: e-posta (hassas)",
+    "kategoriler": [
+     "eposta"
+    ],
+    "olay_sayisi": null,
+    "ilk": null,
+    "son": null,
+    "kilitli": true,
+    "ozet": "Kilitli"
+   },
+   {
+    "id": "ayak",
+    "ad": "Ayaklar: konum (hassas)",
+    "kategoriler": [
+     "konum",
+     "medya_meta"
+    ],
+    "olay_sayisi": null,
+    "ilk": null,
+    "son": null,
+    "kilitli": true,
+    "ozet": "Kilitli"
+   },
+   {
+    "id": "ic",
+    "ad": "Merkez: uygulama kullanımı",
+    "kategoriler": [
+     "uygulama"
+    ],
+    "olay_sayisi": 0,
+    "ilk": null,
+    "son": null,
+    "kilitli": false,
+    "ozet": "Henüz veri yok"
+   }
+  ],
+  "beyan": [
+   {
+    "kategori": "kimlik",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Ornek Kisi"
+   },
+   {
+    "kategori": "tercihler",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Kahve severim"
+   },
+   {
+    "kategori": "cihazlar",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Dizustu bilgisayar kullaniyorum"
+   }
+  ],
+  "not": "Veriden sayım; yorum ya da çıkarım içermez."
+ },
+ "bolge": {
+  "bas": {
+   "id": "bas",
+   "ad": "Baş: ilgi ve merak",
+   "kilitli": false,
+   "toplam": 6,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2024-03",
+      "2024-04"
+     ],
+     "degerler": [
+      4,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-04"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      1,
+      0,
+      0,
+      4,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok aranan terimler",
+     "etiketler": [
+      "ornek google arama",
+      "ornek yer"
+     ],
+     "degerler": [
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "terim",
+       "deger": "ornek google arama"
+      },
+      {
+       "alan": "terim",
+       "deger": "ornek yer"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok gidilen siteler",
+     "etiketler": [
+      "example.test"
+     ],
+     "degerler": [
+      3
+     ],
+     "anahtarlar": [
+      {
+       "alan": "site",
+       "deger": "example.test"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "chrome.ziyaret",
+      "google.arama"
+     ],
+     "degerler": [
+      4,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "chrome.ziyaret"
+      },
+      {
+       "alan": "tur",
+       "deger": "google.arama"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "ornek google arama",
+     "sayi": 1,
+     "grup": "arama terimi",
+     "anahtar": {
+      "alan": "terim",
+      "deger": "ornek google arama"
+     }
+    },
+    {
+     "ad": "ornek yer",
+     "sayi": 1,
+     "grup": "arama terimi",
+     "anahtar": {
+      "alan": "terim",
+      "deger": "ornek yer"
+     }
+    },
+    {
+     "ad": "example.test",
+     "sayi": 3,
+     "grup": "site",
+     "anahtar": {
+      "alan": "site",
+      "deger": "example.test"
+     }
+    }
+   ],
+   "notlar": [
+    "1 ziyarette url alanı yok (ör. konum içerdiği için ayrılmış); site sayımına girmedi.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "zihin": {
+   "id": "zihin",
+   "ad": "Zihin: yapay zekâ sohbetleri",
+   "kilitli": true,
+   "grafikler": [],
+   "en_cok": [],
+   "notlar": [
+    "Kilitli"
+   ]
+  },
+  "goz": {
+   "id": "goz",
+   "ad": "Gözler: izledikleri",
+   "kilitli": false,
+   "toplam": 10,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2024-03"
+     ],
+     "degerler": [
+      7
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok izlenen kanallar",
+     "etiketler": [
+      "Kanal A",
+      "Kanal B",
+      "Kanal D"
+     ],
+     "degerler": [
+      1,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "kanal",
+       "deger": "Kanal A"
+      },
+      {
+       "alan": "kanal",
+       "deger": "Kanal B"
+      },
+      {
+       "alan": "kanal",
+       "deger": "Kanal D"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "youtube.izleme",
+      "youtube.abonelik",
+      "youtube.arama",
+      "youtube.etkinlik"
+     ],
+     "degerler": [
+      4,
+      3,
+      2,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "youtube.izleme"
+      },
+      {
+       "alan": "tur",
+       "deger": "youtube.abonelik"
+      },
+      {
+       "alan": "tur",
+       "deger": "youtube.arama"
+      },
+      {
+       "alan": "tur",
+       "deger": "youtube.etkinlik"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "Kanal A",
+     "sayi": 1,
+     "grup": "kanal",
+     "anahtar": {
+      "alan": "kanal",
+      "deger": "Kanal A"
+     },
+     "ornek": "Watched Ornek Video Bir"
+    },
+    {
+     "ad": "Kanal B",
+     "sayi": 1,
+     "grup": "kanal",
+     "anahtar": {
+      "alan": "kanal",
+      "deger": "Kanal B"
+     },
+     "ornek": "Watched Ornek Video Iki"
+    },
+    {
+     "ad": "Kanal D",
+     "sayi": 1,
+     "grup": "kanal",
+     "anahtar": {
+      "alan": "kanal",
+      "deger": "Kanal D"
+     },
+     "ornek": "Watched Ornek Video Dort"
+    }
+   ],
+   "notlar": [
+    "3 kayıtta gerçek zaman yok (dosya tarihi); zaman grafiklerine alınmadı.",
+    "1 izleme kaydında kanal adı yok; kanal sayımına girmedi.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "kulak": {
+   "id": "kulak",
+   "ad": "Kulaklar: dinledikleri",
+   "kilitli": false,
+   "toplam": 14,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-03",
+      "2023-04",
+      "2023-05"
+     ],
+     "degerler": [
+      2,
+      0,
+      8
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2023-04"
+      },
+      {
+       "alan": "ay",
+       "deger": "2023-05"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      1,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      2,
+      2,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      2,
+      0,
+      3,
+      3,
+      1,
+      1,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok dinlenen sanatçı (dinleme sayısı)",
+     "etiketler": [
+      "Baska Sanatci",
+      "Ornek Sanatci"
+     ],
+     "degerler": [
+      2,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "sanatci",
+       "deger": "Baska Sanatci"
+      },
+      {
+       "alan": "sanatci",
+       "deger": "Ornek Sanatci"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok dinlenen sanatçı (dakika)",
+     "etiketler": [
+      "Ornek Sanatci",
+      "Baska Sanatci"
+     ],
+     "degerler": [
+      6,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "sanatci",
+       "deger": "Ornek Sanatci"
+      },
+      {
+       "alan": "sanatci",
+       "deger": "Baska Sanatci"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok dinlenen parça",
+     "etiketler": [
+      "Genisletilmis Sarki",
+      "Ornek Sarki Bir",
+      "Ornek Sarki Iki",
+      "Turkce Sarkı Şık"
+     ],
+     "degerler": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "parca",
+       "deger": "Genisletilmis Sarki"
+      },
+      {
+       "alan": "parca",
+       "deger": "Ornek Sarki Bir"
+      },
+      {
+       "alan": "parca",
+       "deger": "Ornek Sarki Iki"
+      },
+      {
+       "alan": "parca",
+       "deger": "Turkce Sarkı Şık"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok dinlenen podcast programı",
+     "etiketler": [
+      "Ornek Podcast"
+     ],
+     "degerler": [
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "podcast",
+       "deger": "Ornek Podcast"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "spotify.dinleme",
+      "spotify.arama",
+      "spotify.kutuphane_tracks",
+      "spotify.liste_ogesi",
+      "spotify.podcast",
+      "spotify.kutuphane_albums",
+      "spotify.kutuphane_artists"
+     ],
+     "degerler": [
+      4,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "spotify.dinleme"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.arama"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.kutuphane_tracks"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.liste_ogesi"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.podcast"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.kutuphane_albums"
+      },
+      {
+       "alan": "tur",
+       "deger": "spotify.kutuphane_artists"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "Baska Sanatci",
+     "sayi": 2,
+     "grup": "sanatçı",
+     "anahtar": {
+      "alan": "sanatci",
+      "deger": "Baska Sanatci"
+     }
+    },
+    {
+     "ad": "Ornek Sanatci",
+     "sayi": 2,
+     "grup": "sanatçı",
+     "anahtar": {
+      "alan": "sanatci",
+      "deger": "Ornek Sanatci"
+     }
+    },
+    {
+     "ad": "Genisletilmis Sarki",
+     "sayi": 1,
+     "grup": "parça",
+     "anahtar": {
+      "alan": "parca",
+      "deger": "Genisletilmis Sarki"
+     },
+     "ornek": "Baska Sanatci"
+    },
+    {
+     "ad": "Ornek Sarki Bir",
+     "sayi": 1,
+     "grup": "parça",
+     "anahtar": {
+      "alan": "parca",
+      "deger": "Ornek Sarki Bir"
+     },
+     "ornek": "Ornek Sanatci"
+    },
+    {
+     "ad": "Ornek Sarki Iki",
+     "sayi": 1,
+     "grup": "parça",
+     "anahtar": {
+      "alan": "parca",
+      "deger": "Ornek Sarki Iki"
+     },
+     "ornek": "Ornek Sanatci"
+    },
+    {
+     "ad": "Turkce Sarkı Şık",
+     "sayi": 1,
+     "grup": "parça",
+     "anahtar": {
+      "alan": "parca",
+      "deger": "Turkce Sarkı Şık"
+     },
+     "ornek": "Baska Sanatci"
+    },
+    {
+     "ad": "Ornek Podcast",
+     "sayi": 2,
+     "grup": "podcast",
+     "anahtar": {
+      "alan": "podcast",
+      "deger": "Ornek Podcast"
+     }
+    }
+   ],
+   "notlar": [
+    "4 kayıtta gerçek zaman yok (dosya tarihi); zaman grafiklerine alınmadı.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "agiz": {
+   "id": "agiz",
+   "ad": "Ağız: yazdıkları/söyledikleri",
+   "kilitli": false,
+   "toplam": 12,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-01",
+      "2023-02"
+     ],
+     "degerler": [
+      4,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-01"
+      },
+      {
+       "alan": "ay",
+       "deger": "2023-02"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      1,
+      2,
+      0,
+      0,
+      0,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok yazılan subreddit",
+     "etiketler": [
+      "ornek",
+      "diger"
+     ],
+     "degerler": [
+      3,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "subreddit",
+       "deger": "ornek"
+      },
+      {
+       "alan": "subreddit",
+       "deger": "diger"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Gönderi / yorum / oy / kaydedilen",
+     "etiketler": [
+      "reddit.abone",
+      "reddit.yorum",
+      "reddit.gonderi",
+      "reddit.kaydedilen",
+      "reddit.oy"
+     ],
+     "degerler": [
+      3,
+      3,
+      2,
+      2,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "reddit.abone"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.yorum"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.gonderi"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.kaydedilen"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.oy"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "ornek",
+     "sayi": 3,
+     "grup": "subreddit",
+     "anahtar": {
+      "alan": "subreddit",
+      "deger": "ornek"
+     }
+    },
+    {
+     "ad": "diger",
+     "sayi": 2,
+     "grup": "subreddit",
+     "anahtar": {
+      "alan": "subreddit",
+      "deger": "diger"
+     }
+    }
+   ],
+   "notlar": [
+    "7 kayıtta gerçek zaman yok (dosya tarihi); zaman grafiklerine alınmadı.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "el": {
+   "id": "el",
+   "ad": "Eller: üretim ve iş",
+   "kilitli": false,
+   "toplam": 9,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "pasta",
+     "baslik": "Kategoriler",
+     "etiketler": [
+      "kod"
+     ],
+     "degerler": [
+      9
+     ],
+     "anahtarlar": [
+      {
+       "alan": "kategori",
+       "deger": "kod"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "GitHub kayıt türleri",
+     "etiketler": [
+      "github.depo",
+      "github.issue",
+      "github.issue_comment",
+      "github.yildiz",
+      "github.pr"
+     ],
+     "degerler": [
+      2,
+      2,
+      2,
+      2,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "github.depo"
+      },
+      {
+       "alan": "tur",
+       "deger": "github.issue"
+      },
+      {
+       "alan": "tur",
+       "deger": "github.issue_comment"
+      },
+      {
+       "alan": "tur",
+       "deger": "github.yildiz"
+      },
+      {
+       "alan": "tur",
+       "deger": "github.pr"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok etkinlik olan depo",
+     "etiketler": [
+      "https://github.com/ornekkullanici/ornek-depo",
+      "gizli-depo",
+      "https://github.com/baska/ikinci-depo",
+      "https://github.com/baska/yildizli-depo",
+      "ornek-depo"
+     ],
+     "degerler": [
+      2,
+      1,
+      1,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "depo",
+       "deger": "https://github.com/ornekkullanici/ornek-depo"
+      },
+      {
+       "alan": "depo",
+       "deger": "gizli-depo"
+      },
+      {
+       "alan": "depo",
+       "deger": "https://github.com/baska/ikinci-depo"
+      },
+      {
+       "alan": "depo",
+       "deger": "https://github.com/baska/yildizli-depo"
+      },
+      {
+       "alan": "depo",
+       "deger": "ornek-depo"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "Programlama dilleri",
+     "etiketler": [
+      "Python"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "dil",
+       "deger": "Python"
+      }
+     ]
+    },
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2022-01",
+      "2022-02",
+      "2022-03",
+      "2022-04",
+      "2022-05",
+      "2022-06"
+     ],
+     "degerler": [
+      1,
+      4,
+      1,
+      2,
+      0,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2022-01"
+      },
+      {
+       "alan": "ay",
+       "deger": "2022-02"
+      },
+      {
+       "alan": "ay",
+       "deger": "2022-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2022-04"
+      },
+      {
+       "alan": "ay",
+       "deger": "2022-05"
+      },
+      {
+       "alan": "ay",
+       "deger": "2022-06"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      7,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      0,
+      3,
+      1,
+      1,
+      2,
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "https://github.com/ornekkullanici/ornek-depo",
+     "sayi": 2,
+     "grup": "depo",
+     "anahtar": {
+      "alan": "depo",
+      "deger": "https://github.com/ornekkullanici/ornek-depo"
+     }
+    },
+    {
+     "ad": "gizli-depo",
+     "sayi": 1,
+     "grup": "depo",
+     "anahtar": {
+      "alan": "depo",
+      "deger": "gizli-depo"
+     }
+    },
+    {
+     "ad": "https://github.com/baska/ikinci-depo",
+     "sayi": 1,
+     "grup": "depo",
+     "anahtar": {
+      "alan": "depo",
+      "deger": "https://github.com/baska/ikinci-depo"
+     }
+    },
+    {
+     "ad": "https://github.com/baska/yildizli-depo",
+     "sayi": 1,
+     "grup": "depo",
+     "anahtar": {
+      "alan": "depo",
+      "deger": "https://github.com/baska/yildizli-depo"
+     }
+    },
+    {
+     "ad": "ornek-depo",
+     "sayi": 1,
+     "grup": "depo",
+     "anahtar": {
+      "alan": "depo",
+      "deger": "ornek-depo"
+     }
+    }
+   ],
+   "notlar": [
+    "Dosya türü: bu alan yok (dosyalar kategorisinde kayıt yok).",
+    "Notlar: bu alan yok (notlar kategorisinde kayıt yok).",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "kalp": {
+   "id": "kalp",
+   "ad": "Kalp: kişisel (hassas)",
+   "kilitli": true,
+   "grafikler": [],
+   "en_cok": [],
+   "notlar": [
+    "Kilitli"
+   ]
+  },
+  "karin": {
+   "id": "karin",
+   "ad": "Karın: e-posta (hassas)",
+   "kilitli": true,
+   "grafikler": [],
+   "en_cok": [],
+   "notlar": [
+    "Kilitli"
+   ]
+  },
+  "ayak": {
+   "id": "ayak",
+   "ad": "Ayaklar: konum (hassas)",
+   "kilitli": true,
+   "grafikler": [],
+   "en_cok": [],
+   "notlar": [
+    "Kilitli"
+   ]
+  },
+  "ic": {
+   "id": "ic",
+   "ad": "Merkez: uygulama kullanımı",
+   "kilitli": false,
+   "toplam": 0,
+   "filtre": {},
+   "grafikler": [],
+   "en_cok": [],
+   "notlar": [
+    "Henüz veri yok",
+    "Günlük kullanım süresi: bu alan yok."
+   ]
+  }
+ },
+ "harita_hassas_acik": {
+  "profil": {
+   "ad": "Ornek Kisi",
+   "olay": 80,
+   "ilk": "2022-01-02T03:04:05Z",
+   "son": "2025-03-03T10:00:00Z"
+  },
+  "bolgeler": [
+   {
+    "id": "bas",
+    "ad": "Baş: ilgi ve merak",
+    "kategoriler": [
+     "tarama"
+    ],
+    "olay_sayisi": 6,
+    "ilk": "2024-03-01T10:00:00Z",
+    "son": "2024-04-02T08:00:00Z",
+    "kilitli": false,
+    "ozet": "6 kayıt, 2024-03-01 ile 2024-04-02 arası (veriden sayım)"
+   },
+   {
+    "id": "zihin",
+    "ad": "Zihin: yapay zekâ sohbetleri",
+    "kategoriler": [
+     "sohbet"
+    ],
+    "olay_sayisi": 19,
+    "ilk": "2023-11-14T22:13:20Z",
+    "son": "2025-03-03T10:00:00Z",
+    "kilitli": false,
+    "ozet": "19 kayıt, 2023-11-14 ile 2025-03-03 arası (veriden sayım)"
+   },
+   {
+    "id": "goz",
+    "ad": "Gözler: izledikleri",
+    "kategoriler": [
+     "video"
+    ],
+    "olay_sayisi": 10,
+    "ilk": "2024-03-01T10:00:00Z",
+    "son": "2024-03-07T14:00:00Z",
+    "kilitli": false,
+    "ozet": "10 kayıt, 2024-03-01 ile 2024-03-07 arası (veriden sayım)"
+   },
+   {
+    "id": "kulak",
+    "ad": "Kulaklar: dinledikleri",
+    "kategoriler": [
+     "muzik"
+    ],
+    "olay_sayisi": 14,
+    "ilk": "2023-03-01T00:00:00Z",
+    "son": "2023-05-06T07:00:00Z",
+    "kilitli": false,
+    "ozet": "14 kayıt, 2023-03-01 ile 2023-05-06 arası (veriden sayım)"
+   },
+   {
+    "id": "agiz",
+    "ad": "Ağız: yazdıkları/söyledikleri",
+    "kategoriler": [
+     "sosyal"
+    ],
+    "olay_sayisi": 12,
+    "ilk": "2023-01-10T08:00:00Z",
+    "son": "2023-02-01T10:00:00Z",
+    "kilitli": false,
+    "ozet": "12 kayıt, 2023-01-10 ile 2023-02-01 arası (veriden sayım)"
+   },
+   {
+    "id": "el",
+    "ad": "Eller: üretim ve iş",
+    "kategoriler": [
+     "kod",
+     "dosyalar",
+     "notlar"
+    ],
+    "olay_sayisi": 9,
+    "ilk": "2022-01-02T03:04:05Z",
+    "son": "2022-06-07T08:09:10Z",
+    "kilitli": false,
+    "ozet": "9 kayıt, 2022-01-02 ile 2022-06-07 arası (veriden sayım)"
+   },
+   {
+    "id": "kalp",
+    "ad": "Kalp: kişisel (hassas)",
+    "kategoriler": [
+     "mesaj"
+    ],
+    "olay_sayisi": 4,
+    "ilk": "2023-03-01T10:00:00Z",
+    "son": "2023-04-01T10:05:00Z",
+    "kilitli": false,
+    "ozet": "4 kayıt, 2023-03-01 ile 2023-04-01 arası (veriden sayım)"
+   },
+   {
+    "id": "karin",
+    "ad": "Karın: e-posta (hassas)",
+    "kategoriler": [
+     "eposta"
+    ],
+    "olay_sayisi": 4,
+    "ilk": "2024-03-04T10:00:00Z",
+    "son": "2024-03-07T13:00:00Z",
+    "kilitli": false,
+    "ozet": "4 kayıt, 2024-03-04 ile 2024-03-07 arası (veriden sayım)"
+   },
+   {
+    "id": "ayak",
+    "ad": "Ayaklar: konum (hassas)",
+    "kategoriler": [
+     "konum",
+     "medya_meta"
+    ],
+    "olay_sayisi": 2,
+    "ilk": "2024-03-01T13:00:00Z",
+    "son": "2024-04-02T08:00:00Z",
+    "kilitli": false,
+    "ozet": "2 kayıt, 2024-03-01 ile 2024-04-02 arası (veriden sayım)"
+   },
+   {
+    "id": "ic",
+    "ad": "Merkez: uygulama kullanımı",
+    "kategoriler": [
+     "uygulama"
+    ],
+    "olay_sayisi": 0,
+    "ilk": null,
+    "son": null,
+    "kilitli": false,
+    "ozet": "Henüz veri yok"
+   }
+  ],
+  "beyan": [
+   {
+    "kategori": "kimlik",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Ornek Kisi"
+   },
+   {
+    "kategori": "tercihler",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Kahve severim"
+   },
+   {
+    "kategori": "cihazlar",
+    "durum": "beyan_edilen",
+    "kaynak": null,
+    "veri": "Dizustu bilgisayar kullaniyorum"
+   }
+  ],
+  "not": "Veriden sayım; yorum ya da çıkarım içermez."
+ },
+ "bolge_hassas_acik": {
+  "ayak": {
+   "id": "ayak",
+   "ad": "Ayaklar: konum (hassas)",
+   "kilitli": false,
+   "toplam": 2,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2024-03",
+      "2024-04"
+     ],
+     "degerler": [
+      1,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-04"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "google.konum"
+     ],
+     "degerler": [
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "google.konum"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "Sayılar",
+     "etiketler": [
+      "Kayıt",
+      "Farklı yer"
+     ],
+     "degerler": [
+      2,
+      2
+     ],
+     "anahtarlar": [
+      null,
+      null
+     ]
+    }
+   ],
+   "en_cok": [],
+   "notlar": [
+    "Yer adları ve koordinatlar gösterilmez; yalnız sayılar.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "kalp": {
+   "id": "kalp",
+   "ad": "Kalp: kişisel (hassas)",
+   "kilitli": false,
+   "toplam": 4,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-03",
+      "2023-04"
+     ],
+     "degerler": [
+      2,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2023-04"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      0,
+      0,
+      1,
+      1,
+      0,
+      2,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "reddit.mesaj",
+      "reddit.sohbet"
+     ],
+     "degerler": [
+      2,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "reddit.mesaj"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.sohbet"
+      }
+     ]
+    }
+   ],
+   "en_cok": [],
+   "notlar": [
+    "İçerik gösterilmez; yalnız sayı ve zaman dağılımı.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "karin": {
+   "id": "karin",
+   "ad": "Karın: e-posta (hassas)",
+   "kilitli": false,
+   "toplam": 4,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2024-03"
+     ],
+     "degerler": [
+      4
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "gmail.ileti"
+     ],
+     "degerler": [
+      4
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "gmail.ileti"
+      }
+     ]
+    }
+   ],
+   "en_cok": [],
+   "notlar": [
+    "İçerik gösterilmez; yalnız sayı ve zaman dağılımı.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "zihin": {
+   "id": "zihin",
+   "ad": "Zihin: yapay zekâ sohbetleri",
+   "kilitli": false,
+   "toplam": 19,
+   "filtre": {},
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-11",
+      "2023-12",
+      "2024-01",
+      "2024-02",
+      "2024-03",
+      "2024-04",
+      "2024-05",
+      "2024-06",
+      "2024-07",
+      "2024-08",
+      "2024-09",
+      "2024-10",
+      "2024-11",
+      "2024-12",
+      "2025-01",
+      "2025-02",
+      "2025-03"
+     ],
+     "degerler": [
+      8,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      5
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-11"
+      },
+      {
+       "alan": "ay",
+       "deger": "2023-12"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-01"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-02"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-04"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-05"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-06"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-07"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-08"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-09"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-10"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-11"
+      },
+      {
+       "alan": "ay",
+       "deger": "2024-12"
+      },
+      {
+       "alan": "ay",
+       "deger": "2025-01"
+      },
+      {
+       "alan": "ay",
+       "deger": "2025-02"
+      },
+      {
+       "alan": "ay",
+       "deger": "2025-03"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC+3)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      5,
+      0,
+      0,
+      0,
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3,
+      0,
+      8,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC+3)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      0,
+      5,
+      3,
+      0,
+      5,
+      5
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kaynak (platform)",
+     "etiketler": [
+      "chatgpt",
+      "claude",
+      "gemini"
+     ],
+     "degerler": [
+      8,
+      6,
+      5
+     ],
+     "anahtarlar": [
+      {
+       "alan": "platform",
+       "deger": "chatgpt"
+      },
+      {
+       "alan": "platform",
+       "deger": "claude"
+      },
+      {
+       "alan": "platform",
+       "deger": "gemini"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "Sayılar",
+     "etiketler": [
+      "Mesaj",
+      "Konuşma",
+      "Kullanıcı mesajı",
+      "Asistan mesajı"
+     ],
+     "degerler": [
+      15,
+      7,
+      8,
+      7
+     ],
+     "anahtarlar": [
+      null,
+      null,
+      null,
+      null
+     ]
+    }
+   ],
+   "en_cok": [],
+   "notlar": [
+    "İçerik gösterilmez; yalnız sayı ve zaman dağılımı.",
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  }
+ },
+ "filtre_ornek": {
+  "istek": {
+   "bolge_id": "goz",
+   "filtre": {
+    "kanal": "Kanal A"
+   }
+  },
+  "yanit": {
+   "id": "goz",
+   "ad": "Gözler: izledikleri",
+   "kilitli": false,
+   "toplam": 1,
+   "filtre": {
+    "kanal": "Kanal A"
+   },
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2024-03"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2024-03"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok izlenen kanallar",
+     "etiketler": [
+      "Kanal A"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "kanal",
+       "deger": "Kanal A"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Kayıt türleri",
+     "etiketler": [
+      "youtube.izleme"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "youtube.izleme"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "Kanal A",
+     "sayi": 1,
+     "grup": "kanal",
+     "anahtar": {
+      "alan": "kanal",
+      "deger": "Kanal A"
+     },
+     "ornek": "Watched Ornek Video Bir"
+    }
+   ],
+   "notlar": [
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  }
+ },
+ "kayitlar_ornek": {
+  "istek": {
+   "bolge_id": "goz",
+   "limit": 3
+  },
+  "yanit": {
+   "id": "goz",
+   "kilitli": false,
+   "toplam": 10,
+   "limit": 3,
+   "offset": 0,
+   "kayitlar": [
+    {
+     "event_id": "a152f9af-366e-4a46-bd08-27cdbc874335",
+     "ts": "2026-11-10T05:20:13Z",
+     "kind": "youtube.abonelik",
+     "kategori": "video",
+     "baslik": "Kanal, virgullu",
+     "ozet": "Kanal, virgullu",
+     "kaynak_adi": "google_takeout: Takeout__Chrome__History.json"
+    },
+    {
+     "event_id": "f3448a40-369c-4e69-b29d-a0b3332d3f03",
+     "ts": "2026-11-10T05:20:13Z",
+     "kind": "youtube.abonelik",
+     "kategori": "video",
+     "baslik": "Kanal B",
+     "ozet": "Kanal B",
+     "kaynak_adi": "google_takeout: Takeout__Chrome__History.json"
+    },
+    {
+     "event_id": "72d74872-075e-4f85-bad8-729b12988ae0",
+     "ts": "2026-11-10T05:20:13Z",
+     "kind": "youtube.abonelik",
+     "kategori": "video",
+     "baslik": "Kanal A",
+     "ozet": "Kanal A",
+     "kaynak_adi": "google_takeout: Takeout__Chrome__History.json"
+    }
+   ]
+  }
+ },
+ "kayitlar_hassas_acik_ornek": {
+  "id": "zihin",
+  "kilitli": false,
+  "toplam": 19,
+  "limit": 3,
+  "offset": 0,
+  "kayitlar": [
+   {
+    "event_id": "55c6a4f8-1ba2-49bb-a12c-660b09b03774",
+    "ts": "2025-03-03T10:00:00Z",
+    "kind": "sohbet.mesaj",
+    "kategori": "sohbet",
+    "baslik": null,
+    "ozet": null,
+    "kaynak_adi": "google_takeout: Takeout__My Activity__Gemini Apps__MyActivity.json"
+   },
+   {
+    "event_id": "402c654e-a30b-4d24-bf56-3fbc0f770500",
+    "ts": "2025-03-02T10:00:00Z",
+    "kind": "sohbet.mesaj",
+    "kategori": "sohbet",
+    "baslik": null,
+    "ozet": null,
+    "kaynak_adi": "google_takeout: Takeout__My Activity__Gemini Apps__MyActivity.json"
+   },
+   {
+    "event_id": "33e6ec2c-954a-47fe-ad34-437290c4b725",
+    "ts": "2025-03-02T10:00:00Z",
+    "kind": "sohbet.mesaj",
+    "kategori": "sohbet",
+    "baslik": null,
+    "ozet": null,
+    "kaynak_adi": "google_takeout: Takeout__My Activity__Gemini Apps__MyActivity.json"
+   }
+  ]
+ },
+ "ayrinti_ornek": {
+  "event_id": "a152f9af-366e-4a46-bd08-27cdbc874335",
+  "kilitli": false,
+  "bolge": "goz",
+  "ts": "2026-11-10T05:20:13Z",
+  "kind": "youtube.abonelik",
+  "kategori": "video",
+  "cihaz": null,
+  "ice_aktarma_ts": "2026-11-10T05:42:43Z",
+  "kaynak": {
+   "source_id": "9aa24026-77a8-4f1e-b5fa-be1c205a2eab",
+   "tur": "google_takeout",
+   "surum": "0.1.0",
+   "dosya_sha256": "724d47a4295386e0785f61efdfe1784a4923cf453c291bdcdf9758b56c109e82",
+   "ice_aktarma": "2026-11-10T05:42:43Z",
+   "dosyalar": [
+    {
+     "ad": "Takeout__Chrome__History.json",
+     "sha256": "c177ea081916cdb299197880cb548005765e6cda238258976d39bd442e3a3a93"
+    },
+    {
+     "ad": "Takeout__YouTube and YouTube Music__history__search-history.json",
+     "sha256": "9efd0baeb7e3c7b81d8cfcf1f896b8e10d14fd5e67bd401144249ffbf4bb79d2"
+    },
+    {
+     "ad": "Takeout__YouTube and YouTube Music__history__watch-history.json",
+     "sha256": "94c58c449c0827ccef687c94869a364ba9e39ec11ff68739575eef491f0673ae"
+    },
+    {
+     "ad": "Takeout__My Activity__Search__MyActivity.json",
+     "sha256": "78c16ae0bca3407d6bae5965c745771826336a8af0021a793904f5a6ffbb297d"
+    },
+    {
+     "ad": "Takeout__YouTube and YouTube Music__subscriptions__subscriptions.csv",
+     "sha256": "82902f7309e621be9a15eb3620152a9acac6c3528a7f8a5cb7ca8d14e0cac970"
+    }
+   ],
+   "ad": "google_takeout: Takeout__Chrome__History.json"
+  },
+  "alanlar": {
+   "kanal_adi": "Kanal, virgullu",
+   "kanal_id": "UCcccccccccccccccccccccc",
+   "kanal_url": "http://www.youtube.com/channel/UCcccccccccccccccccccccc",
+   "zaman_kaynagi": "dosya_tarihi"
+  },
+  "metin": "Kanal, virgullu",
+  "tekrar": {
+   "ilk": "2026-11-10T05:20:13Z",
+   "son": "2026-11-10T05:20:13Z",
+   "sayi": 1
+  }
+ },
+ "karsilastir_ornek": {
+  "id": "agiz",
+  "ad": "Ağız: yazdıkları/söyledikleri",
+  "kilitli": false,
+  "a": {
+   "aralik": [
+    "2023-01-01T00:00:00Z",
+    "2023-01-31T23:59:59Z"
+   ],
+   "toplam": 4,
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-01"
+     ],
+     "degerler": [
+      4
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-01"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok yazılan subreddit",
+     "etiketler": [
+      "ornek",
+      "diger"
+     ],
+     "degerler": [
+      3,
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "subreddit",
+       "deger": "ornek"
+      },
+      {
+       "alan": "subreddit",
+       "deger": "diger"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Gönderi / yorum / oy / kaydedilen",
+     "etiketler": [
+      "reddit.gonderi",
+      "reddit.yorum"
+     ],
+     "degerler": [
+      2,
+      2
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "reddit.gonderi"
+      },
+      {
+       "alan": "tur",
+       "deger": "reddit.yorum"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "ornek",
+     "sayi": 3,
+     "grup": "subreddit",
+     "anahtar": {
+      "alan": "subreddit",
+      "deger": "ornek"
+     }
+    },
+    {
+     "ad": "diger",
+     "sayi": 1,
+     "grup": "subreddit",
+     "anahtar": {
+      "alan": "subreddit",
+      "deger": "diger"
+     }
+    }
+   ],
+   "notlar": [
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "b": {
+   "aralik": [
+    "2023-02-01T00:00:00Z",
+    "2023-02-28T23:59:59Z"
+   ],
+   "toplam": 1,
+   "grafikler": [
+    {
+     "tur": "zaman",
+     "baslik": "Aylık etkinlik",
+     "etiketler": [
+      "2023-02"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "ay",
+       "deger": "2023-02"
+      }
+     ]
+    },
+    {
+     "tur": "saat",
+     "baslik": "Günün saati (UTC)",
+     "etiketler": [
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ],
+     "degerler": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "saat",
+       "deger": 0
+      },
+      {
+       "alan": "saat",
+       "deger": 1
+      },
+      {
+       "alan": "saat",
+       "deger": 2
+      },
+      {
+       "alan": "saat",
+       "deger": 3
+      },
+      {
+       "alan": "saat",
+       "deger": 4
+      },
+      {
+       "alan": "saat",
+       "deger": 5
+      },
+      {
+       "alan": "saat",
+       "deger": 6
+      },
+      {
+       "alan": "saat",
+       "deger": 7
+      },
+      {
+       "alan": "saat",
+       "deger": 8
+      },
+      {
+       "alan": "saat",
+       "deger": 9
+      },
+      {
+       "alan": "saat",
+       "deger": 10
+      },
+      {
+       "alan": "saat",
+       "deger": 11
+      },
+      {
+       "alan": "saat",
+       "deger": 12
+      },
+      {
+       "alan": "saat",
+       "deger": 13
+      },
+      {
+       "alan": "saat",
+       "deger": 14
+      },
+      {
+       "alan": "saat",
+       "deger": 15
+      },
+      {
+       "alan": "saat",
+       "deger": 16
+      },
+      {
+       "alan": "saat",
+       "deger": 17
+      },
+      {
+       "alan": "saat",
+       "deger": 18
+      },
+      {
+       "alan": "saat",
+       "deger": 19
+      },
+      {
+       "alan": "saat",
+       "deger": 20
+      },
+      {
+       "alan": "saat",
+       "deger": 21
+      },
+      {
+       "alan": "saat",
+       "deger": 22
+      },
+      {
+       "alan": "saat",
+       "deger": 23
+      }
+     ]
+    },
+    {
+     "tur": "hafta",
+     "baslik": "Haftanın günü (UTC)",
+     "etiketler": [
+      "Pzt",
+      "Sal",
+      "Çar",
+      "Per",
+      "Cum",
+      "Cmt",
+      "Paz"
+     ],
+     "degerler": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+     ],
+     "anahtarlar": [
+      {
+       "alan": "gun",
+       "deger": "Pzt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Sal"
+      },
+      {
+       "alan": "gun",
+       "deger": "Çar"
+      },
+      {
+       "alan": "gun",
+       "deger": "Per"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cum"
+      },
+      {
+       "alan": "gun",
+       "deger": "Cmt"
+      },
+      {
+       "alan": "gun",
+       "deger": "Paz"
+      }
+     ]
+    },
+    {
+     "tur": "cubuk",
+     "baslik": "En çok yazılan subreddit",
+     "etiketler": [
+      "diger"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "subreddit",
+       "deger": "diger"
+      }
+     ]
+    },
+    {
+     "tur": "pasta",
+     "baslik": "Gönderi / yorum / oy / kaydedilen",
+     "etiketler": [
+      "reddit.yorum"
+     ],
+     "degerler": [
+      1
+     ],
+     "anahtarlar": [
+      {
+       "alan": "tur",
+       "deger": "reddit.yorum"
+      }
+     ]
+    }
+   ],
+   "en_cok": [
+    {
+     "ad": "diger",
+     "sayi": 1,
+     "grup": "subreddit",
+     "anahtar": {
+      "alan": "subreddit",
+      "deger": "diger"
+     }
+    }
+   ],
+   "notlar": [
+    "Veriden sayım; yorum ya da çıkarım içermez."
+   ]
+  },
+  "fark": {
+   "toplam": -3,
+   "yuzde": -75.0
+  },
+  "en_cok_degisim": [
+   {
+    "ad": "ornek",
+    "grup": "subreddit",
+    "anahtar": {
+     "alan": "subreddit",
+     "deger": "ornek"
+    },
+    "a": 3,
+    "b": 0,
+    "fark": -3
+   },
+   {
+    "ad": "diger",
+    "grup": "subreddit",
+    "anahtar": {
+     "alan": "subreddit",
+     "deger": "diger"
+    },
+    "a": 1,
+    "b": 1,
+    "fark": 0
+   }
+  ],
+  "notlar": [
+   "Veriden sayım; yorum ya da çıkarım içermez."
+  ]
+ }
+}
