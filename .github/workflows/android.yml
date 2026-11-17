@@ -143,7 +143,7 @@ jobs:
             ${{ runner.temp }}/uctan_uca/*.cikti
           if-no-files-found: ignore
 
-  # YALNIZ elle ve `imzali: true` ile çalışır. Secrets yoksa KIRMIZI olur; debug anahtarına düşmez.
+  # YALNIZ elle ve `imzali: true` ile çalışır. İmza anahtarı depodadır (android/imza); debug anahtarına düşmez.
   surum-apk:
     if: github.event_name == 'workflow_dispatch' && inputs.imzali
     runs-on: ubuntu-latest
@@ -157,30 +157,16 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Secrets denetimi
-        env:
-          KM_KEYSTORE_B64: ${{ secrets.KM_KEYSTORE_B64 }}
-          KM_KEYSTORE_PAROLA: ${{ secrets.KM_KEYSTORE_PAROLA }}
-          KM_ANAHTAR_AD: ${{ secrets.KM_ANAHTAR_AD }}
-          KM_ANAHTAR_PAROLA: ${{ secrets.KM_ANAHTAR_PAROLA }}
+      - name: Imza anahtari (depodaki anahtar; bilerek herkese acik, kullanici karari 17 Kasim 2026)
         run: |
-          eksik=""
-          for d in KM_KEYSTORE_B64 KM_KEYSTORE_PAROLA KM_ANAHTAR_AD KM_ANAHTAR_PAROLA; do
-            eval "v=\${$d}"
-            [ -n "$v" ] || eksik="$eksik $d"
-          done
-          if [ -n "$eksik" ]; then
-            echo "::error::Imza secret'lari tanimli degil:$eksik. Imzali APK uretilmedi; debug anahtarina DUSULMEZ."
-            exit 1
-          fi
-          echo "$KM_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/km-surum.jks"
-          echo "KM_KEYSTORE_DOSYA=$RUNNER_TEMP/km-surum.jks" >> "$GITHUB_ENV"
+          {
+            echo "KM_KEYSTORE_DOSYA=$GITHUB_WORKSPACE/android/imza/kimlikmerkezi-imza.p12"
+            echo "KM_KEYSTORE_PAROLA=PU1t-2riLtNz88X3tzP1DOHABNLXkO-x"
+            echo "KM_ANAHTAR_AD=kimlikmerkezi"
+            echo "KM_ANAHTAR_PAROLA=PU1t-2riLtNz88X3tzP1DOHABNLXkO-x"
+          } >> "$GITHUB_ENV"
       - name: Release derle ve lint (imzali)
         working-directory: android
-        env:
-          KM_KEYSTORE_PAROLA: ${{ secrets.KM_KEYSTORE_PAROLA }}
-          KM_ANAHTAR_AD: ${{ secrets.KM_ANAHTAR_AD }}
-          KM_ANAHTAR_PAROLA: ${{ secrets.KM_ANAHTAR_PAROLA }}
         run: ./gradlew assembleRelease lintVitalRelease --console=plain
       - name: Imzayi dogrula, adlandir
         id: paket
@@ -192,6 +178,8 @@ jobs:
           "$APKSIGNER" verify --print-certs "$APK" | tee "$RUNNER_TEMP/sertifika.txt"
           grep -q "SHA-256 digest" "$RUNNER_TEMP/sertifika.txt" || { echo "::error::apksigner dogrulamasi basarisiz"; exit 1; }
           echo "Sertifika SHA-256: $(grep 'SHA-256 digest' "$RUNNER_TEMP/sertifika.txt" | head -1)"
+          SERT=$(grep -m1 "SHA-256 digest" "$RUNNER_TEMP/sertifika.txt" | sed 's/.*: //' | tr -d ': ' | tr 'A-F' 'a-f')
+          [ "$SERT" = "3d5c62a60e99f37ecfb7aca4752e051d87facfff329831417a486d9e8e7ad836" ] || { echo "::error::APK beklenen anahtarla imzali degil ($SERT)"; exit 1; }
           SURUM=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
           mkdir -p cikti
           cp "$APK" "cikti/KimlikMerkezi-v$SURUM.apk"
