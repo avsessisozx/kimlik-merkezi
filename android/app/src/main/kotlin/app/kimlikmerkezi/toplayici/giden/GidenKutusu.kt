@@ -87,6 +87,10 @@ class GidenKutusu(
     @Volatile
     var dinleyici: (() -> Unit)? = null
 
+    /** Yeni yazılan kayıtların özetleri (kilit dışında); yerel geçmiş için. Kutu boşalsa da geçmiş kalır. */
+    @Volatile
+    var ozetDinleyici: ((List<KayitOzeti>) -> Unit)? = null
+
     init {
         kilit.withLock {
             dizin.mkdirs()
@@ -122,6 +126,7 @@ class GidenKutusu(
             require(k.onceki == null || UUID_RE.matches(k.onceki)) { "onceki gecerli bir kimlik degil" }
         }
         val idler = ArrayList<String>(liste.size)
+        val yeniOzetler = ArrayList<KayitOzeti>(liste.size)
         kilit.withLock {
             var i = 0
             while (i < liste.size) {
@@ -133,12 +138,17 @@ class GidenKutusu(
                 val hazir = parti.map { hazirla(it, simdi) }
                 ekle(d, hazir.map { it.satir })
                 d.kayitSayisi += hazir.size
-                hazir.forEach { d.ozetler.add(KayitOzeti(it.id, it.ts, it.tur, ozet(it.metin), it.onceki)) }
+                hazir.forEach {
+                    val oz = KayitOzeti(it.id, it.ts, it.tur, ozet(it.metin), it.onceki)
+                    d.ozetler.add(oz)
+                    yeniOzetler.add(oz)
+                }
                 hazir.forEach { idler.add(it.id) }
                 i += parti.size
                 if (d.kayitSayisi >= kapatmaEsigi) kapatDene(d)
             }
         }
+        runCatching { ozetDinleyici?.invoke(yeniOzetler) }
         dinleyici?.invoke()
         return idler
     }
@@ -411,6 +421,8 @@ class GidenKutusu(
             "medya.konum" to "konum",
             "indirilen.dosya" to "dosyalar",
             "uygulama.kullanim" to "uygulama",
+            "sensor.adim" to "uygulama",
+            "ekran.metin" to "mesaj",
         )
 
         val ISO: DateTimeFormatter =

@@ -15,6 +15,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!-- Uygulama adlarını görebilmek için (yalnız başlatıcıda görünen uygulamalar). -->
     <queries>
@@ -60,5 +61,19 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- Ekran metni: sistem ekranından kullanıcı açmadıkça çalışmaz; uygulamada ayrıca anahtar gerekir. -->
+        <service
+            android:name=".topla.EkranMetniServisi"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/ekran_metni_servisi" />
+        </service>
     </application>
 </manifest>

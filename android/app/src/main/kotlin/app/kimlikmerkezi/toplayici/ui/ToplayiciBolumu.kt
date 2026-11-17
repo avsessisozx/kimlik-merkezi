@@ -36,7 +36,7 @@ import app.kimlikmerkezi.toplayici.topla.MedyaIzni
 import app.kimlikmerkezi.toplayici.topla.ToplayiciAyarlari.Ad
 import app.kimlikmerkezi.toplayici.topla.ToplayiciYonetici
 
-/** Dört isteğe bağlı toplayıcı: ayrı aç/kapat, tek cümle açıklama, izin durumu. İzin reddi anahtarı kapatır. */
+/** Altı isteğe bağlı toplayıcı: ayrı aç/kapat, tek cümle açıklama, izin durumu. İzin reddi anahtarı kapatır. */
 @Composable
 fun ToplayiciBolumu(depo: Depo) {
     val ctx = LocalContext.current
@@ -70,7 +70,15 @@ fun ToplayiciBolumu(depo: Depo) {
         sonuc(Ad.INDIRILEN, ok)
     }
 
+    val adimIstek = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        sonuc(Ad.ADIM, ok)
+    }
+
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (depo.depolama.mantik(EKRAN_BEKLIYOR)) {
+            depo.depolama.yazMantik(EKRAN_BEKLIYOR, false)
+            sonuc(Ad.EKRAN, Izinler.ekranServisiAcik(ctx))
+        }
         if (depo.depolama.mantik(ToplayiciYonetici.KULLANIM_BEKLIYOR)) {
             depo.depolama.yazMantik(ToplayiciYonetici.KULLANIM_BEKLIYOR, false)
             sonuc(Ad.KULLANIM, Izinler.kullanimErisimi(ctx))
@@ -142,6 +150,41 @@ fun ToplayiciBolumu(depo: Depo) {
             }
         }
 
+        Toplayici(
+            "adim", R.string.tp_adim_baslik, R.string.tp_adim_aciklama,
+            if (Izinler.adim(ctx)) izinVar else izinYok,
+            ayar.acik(Ad.ADIM),
+        ) { ac ->
+            if (!ac) {
+                ayar.ayarla(Ad.ADIM, false); depo.ayarDegisti()
+            } else if (Izinler.adim(ctx)) {
+                sonuc(Ad.ADIM, true)
+            } else {
+                adimIstek.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+        }
+        Toplayici(
+            "ekran", R.string.tp_ekran_baslik, R.string.tp_ekran_aciklama,
+            if (Izinler.ekranServisiAcik(ctx)) izinVar else izinYok,
+            ayar.acik(Ad.EKRAN),
+        ) { ac ->
+            if (!ac) {
+                ayar.ayarla(Ad.EKRAN, false); depo.ayarDegisti()
+            } else if (Izinler.ekranServisiAcik(ctx)) {
+                sonuc(Ad.EKRAN, true)
+            } else {
+                try {
+                    depo.depolama.yazMantik(EKRAN_BEKLIYOR, true)
+                    Toast.makeText(ctx, R.string.tp_ekran_yonlendirme, Toast.LENGTH_LONG).show()
+                    ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (e: ActivityNotFoundException) {
+                    depo.depolama.yazMantik(EKRAN_BEKLIYOR, false)
+                    Toast.makeText(ctx, R.string.tp_ekran_acilamadi, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        Text(stringResource(R.string.tp_ses_yok), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+
         OutlinedButton(
             onClick = { depo.tara() },
             modifier = Modifier.fillMaxWidth().testTag("simdi_tara_btn"),
@@ -151,6 +194,8 @@ fun ToplayiciBolumu(depo: Depo) {
         }
     }
 }
+
+private const val EKRAN_BEKLIYOR = "ekran_bekliyor"
 
 @Composable
 private fun Toplayici(

@@ -56,7 +56,8 @@ class DosyaGorulen(private val dosya: File) : GorulenKumesi {
 /** Toplayıcı ayar anahtarları ve açma/kapama kuralları. Varsayılan hepsi KAPALI. */
 class ToplayiciAyarlari(private val d: Depolama) {
     enum class Ad(val anahtar: String) {
-        MEDYA("medya_acik"), KONUM("konum_acik"), INDIRILEN("indirilen_acik"), KULLANIM("kullanim_acik")
+        MEDYA("medya_acik"), KONUM("konum_acik"), INDIRILEN("indirilen_acik"), KULLANIM("kullanim_acik"),
+        ADIM("adim_acik"), EKRAN("ekran_acik")
     }
 
     fun acik(a: Ad) = d.mantik(a.anahtar, false)

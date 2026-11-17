@@ -13,6 +13,7 @@ import app.kimlikmerkezi.toplayici.giden.KeystoreAnahtar
 import app.kimlikmerkezi.toplayici.gunluk.Gunluk
 import app.kimlikmerkezi.toplayici.gunluk.HataRaporu
 import app.kimlikmerkezi.toplayici.topla.TercihDepolama
+import app.kimlikmerkezi.toplayici.topla.YerelGecmis
 import app.kimlikmerkezi.toplayici.topla.ToplayiciYonetici
 import app.kimlikmerkezi.toplayici.aktarim.AdresSuzgeci
 import app.kimlikmerkezi.toplayici.aktarim.BaglantiUretici
@@ -47,6 +48,9 @@ class Depo(ctx: Context) {
         gunluk.hata("baslangic", e)
         throw e
     }
+
+    /** Kutu PC'ye gönderilince boşalır; ana ekran bu yerel özet geçmişinden okur. */
+    val gecmis = YerelGecmis(File(ctx.filesDir, "yerel_gecmis.txt")).also { g -> kutu.ozetDinleyici = { g.ekle(it) } }
 
     /** Arayüzü yenilemek için artan sayaç. */
     var degisim by mutableIntStateOf(0)

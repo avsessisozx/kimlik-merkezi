@@ -125,6 +125,17 @@ fun PilEkrani(geri: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().testTag("uygulama_ayari_btn"),
             ) { Text(stringResource(R.string.pil_uygulama_ayari)) }
             Text(stringResource(R.string.pil_garanti))
+            Text(
+                stringResource(R.string.pil_cihaz, android.os.Build.MANUFACTURER, android.os.Build.MODEL, android.os.Build.VERSION.RELEASE),
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("pil_cihaz"),
+            )
+            if (android.os.Build.MANUFACTURER.equals("realme", ignoreCase = true)) {
+                Text(stringResource(R.string.pil_realme_baslik), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.pil_realme_ui3))
+                Text(stringResource(R.string.pil_realme_ui45))
+                Text(stringResource(R.string.pil_realme_ui6))
+            }
+            Text(stringResource(R.string.pil_diger_marka), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

@@ -121,6 +121,9 @@ private fun yerelZaman(ts: String): String =
     runCatching { YEREL_SAAT.format(Instant.parse(ts).atZone(ZoneId.systemDefault())) }.getOrDefault("")
 
 @Composable
+private fun turAdiMetin(tur: String): String = turAdi(tur)
+
+@Composable
 private fun turAdi(tur: String): String = when (tur) {
     "not.hizli" -> stringResource(R.string.tur_not)
     "paylasim.link" -> stringResource(R.string.tur_link)
@@ -130,6 +133,8 @@ private fun turAdi(tur: String): String = when (tur) {
     "medya.konum" -> stringResource(R.string.tur_konum)
     "indirilen.dosya" -> stringResource(R.string.tur_indirilen)
     "uygulama.kullanim" -> stringResource(R.string.tur_kullanim)
+    "sensor.adim" -> stringResource(R.string.tur_adim)
+    "ekran.metin" -> stringResource(R.string.tur_ekran)
     else -> stringResource(R.string.tur_diger)
 }
 
@@ -138,7 +143,7 @@ private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> U
     // degisim okunur: giden kutusu değişince yeniden çizilir.
     val degisim = depo.degisim
     val bekleyen = remember(degisim) { depo.kutu.bekleyenKayitSayisi() }
-    val son: List<KayitOzeti> = remember(degisim) { depo.kutu.sonKayitlar(30) }
+    val son: List<KayitOzeti> = remember(degisim) { depo.gecmis.son(30) }
     Cerceve(
         baslik = stringResource(R.string.app_name),
         geri = null,
@@ -175,6 +180,16 @@ private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> U
             )
             val akMetin = aktarimMetni(ak)
             if (akMetin != null) Text(akMetin, modifier = Modifier.testTag("aktarim_durumu"))
+            val sayilar = remember(degisim) { depo.gecmis.turSayilari() }
+            Text(stringResource(R.string.ana_toplanan), style = MaterialTheme.typography.titleMedium)
+            if (sayilar.isEmpty()) {
+                Text(stringResource(R.string.ana_toplanan_yok), color = MaterialTheme.colorScheme.secondary)
+            } else {
+                Text(
+                    sayilar.entries.sortedByDescending { it.value }.joinToString(" · ") { "${turAdiMetin(it.key)}: ${it.value}" },
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("toplanan_ozet"),
+                )
+            }
             Text(stringResource(R.string.ana_son_kayitlar), style = MaterialTheme.typography.titleMedium)
             if (son.isEmpty()) {
                 Text(stringResource(R.string.ana_kayit_yok), color = MaterialTheme.colorScheme.secondary)

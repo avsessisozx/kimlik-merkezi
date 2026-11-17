@@ -50,4 +50,15 @@ object Izinler {
         val u = Uri.parse(kayitli)
         return u.takeIf { x -> ctx.contentResolver.persistedUriPermissions.any { it.uri == x && it.isReadPermission } }
     }
+
+    fun adim(ctx: Context) = var_mi(ctx, Manifest.permission.ACTIVITY_RECOGNITION)
+
+    /** Erişilebilirlik hizmeti kullanıcı tarafından sistemde açılmış mı. */
+    fun ekranServisiAcik(ctx: Context): Boolean {
+        val liste = android.provider.Settings.Secure.getString(
+            ctx.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        val ad = ctx.packageName + "/" + EkranMetniServisi::class.java.name
+        return liste.split(':').any { it.equals(ad, ignoreCase = true) }
+    }
 }

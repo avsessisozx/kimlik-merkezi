@@ -44,6 +44,10 @@ class ToplayiciYonetici(
                 val t = KullanimToplayici(kutu, AndroidKullanimKaynagi(ctx), depolama, kendiPaket = ctx.packageName)
                 dene("kullanim") { t.tara() }
             }
+            if (ayarlar.acik(ToplayiciAyarlari.Ad.ADIM) && Izinler.adim(ctx)) {
+                val t = AdimToplayici(kutu, AndroidAdimKaynagi(ctx), depolama)
+                dene("adim") { t.tara() }
+            }
             gunluk.bilgi("tara", "tamamlandi: $toplam yeni kayit")
             return toplam
         } finally {

@@ -1,7 +1,11 @@
 package app.kimlikmerkezi.toplayici
 
 import app.kimlikmerkezi.toplayici.giden.GidenKutusu
+import app.kimlikmerkezi.toplayici.topla.AdimKaynagi
+import app.kimlikmerkezi.toplayici.topla.AdimToplayici
 import app.kimlikmerkezi.toplayici.topla.BellekDepolama
+import app.kimlikmerkezi.toplayici.topla.EkranMetniSuzgeci
+import app.kimlikmerkezi.toplayici.topla.YerelGecmis
 import app.kimlikmerkezi.toplayici.topla.BellekGorulen
 import app.kimlikmerkezi.toplayici.topla.IndirilenKaynagi
 import app.kimlikmerkezi.toplayici.topla.IndirilenOge
@@ -57,6 +61,7 @@ class ToplayicilarTest {
             "paylasim.link" to "notlar", "paylasim.metin" to "notlar", "not.hizli" to "notlar",
             "medya.foto" to "medya_meta", "medya.video" to "medya_meta", "medya.konum" to "konum",
             "indirilen.dosya" to "dosyalar", "uygulama.kullanim" to "uygulama",
+            "sensor.adim" to "uygulama", "ekran.metin" to "mesaj",
         )
         assertEquals(beklenen, GidenKutusu.KATEGORI)
         assertEquals("medya.foto", MedyaTuru.FOTO.kayitTuru)
@@ -260,5 +265,58 @@ class ToplayicilarTest {
         assertEquals(200, k.bekleyenKayitSayisi()) // ilk grup yazıldı, imleç onun sonunda
         assertEquals(250, t.taraMedya()) // kalan 250, tekrarsız
         assertEquals(450, k.bekleyenKayitSayisi())
+    }
+
+    @Test
+    fun adimIlkTaramaYalnizBaslangicSonrasiFarkYenidenBaslatmaSayaciSifirlar() {
+        val k = TestYardim.Kurulum().ac()
+        val d = BellekDepolama()
+        var deger: Long? = 1000
+        val t = AdimToplayici(k, object : AdimKaynagi { override fun sayac() = deger }, d)
+        assertEquals(0, t.tara())
+        assertEquals(0, t.tara()) // fark yok
+        deger = 1250
+        assertEquals(1, t.tara())
+        deger = 40 // telefon yeniden başladı
+        assertEquals(1, t.tara())
+        deger = null // sensör yok
+        assertEquals(0, t.tara())
+        val kayitlar = k.tum()
+        assertEquals(listOf("250", "40"), kayitlar.map { it["yuk"]!!.let { y -> (y as JsonObject)["fark"]!!.jsonPrimitive.content } })
+        assertTrue(kayitlar.all { it["tur"]!!.jsonPrimitive.content == "sensor.adim" && it["kategori"]!!.jsonPrimitive.content == "uygulama" })
+    }
+
+    @Test
+    fun ekranSuzgeciKendiPaketiAralikTekrarVeKisaMetniAtlar() {
+        val s = EkranMetniSuzgeci("app.kimlikmerkezi.toplayici", aralikMs = 5000, azami = 20)
+        assertEquals(null, s.kabul("app.kimlikmerkezi.toplayici", "kendi ekranım", 0))
+        assertEquals(null, s.kabul("x.y", "ab", 0))
+        assertEquals("merhaba dünya", s.kabul("x.y", "  merhaba \n dünya ", 0))
+        assertEquals(null, s.kabul("x.y", "başka metin burada", 1000)) // aralık dolmadı
+        assertEquals(null, s.kabul("x.y", "merhaba dünya", 6000)) // aynı metin
+        assertEquals("başka metin burada", s.kabul("x.y", "başka metin burada", 12000))
+        assertEquals("a".repeat(20), s.kabul("z.w", "a".repeat(50), 12000)) // en çok 20 karakter
+    }
+
+    @Test
+    fun yerelGecmisKutuBosalsaDaKalirDuzenlenenYerineGecerEkranMetniGizlenir() {
+        val f = java.io.File.createTempFile("gecmis", ".txt")
+        try {
+            val g = YerelGecmis(f, limit = 3)
+            g.ekle(listOf(
+                app.kimlikmerkezi.toplayici.giden.KayitOzeti("a", "2026-11-17T10:00:00.000Z", "not.hizli", "ilk\tnot", null),
+                app.kimlikmerkezi.toplayici.giden.KayitOzeti("b", "2026-11-17T10:01:00.000Z", "not.hizli", "ilk not düzeltildi", "a"),
+                app.kimlikmerkezi.toplayici.giden.KayitOzeti("c", "2026-11-17T10:02:00.000Z", "ekran.metin", "gizli içerik", null),
+            ))
+            val yeni = YerelGecmis(f, limit = 3) // dosyadan yüklenir
+            val son = yeni.son(10)
+            assertEquals(listOf("c", "b"), son.map { it.id })
+            assertFalse(son.any { it.ozet.contains("gizli") })
+            assertEquals(mapOf("not.hizli" to 2, "ekran.metin" to 1), yeni.turSayilari())
+            yeni.ekle(listOf(app.kimlikmerkezi.toplayici.giden.KayitOzeti("d", "2026-11-17T10:03:00.000Z", "sensor.adim", "9 adım", null)))
+            assertEquals(3, yeni.turSayilari().values.sum()) // en çok 3 satır
+        } finally {
+            f.delete()
+        }
     }
 }

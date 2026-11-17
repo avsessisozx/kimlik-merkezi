@@ -22,6 +22,23 @@
     <string name="tur_not">Not</string>
     <string name="tur_link">Bağlantı</string>
     <string name="tur_metin">Paylaşılan metin</string>
+    <string name="tur_adim">Adım sayısı</string>
+    <string name="tur_ekran">Ekran metni</string>
+    <string name="tp_adim_baslik">Adım sayısı</string>
+    <string name="tp_adim_aciklama">Toplanır: iki tarama arasında atılan adım sayısı. Toplanmaz: nerede yürüdüğün.</string>
+    <string name="tp_ekran_baslik">Ekran metni</string>
+    <string name="tp_ekran_aciklama">Toplanır: açık uygulamanın ekranında görünen yazılar (parola alanları ve bu uygulama hariç). Bu veri hassas sayılır; yapay zekâ erişimine kapalı kalır. Android\'in erişilebilirlik izni gerekir.</string>
+    <string name="tp_ekran_yonlendirme">Açılan ekranda Kimlik Merkezi\'ni bulup aç, sonra geri dön.</string>
+    <string name="tp_ses_yok">Ses kaydı: bu sürümde yok.</string>
+    <string name="ana_toplanan">Şimdiye kadar toplananlar</string>
+    <string name="ana_toplanan_yok">Henüz bir şey toplanmadı.</string>
+    <string name="pil_cihaz">Bu telefon: %1$s %2$s, Android %3$s</string>
+    <string name="pil_realme_baslik">Realme telefonlar için (realme\'nin resmî destek sayfasına göre; bu telefonda denenmedi)</string>
+    <string name="pil_realme_ui3">realme UI 3.0, 2.0, 1.0: Ayarlar > Pil > Pil kullanımı > Kimlik Merkezi > \"Arka plan etkinliğine izin ver\" ve \"Otomatik başlatmaya izin ver\".</string>
+    <string name="pil_realme_ui45">realme UI 4.0 ve 5.0: Ayarlar > Pil > Daha fazla ayar > Uygulama pil yönetimi > Kimlik Merkezi.</string>
+    <string name="pil_realme_ui6">realme UI 6.0: Ayarlar > Pil > Güç tasarrufu ayarları > Uygulama pil yönetimi > Kimlik Merkezi > \"Arka plan etkinliğine izin ver\".</string>
+    <string name="pil_diger_marka">Menü adları telefon sürümüne göre değişebilir; bulamazsan yukarıdaki iki düğmeyi kullan.</string>
+    <string name="ekran_servis_aciklama">Kimlik Merkezi, açık uygulamanın ekranındaki yazıları yalnız sen uygulamada \"Ekran metni\" anahtarını açarsan kaydeder.</string>
     <string name="tur_diger">Kayıt</string>
 
     <string name="tur_foto">Fotoğraf</string>
