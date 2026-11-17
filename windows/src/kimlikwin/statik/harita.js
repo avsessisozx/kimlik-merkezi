@@ -217,7 +217,7 @@ function genelCiz(){const d=HS.dom,p=d.panel;temizle();p.textContent='';p.classN
   p.append(radar,h('div',{class:'kart hud'},h('h3',{class:'k-baslik'},'Bölgeler'),kartlar));
   const kap=radar.querySelector('.cgraf'),r=R();
   const mx=Math.max(...bl.map(b=>Math.sqrt(b.olay_sayisi)));
-  const o=temel(r);Object.assign(o,{radar:{indicator:bl.map(b=>({name:HAP_AD[b.id]||b.ad,max:mx*1.1,id:b.id})),radius:(kap.clientWidth||window.innerWidth)<400?'46%':'66%',center:['50%','54%'],shape:'polygon',splitNumber:4,triggerEvent:true,
+  const o=temel(r);Object.assign(o,{radar:{indicator:bl.map(b=>({name:HAP_AD[b.id]||b.ad,max:mx*1.1,id:b.id})),radius:(kap.clientWidth||window.innerWidth)<400?'36%':'66%',center:['50%','54%'],shape:'polygon',splitNumber:4,triggerEvent:true,
       axisName:{color:r.yazi,fontSize:13,fontWeight:600,backgroundColor:hexA(r.v,.1),borderRadius:6,padding:[3,8]},axisLine:{lineStyle:{color:hexA(r.v,.3)}},splitLine:{lineStyle:{color:hexA(r.cizgi,.7)}},splitArea:{show:false}},
     tooltip:{...o.tooltip,trigger:'item',formatter:()=>bl.map(b=>`${HAP_AD[b.id]}: <b>${SAYI(b.olay_sayisi)}</b>`).join('<br>')},
     series:[{type:'radar',data:[{value:bl.map(b=>Math.sqrt(b.olay_sayisi)),name:'Profil'}],symbol:'circle',symbolSize:7,lineStyle:{color:r.v,width:2.4,shadowBlur:12,shadowColor:hexA(r.v,.6)},itemStyle:{color:r.v},areaStyle:{color:hexA(r.v,.22)}}]});
