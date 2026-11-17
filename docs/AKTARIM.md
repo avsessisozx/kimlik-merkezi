@@ -55,7 +55,7 @@ Kotlin + Jetpack Compose. `minSdk 30`, `targetSdk 35`, `compileSdk 35`. Birincil
 - `km1:` metnindeki base64url DOLGUSUZDUR (`=` yazılmaz); çözücüler dolgulu ve dolgusuz iki biçimi de kabul eder.
 - `cihaz_anahtari` 64 karakterlik küçük harf hex metindir. `Authorization: Bearer <bu metin>`. PC'de saklanan özet, bu metnin UTF-8 baytlarının SHA-256'sıdır.
 - Yeniden eşleştirme: aynı `cihaz_id` geçerli bir tek kullanımlık kodla yeniden eşleşirse anahtar yenilenir, eski anahtar geçersiz olur, iptal kalkar. Kod olmadan yeniden eşleştirme yoktur.
-- Telefondan yalnız şu kategoriler kabul edilir: `notlar`, `medya_meta`, `konum`, `dosyalar`, `uygulama`. Başka kategori taşıyan dosya reddedilir (telefon `persona`, `eposta`, `mesaj`, `sohbet` kaydı yazamaz).
+- Telefondan yalnız şu kategoriler kabul edilir: `notlar`, `medya_meta`, `konum`, `dosyalar`, `uygulama`; tek istisna: `ekran.metin` türü yalnız `mesaj` kategorisiyle gelir (v0.3.0; yapay zekâ/MCP yolundan okunamayan hassas kategori). Yeni türler: `sensor.adim` (kategori `uygulama`). Başka kategori taşıyan dosya reddedilir (telefon `persona`, `eposta`, `mesaj`, `sohbet` kaydı yazamaz).
 - Alıcı tamamlanan dosyada her satırın JSON nesnesi olduğunu da doğrular; değilse 422. Kategori ve alan denetimi içe aktarıcıdadır.
 - Yanıt kodları: tamamlanma `201 X-Durum: var`; zaten alınmış dosyaya PUT `200 X-Durum: var`; yanlış ofset ya da aynı dosyaya eşzamanlı ikinci PUT `409 + X-Alinan`; doğrulama hatası `422`; kimlik `401`; başka cihazın yolu `403`; geçersiz yol `400`; boyut `413`; başlık `431`; `Content-Length` yok `411`.
 - Daha önce alınmış ama içe alınıp klasörden kaldırılmış dosya için `HEAD` yanıtı `X-Durum: var`, `X-Alinan: 0` olabilir; telefon `var` gördüğünde bayt sayısına bakmaz.

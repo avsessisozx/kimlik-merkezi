@@ -246,3 +246,17 @@ def test_derin_json_yalniz_o_dosyayi_reddeder(hub, tmp_path):
     assert dosya_dogrula(kl / f"{KAPANISSIZ}.jsonl")[0] is False
     r = run(hub, kl, "android_giden")
     assert r.added == 10 and len(r.report.missing) == 1
+
+
+def test_ekran_metin_yalniz_mesaj_kategorisiyle(tmp_path):
+    ok = '{"id":"a","tur":"ekran.metin","kategori":"mesaj","ts":"2026-01-01T00:00:00Z","metin":"x"}'
+    for tur, kat, beklenen in [
+        ("ekran.metin", "mesaj", True), ("ekran.metin", "notlar", False),
+        ("not.hizli", "mesaj", False), ("sensor.adim", "uygulama", True), ("sensor.adim", "mesaj", False),
+    ]:
+        s = dosya(SAGLAM).read_text(encoding="utf-8").splitlines()
+        s[1] = ok.replace('"ekran.metin"', f'"{tur}"').replace('"mesaj"', f'"{kat}"')
+        p = tmp_path / f"{tur}-{kat}.jsonl"
+        p.write_text("\n".join(s[:2] + s[-1:]) + "\n", encoding="utf-8")
+        sonuc = dosya_dogrula(p)
+        assert (sonuc[2] != "kategori_gecersiz") is beklenen, (tur, kat, sonuc)

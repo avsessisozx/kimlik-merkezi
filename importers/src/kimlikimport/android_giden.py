@@ -25,8 +25,10 @@ MAX_SATIR = 4 * 1024 * 1024     # tek satır üst sınırı; PC alıcısı da ay
 _MAX_SATIR = MAX_SATIR
 _BILINEN_TURLER = frozenset({
     "paylasim.link", "paylasim.metin", "not.hizli", "medya.foto", "medya.video", "medya.konum",
-    "indirilen.dosya", "uygulama.kullanim",
+    "indirilen.dosya", "uygulama.kullanim", "sensor.adim", "ekran.metin",
 })
+# `mesaj` kategorisi telefondan YALNIZ ekran metni için kabul edilir (yapay zekâ/MCP yolu bu kategoriyi okuyamaz).
+_OZEL_KATEGORI = {"ekran.metin": "mesaj"}
 
 
 class _Bozuk(Exception):
@@ -137,8 +139,10 @@ def _kayit_denetle(n: int, o: dict) -> None:
     for alan in ("id", "tur", "kategori"):
         if not isinstance(o.get(alan), str) or not o[alan]:
             raise _Bozuk(f"{n}. satır: `{alan}` yok ya da metin değil", "alan_gecersiz")
-    if o["kategori"] not in _KATEGORILER:
+    if o["kategori"] not in _KATEGORILER and _OZEL_KATEGORI.get(o["tur"]) != o["kategori"]:
         raise _Bozuk(f"{n}. satır: geçersiz kategori", "kategori_gecersiz")
+    if o["tur"] in _OZEL_KATEGORI and o["kategori"] != _OZEL_KATEGORI[o["tur"]]:
+        raise _Bozuk(f"{n}. satır: tür ile kategori uyuşmuyor", "kategori_gecersiz")
     if iso_utc(o.get("ts")) is None:
         raise _Bozuk(f"{n}. satır: `ts` okunamadı", "ts_gecersiz")
     if not isinstance(o.get("metin", ""), str):
