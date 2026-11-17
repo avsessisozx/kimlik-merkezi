@@ -45,8 +45,8 @@ class GidenKutusuTest {
         val altin = javaClass.getResource("/giden_ornek.jsonl")!!.readText()
         val kayitlar = TestYardim.bicimiDogrula(altin)
         assertEquals(9, kayitlar.size)
-        // Sözleşmedeki bütün türler örnekte var.
-        assertEquals(GidenKutusu.KATEGORI.keys, kayitlar.map { it["tur"]!!.jsonPrimitive.content }.toSet())
+        // Altın örnek v0.2 türlerini kapsar; v0.3.0'ın iki yeni türü (adım, ekran metni) ayrı testlerde sınanır.
+        assertEquals(GidenKutusu.KATEGORI.keys - setOf("sensor.adim", "ekran.metin"), kayitlar.map { it["tur"]!!.jsonPrimitive.content }.toSet())
     }
 
     @Test
