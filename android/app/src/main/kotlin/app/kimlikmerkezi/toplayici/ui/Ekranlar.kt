@@ -185,8 +185,9 @@ private fun AnaEkran(depo: Depo, yeniNot: () -> Unit, notuDuzenle: (String) -> U
             if (sayilar.isEmpty()) {
                 Text(stringResource(R.string.ana_toplanan_yok), color = MaterialTheme.colorScheme.secondary)
             } else {
+                val parcalar = sayilar.entries.sortedByDescending { it.value }.map { "${turAdiMetin(it.key)}: ${it.value}" }
                 Text(
-                    sayilar.entries.sortedByDescending { it.value }.joinToString(" · ") { "${turAdiMetin(it.key)}: ${it.value}" },
+                    parcalar.joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("toplanan_ozet"),
                 )
             }
