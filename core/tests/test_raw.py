@@ -53,3 +53,20 @@ def test_tehlikeli_dosya_adi(hub, tmp_path):
     sid = hub.add_source("test", "1", None)
     raw = hub.store_raw(sid, src)
     assert (hub.root / raw.path).resolve().is_relative_to((hub.root / "arsiv").resolve())
+
+
+def test_arsiv_adi_windows_icin_guvenli(hub, tmp_path):
+    # Sondaki nokta/boşluk ve CON/NUL gibi ayrılmış adlar Windows'ta 'Invalid argument' verir.
+    src = tmp_path / "icerik.json"
+    src.write_bytes(b'{"a": 1}')
+    sid = hub.add_source("test", "1", sha256_file(src))
+    for istek, beklenen in [
+        ("Chrome__Tarih.json", "Chrome__Tarih.json"),
+        ("ad. ", "ad"),
+        ("NUL.txt", "_NUL.txt"),
+        ("com1", "_com1"),
+        ("Chrome__Geçmiş (1).json", "Chrome__Geçmiş (1).json"),
+    ]:
+        raw = hub.store_raw(sid, src, name=istek)
+        assert raw.path.endswith("/" + beklenen), (istek, raw.path)
+        assert (hub.root / raw.path).read_bytes() == src.read_bytes()

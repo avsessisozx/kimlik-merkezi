@@ -554,14 +554,15 @@ def _bolge_kaydi(reg, bolge_id: str):
 def bolge(hub: Hub, bolge_id: str, *, ac_hassas: Iterable[str] = frozenset(),
           aralik: tuple[Any, Any] | None = None, filtre: Filtre | None = None,
           utc_kaydirma: int = 0,
-          bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None) -> dict[str, Any]:
+          bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None,
+          sahip: bool = False) -> dict[str, Any]:
     """Bir bölgenin ayrıntılı grafikleri. `aralik=(baslangic, bitis)` (UTC, ISO; None serbest).
     `filtre={alan: değer | [değerler]}`: bütün grafikler ve en_cok listeleri filtreye göre
     yeniden hesaplanır (çapraz filtre); alan adları grafik/en_cok `anahtar`larından gelir.
     `utc_kaydirma`: saat/gün grafikleri için UTC'ye eklenecek saat (İstanbul: 3)."""
     reg = bolgeler or VARSAYILAN_BOLGELER
     ad, kats = _bolge_kaydi(reg, bolge_id)
-    if _kilitli(bolge_id, kats, ac_hassas):
+    if not sahip and _kilitli(bolge_id, kats, ac_hassas):
         return {"id": bolge_id, "ad": ad, "kilitli": True, "grafikler": [], "en_cok": [],
                 "notlar": ["Kilitli"]}
     kayma = int(utc_kaydirma)
@@ -593,12 +594,15 @@ def _kaynak_adi(kind: str | None, dosya: str | None) -> str | None:
 def kayitlar(hub: Hub, bolge_id: str, *, filtre: Filtre | None = None,
              aralik: tuple[Any, Any] | None = None, limit: int = 50, offset: int = 0,
              ac_hassas: Iterable[str] = frozenset(), utc_kaydirma: int = 0,
-             bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None) -> dict[str, Any]:
+             bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None,
+             sahip: bool = False) -> dict[str, Any]:
     """Filtreye uyan kayıtların sayfası (yeniden eskiye). Hassas bölgede içerik YOK: yalnız
-    event_id, ts, kind, kaynak adı. Kilitliyken {"kilitli": True, "toplam": None}."""
+    event_id, ts, kind, kaynak adı. Kilitliyken {"kilitli": True, "toplam": None}.
+    `sahip=True`: verinin sahibi kendi bilgisayarında bakıyor (yerel arayüz); hassas bölge de
+    kilitsiz ve içerikli gelir. Yapay zekâ/MCP yolu bu bayrağı HİÇ kullanmaz."""
     reg = bolgeler or VARSAYILAN_BOLGELER
     ad, kats = _bolge_kaydi(reg, bolge_id)
-    if _kilitli(bolge_id, kats, ac_hassas):
+    if not sahip and _kilitli(bolge_id, kats, ac_hassas):
         return {"id": bolge_id, "kilitli": True, "toplam": None, "kayitlar": []}
     limit = max(1, min(int(limit), MAX_SAYFA))
     offset = max(0, int(offset))
@@ -606,7 +610,7 @@ def kayitlar(hub: Hub, bolge_id: str, *, filtre: Filtre | None = None,
     toplam = q.one("COUNT(*)")[0]
     ids = [r[0] for r in q.rows("event_id", "", "ORDER BY ts DESC, seq DESC LIMIT ? OFFSET ?",
                                 [limit, offset])]
-    hassas = bolge_id in HASSAS_BOLGELER
+    hassas = bolge_id in HASSAS_BOLGELER and not sahip
     out: list[dict[str, Any]] = []
     if ids:
         ph = ",".join("?" * len(ids))
@@ -643,7 +647,8 @@ _GPS_ANAHTARLARI = frozenset({"gps", "lat", "lon", "lng", "latitude", "longitude
 
 
 def ayrinti(hub: Hub, event_id: str, *, ac_hassas: Iterable[str] = frozenset(),
-            bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None) -> dict[str, Any]:
+            bolgeler: dict[str, tuple[str, tuple[str, ...]]] | None = None,
+            sahip: bool = False) -> dict[str, Any]:
     """Tek kaydın alanları ve kaynağı. Hassas kategoride (kilitli ya da açık) içerik YOK:
     açıkken yalnız zaman, tür ve kaynak bilgisi; kilitliyken yalnız {"kilitli": True}.
     `tekrar`: aynı tür+metinli kayıtların ilk/son görülmesi ve sayısı (metni olmayan için None)."""
@@ -655,6 +660,8 @@ def ayrinti(hub: Hub, event_id: str, *, ac_hassas: Iterable[str] = frozenset(),
     eid, ts, kind, cat, payload, text, sid, dev, ing = r
     bid = next((b for b, (_, kats) in reg.items() if cat in kats), None)
     hassas = (bid in HASSAS_BOLGELER) if bid else (cat in Category.SENSITIVE)
+    if sahip:
+        hassas = False   # sahip kendi verisini tam görür (yerel arayüz); yapay zekâ yolunda bayrak yok
     if hassas and (_kilitli(bid, reg[bid][1], ac_hassas) if bid else cat not in set(ac_hassas)):
         return {"event_id": eid, "kilitli": True}
     src = hub.query_one("SELECT kind, version, file_sha256, imported_at, removed_at FROM sources "
@@ -672,7 +679,8 @@ def ayrinti(hub: Hub, event_id: str, *, ac_hassas: Iterable[str] = frozenset(),
     if hassas:
         out["not"] = "Hassas kategori: içerik gösterilmez."
         return out
-    out["alanlar"] = _gps_temizle(json.loads(payload))
+    alanlar = json.loads(payload)
+    out["alanlar"] = alanlar if sahip else _gps_temizle(alanlar)   # sahip: koordinatlar dahil
     out["metin"] = (text or "")[:20000]
     if text:
         ilk, son, n = hub.query_one(

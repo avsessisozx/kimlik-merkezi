@@ -178,7 +178,7 @@ def harita(hub, *, ac_hassas=frozenset(), now=None, aralik=None) -> dict:
     return {"profil": {"ad": ad, "olay": toplam, "ilk": ilk, "son": son}, "bolgeler": bolgeler, "beyan": beyan}
 
 
-def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None, filtre=None) -> dict:
+def bolge(hub, bolge_id, *, ac_hassas=frozenset(), aralik=None, filtre=None, utc_kaydirma=0, sahip=False) -> dict:
     if bolge_id not in BOLGELER:
         raise ValueError("Bilinmeyen bölge.")
     ad, _kat, hassas, dims, birincil = BOLGELER[bolge_id]
@@ -245,7 +245,8 @@ def _baslik(kind, payload, text):
     return text[:80] if text else kind
 
 
-def kayitlar(hub, bolge_id, *, ac_hassas=frozenset(), filtre=None, aralik=None, limit=20, offset=0) -> dict:
+def kayitlar(hub, bolge_id, *, ac_hassas=frozenset(), filtre=None, aralik=None, limit=20, offset=0,
+             utc_kaydirma=0, sahip=False) -> dict:
     ad, _k, hassas, _d, _p = BOLGELER[bolge_id]
     if hassas and bolge_id not in ac_hassas:
         return {"kilitli": True, "toplam": 0, "kayitlar": []}
@@ -267,7 +268,7 @@ def _duz(p, onek=""):
             yield f"{onek}{k}", v
 
 
-def ayrinti(hub, event_id) -> dict:
+def ayrinti(hub, event_id, *, sahip=False, ac_hassas=frozenset()) -> dict:
     e = hub.get_event(event_id)
     kaynak = next((s for s in hub.sources() if s.source_id == e.source_id), None)
     dosyalar = [r.name for r in hub.raw_files(e.source_id)]

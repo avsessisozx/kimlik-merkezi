@@ -156,7 +156,7 @@ def test_tema_sistem_tercihine_uyar(sonuc):
 
 def test_utc_ve_aciklamalar_gorunur(sonuc):
     for ad in ("Zaman çizelgesi", "Arama", "Persona"):
-        assert "UTC" in sonuc["sayfalar"][ad]["metin"], f"{ad}: saatin UTC olduğu yazmıyor"
+        assert "TSİ" in sonuc["sayfalar"][ad]["metin"], f"{ad}: saatin Türkiye saati olduğu yazmıyor"
     assert "Harita'daki toplamdan farklı" in sonuc["ana_metin"]
     assert sonuc["harita_nedir"] and sonuc["harita_nedir"]["acik"] and "Kilitli" in sonuc["harita_nedir"]["metin"]
     assert sonuc["ipucu_metni"] and len(sonuc["ipucu_metni"]) > 20

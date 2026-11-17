@@ -50,6 +50,16 @@ def ayar_ortami(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(ev))
 
 
+@pytest.fixture(autouse=True)
+def eski_kilitli_gorunum(request, monkeypatch):
+    """Üretimde sahip görünümü açıktır (harita_kopru.SAHIP=True). Eski kilit/gizleme sınamaları
+    `SAHIP=False` ile (savunma katmanı hâlâ çalışıyor mu diye) sürer; sahip görünümü test_sahip_gorunum.py'de."""
+    if request.module.__name__.endswith("test_sahip_gorunum"):
+        return
+    from kimlikwin import harita_kopru
+    monkeypatch.setattr(harita_kopru, "SAHIP", False)
+
+
 @pytest.fixture
 def veri(tmp_path):
     return tmp_path / "veri"

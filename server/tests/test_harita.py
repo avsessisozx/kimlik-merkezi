@@ -539,6 +539,28 @@ def test_hassas_kayitlar_ve_ayrinti_icerik_yok(hub):
     assert kayitlar(hub, "ayak", ac_hassas={"konum"})["toplam"] == 3
 
 
+def test_sahip_kendi_hassas_verisini_tam_gorur(hub):
+    """Verinin sahibi (yerel arayüz, sahip=True) hassas bölgelerde de içeriği görür; kilit/onay yok."""
+    elle_veri(hub)
+    for bid, n in (("kalp", 2), ("karin", 1), ("ayak", 3)):
+        k = kayitlar(hub, bid, sahip=True)          # ac_hassas verilmedi: sahip için kilit yok
+        assert not k["kilitli"] and k["toplam"] == n
+    k = kayitlar(hub, "kalp", sahip=True)
+    assert any(SIR_METIN in (x["baslik"] or "") for x in k["kayitlar"])
+    mesaj = k["kayitlar"][0]["event_id"]
+    d = ayrinti(hub, mesaj, sahip=True)
+    assert not d["kilitli"] and SIR_METIN in (d["metin"] or "") + json.dumps(d["alanlar"], ensure_ascii=False)
+    konum = next(x["event_id"] for x in kayitlar(hub, "ayak", sahip=True)["kayitlar"]
+                 if x["ts"] == "2026-08-04T12:00:00Z")
+    dk = ayrinti(hub, konum, sahip=True)
+    assert dk["alanlar"]["lat"] == 41.0123456 and dk["alanlar"]["url"] == SIR_URL   # koordinat dahil
+    assert not bolge(hub, "kalp", sahip=True)["kilitli"]
+    # sahip DEĞİLSE (yapay zekâ/varsayılan yol) aynı veriler kilitli ve içeriksiz kalır
+    assert kayitlar(hub, "kalp")["kilitli"] is True
+    assert ayrinti(hub, mesaj) == {"event_id": mesaj, "kilitli": True}
+    assert bolge(hub, "kalp")["kilitli"] is True
+
+
 def test_tombstone_drilldown(hub):
     sid = elle_veri(hub)
     onceki = kayitlar(hub, "bas", limit=50)

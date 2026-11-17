@@ -7,14 +7,14 @@ const AY=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos',
 const AYK=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 const GUN=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
 const GUNK=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
-const DIM_AD={ay:'Ay',gun:'Gün (UTC)',saat:'Saat (UTC)',kanal:'Kanal',video:'Video',tur:'Tür',terim:'Terim',site:'Site',sanatci:'Sanatçı',parca:'Parça',subreddit:'Subreddit',depo:'Depo',dosya_turu:'Dosya türü',kategori:'Kategori',uygulama:'Uygulama',yer:'Yer',platform:'Platform'};
+const DIM_AD={ay:'Ay',gun:'Gün',saat:'Saat',kanal:'Kanal',video:'Video',tur:'Tür',terim:'Terim',site:'Site',sanatci:'Sanatçı',parca:'Parça',subreddit:'Subreddit',depo:'Depo',dosya_turu:'Dosya türü',kategori:'Kategori',uygulama:'Uygulama',yer:'Yer',platform:'Platform'};
 const HAP_AD={bas:'Baş',goz:'Gözler',kulak:'Kulaklar',agiz:'Ağız',el:'Eller',kalp:'Kalp',karin:'Karın',ayak:'Ayaklar',ic:'Merkez',zihin:'Zihin'};
 const HASSAS=['kalp','karin','ayak','zihin'];
 const HAREKET_AZ=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const dimAd=k=>DIM_AD[k]||k;
 function degerMetin(k,v){if(k==='ay'){const [y,m]=String(v).split('-');return `${AY[+m-1]} ${y}`;}if(k==='gun')return GUN[+v]||v;if(k==='saat')return String(v).padStart(2,'0')+':00 '+UTC_ETIKET;return String(v);}
-function tarihMetin(ts){if(!ts)return '-';const d=new Date(ts);if(isNaN(d))return ts;return d.toLocaleString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+' '+UTC_ETIKET;}
-function gunMetin(ts){if(!ts)return '-';const d=new Date(ts);return isNaN(d)?ts:d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});}
+function tarihMetin(ts){if(!ts)return '-';const d=new Date(ts);if(isNaN(d))return ts;return d.toLocaleString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:TR_DILIM})+' '+UTC_ETIKET;}
+function gunMetin(ts){if(!ts)return '-';const d=new Date(ts);return isNaN(d)?ts:d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric',timeZone:TR_DILIM});}
 function ayEtiket(a){const [y,m]=a.split('-');return `${AYK[+m-1]} ${y.slice(2)}`;}
 
 // ------------------------------------------------------------------ durum

@@ -4,13 +4,17 @@
   DÜŞÜLMEZ. Testler `saglayici` değişkenine sahte bir sağlayıcı atar.
 - Gerçek modül `filtre`/`aralik` parametrelerini ya da `kayitlar`/`ayrinti` işlevlerini henüz sunmuyorsa
   köprü bunu bildirir (`filtre_destegi: False`, `ozellik_yok` hatası); arayüz bunu zarifçe gösterir.
-- Savunma: kilitli hassas bölgenin hiçbir sayısı/içeriği arayüze gitmez; açık hassas bölgede yalnız sayılar kalır
-  (en_cok/gruplar/örnek atılır); hassas kategorili kaydın içeriği (başlık, metin, alanlar) HİÇBİR koşulda iletilmez.
+- SAHİP GÖRÜNÜMÜ (v0.3.0): bu köprü yalnız verinin sahibinin kendi bilgisayarındaki arayüzüne hizmet eder
+  (parola/oturum jetonu ile korunan yerel web). Sahip kendi verisini, hassas kategoriler dahil, TAM görür:
+  kilit ve "içerik gizli" yok. Yapay zekâ (MCP) yolu bu köprüyü HİÇ kullanmaz; orada kategori izni, ayrı
+  hassas onayı ve içerik kısıtı aynen sürer (server/access.py). `SAHIP = False` yapılırsa eski kilitli
+  görünüm döner (testler bunu sınar).
 """
 from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any, NamedTuple
 
 from kimlikcore import Category
@@ -28,6 +32,23 @@ class Saglayici(NamedTuple):
 
 # Testlerde atanır. Üretimde None kalır.
 saglayici: Saglayici | tuple | None = None
+
+# Sahip görünümü: açık (True) = hassas bölgeler kilitsiz ve içerikli. Yapay zekâ yolunu ETKİLEMEZ.
+SAHIP = True
+
+# Yerel saat farkı (saat) testlerde sabitlenebilir; None = bilgisayarın saat dilimi (Türkiye: +3).
+YEREL_KAYMA: int | None = None
+
+
+def yerel_kayma() -> int:
+    """Grafiklerdeki saat/gün dilimleri için UTC'ye eklenecek tam saat (Türkiye +3). Kayıtlar UTC saklanır."""
+    if YEREL_KAYMA is not None:
+        return int(YEREL_KAYMA)
+    try:
+        fark = datetime.now().astimezone().utcoffset()
+        return int(round(fark.total_seconds() / 3600)) if fark is not None else 0
+    except (OSError, ValueError, OverflowError):
+        return 0
 
 
 class HaritaYok(Exception):
@@ -71,7 +92,12 @@ def _aralik(aralik: Any) -> tuple[Any, Any] | None:
     return tuple(aralik)
 
 
+def _acik(ac_hassas: set[str]) -> set[str]:
+    return set(ac_hassas) | (set(HASSAS) if SAHIP else set())
+
+
 def harita(hub, ac_hassas: set[str], aralik: dict | None = None) -> dict[str, Any]:
+    ac_hassas = _acik(ac_hassas)
     fn = _s().harita
     kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "aralik": _aralik(aralik)})
     veri = fn(hub, **kw)
@@ -84,10 +110,11 @@ def harita(hub, ac_hassas: set[str], aralik: dict | None = None) -> dict[str, An
 
 
 def bolge(hub, bolge_id: str, ac_hassas: set[str], filtre: dict | None = None, aralik: dict | None = None) -> dict[str, Any]:
+    ac_hassas = _acik(ac_hassas)
     if bolge_id in HASSAS and bolge_id not in ac_hassas:
         return {"id": bolge_id, "kilitli": True, "grafikler": [], "en_cok": [], "gruplar": [], "notlar": []}
     fn = _s().bolge
-    istek = {"ac_hassas": frozenset(ac_hassas)}
+    istek: dict[str, Any] = {"ac_hassas": frozenset(ac_hassas), "utc_kaydirma": yerel_kayma(), "sahip": SAHIP}
     if filtre:
         istek["filtre"] = filtre
     if aralik := _aralik(aralik):
@@ -95,7 +122,7 @@ def bolge(hub, bolge_id: str, ac_hassas: set[str], filtre: dict | None = None, a
     kw, yok = _uygun(fn, istek)
     veri = fn(hub, bolge_id, **kw)
     veri["filtre_destegi"] = not ({"filtre", "aralik"} & yok)
-    if bolge_id in HASSAS:
+    if bolge_id in HASSAS and not SAHIP:
         veri["en_cok"], veri["gruplar"] = [], []   # hassas bölgede içerik/örnek yok, yalnız sayı ve dağılım
         for g in veri.get("grafikler", []):
             g.pop("ornek", None)
@@ -108,22 +135,25 @@ _GIZLI = "(içerik gizli)"
 
 def kayitlar(hub, bolge_id: str, ac_hassas: set[str], filtre: dict | None = None, aralik: dict | None = None,
              limit: int = 20, offset: int = 0) -> dict[str, Any]:
+    ac_hassas = _acik(ac_hassas)
     if bolge_id in HASSAS and bolge_id not in ac_hassas:
         return {"kilitli": True, "toplam": 0, "kayitlar": []}
     fn = _s().kayitlar
     if fn is None:
         raise OzellikYok("Kayıt listesi bu sürümde yok.")
     kw, _ = _uygun(fn, {"ac_hassas": frozenset(ac_hassas), "filtre": filtre, "aralik": _aralik(aralik),
-                        "limit": max(1, min(int(limit), 100)), "offset": max(0, int(offset))})
+                        "limit": max(1, min(int(limit), 100)), "offset": max(0, int(offset)),
+                        "utc_kaydirma": yerel_kayma(), "sahip": SAHIP})
     veri = fn(hub, bolge_id, **kw)
     veri["kilitli"] = False
-    if bolge_id in HASSAS:                     # açık hassas bölge: yalnız tarih/tür, içerik asla
+    if bolge_id in HASSAS and not SAHIP:       # sahip değilse: yalnız tarih/tür, içerik asla
         for r in veri.get("kayitlar", []):
             r["baslik"], r["alt"] = f"{r.get('kategori', 'kayıt')} kaydı {_GIZLI}", ""
     return veri
 
 
 def ayrinti(hub, event_id: str, ac_hassas: set[str]) -> dict[str, Any]:
+    ac_hassas = _acik(ac_hassas)
     fn = _s().ayrinti
     if fn is None:
         raise OzellikYok("Kayıt ayrıntısı bu sürümde yok.")
@@ -131,9 +161,10 @@ def ayrinti(hub, event_id: str, ac_hassas: set[str]) -> dict[str, Any]:
     hassas = kategori in Category.SENSITIVE
     if hassas and KATEGORI_BOLGE.get(kategori) not in ac_hassas:
         return {"id": event_id, "kilitli": True}
-    veri = fn(hub, event_id)
+    kw, _ = _uygun(fn, {"sahip": SAHIP, "ac_hassas": frozenset(ac_hassas)})
+    veri = fn(hub, event_id, **kw)
     veri["kilitli"] = False
-    if hassas:                                    # kaynak, ham tarih ve kaynak dosya kalır; içerik gider
+    if hassas and not SAHIP:                      # kaynak, ham tarih ve kaynak dosya kalır; içerik gider
         veri["metin"] = ""
         veri["alanlar"] = []
         veri["icerik_gizli"] = True

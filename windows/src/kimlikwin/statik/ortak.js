@@ -4,5 +4,6 @@
 "use strict";
 // Sayı biçimi her yerde tr-TR (binlik ayraç nokta): 15171 -> "15.171"
 const SAYI=n=>Number(n).toLocaleString('tr-TR');
-// Kayıt saatleri veritabanında UTC tutulur ve her yerde UTC olarak gösterilir; hep bu etiketle.
-const UTC_ETIKET='UTC';
+// Kayıtlar veritabanında UTC tutulur; kullanıcıya her yerde Türkiye saatiyle (TSİ, UTC+3) gösterilir.
+const UTC_ETIKET='TSİ';
+const TR_DILIM='Europe/Istanbul';

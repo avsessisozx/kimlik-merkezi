@@ -95,10 +95,16 @@ def _clean_text(s: str) -> str:
         return s.encode("utf-8", "replace").decode("utf-8")
 
 
+_WIN_ayrilmis = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+
+
 def _safe_name(name: str) -> str:
-    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(name).name).strip()
+    # Windows'ta geçersiz adlar (sondaki nokta/boşluk, CON/NUL gibi ayrılmış adlar) "Invalid argument" verir.
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(name).name).strip().rstrip(". ")
     if not base or set(base) == {"."}:
         base = "dosya"
+    if base.split(".")[0].upper() in _WIN_ayrilmis:
+        base = "_" + base
     return base[:200]
 
 
@@ -561,9 +567,10 @@ class Hub:
         return row
 
     @_write_only
-    def store_raw(self, source_id: str, src_path: Path | str) -> RawFile:
+    def store_raw(self, source_id: str, src_path: Path | str, name: str | None = None) -> RawFile:
         """Dosyayı akışla `arsiv/<sha256>/<ad>` altına kopyalar; kaynak dosyaya dokunmaz,
-        arşivdeki kopya salt okunur yapılır ve bir daha değiştirilmez."""
+        arşivdeki kopya salt okunur yapılır ve bir daha değiştirilmez.
+        `name` verilirse arşivdeki ad odur (gevşek dosyalar için düzleştirilmiş yol); verilmezse dosya adı."""
         self._source_row(source_id)
         src = Path(src_path)
         arsiv = self.root / "arsiv"
@@ -586,7 +593,7 @@ class Hub:
                 fo.flush()
                 os.fsync(fo.fileno())
             sha = h.hexdigest()
-            name = _safe_name(src.name)
+            name = _safe_name(name or src.name)
             d = arsiv / sha
             d.mkdir(exist_ok=True)
             dest = d / name

@@ -113,6 +113,32 @@ def test_turkce_zip_adlari_utf8(hub, tmp_path):
     assert r.added == EXPECT_ADDED
 
 
+def test_klasor_sembolik_baga_ve_kopyaya_gerek_duymaz(hub, monkeypatch):
+    # Windows'ta sembolik bağ/kopya yolu 'Errno 22' veriyordu; gevşek dosyalar artık yerinden okunur.
+    import os
+    import shutil
+
+    monkeypatch.setattr(os, "symlink", lambda *a, **k: pytest.fail("symlink çağrıldı"))
+    monkeypatch.setattr(shutil, "copy2", lambda *a, **k: pytest.fail("copy2 çağrıldı"))
+    r = run(hub, FIX / "takeout_tr")
+    assert (r.parsed, r.added) == (EXPECT_PARSED, EXPECT_ADDED)
+    adlar = {rf.name for rf in r.raw_files}
+    assert all("/" not in a and "\\" not in a for a in adlar)  # düzleştirilmiş, güvenli adlar
+
+
+def test_okunamayan_dosya_gercek_adini_ve_nedenini_soyler(hub, monkeypatch):
+    import kimlikimport.run as run_mod
+
+    def bozuk(_p):
+        raise OSError(22, "Invalid argument")
+
+    monkeypatch.setattr(run_mod, "sha256_file", bozuk)
+    with pytest.raises(FormatError) as ei:
+        run(hub, FIX / "takeout_tr")
+    msg = str(ei.value)
+    assert "Bu dosya okunamadı" in msg and "Invalid argument" in msg and "zip" in msg
+
+
 def test_eski_chrome_adi(hub):
     r = run(hub, FIX / "takeout_eski_chrome")
     assert r.added == 5  # 4 ziyaret + 1 konum

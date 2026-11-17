@@ -7,9 +7,6 @@ rapordur) ve hiçbir şey eklenmez.
 from __future__ import annotations
 
 import hashlib
-import os
-import shutil
-import tempfile
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -68,15 +65,23 @@ def _counting(it: Iterator[EventIn], counter: list[int], progress: ProgressFn | 
         yield ev
 
 
-def _flat_link(tmp: Path, origin: Origin) -> Path:
+def _arsiv_adi(origin: Origin) -> str:
     """Gevşek dosya için ham arşivde benzersiz ad: klasör yolu '__' ile düzleştirilir.
-    Önce sembolik bağ (kopya yok); olmazsa kopya."""
-    link = tmp / origin.label.replace("/", "__")[:200]
-    try:
-        os.symlink(origin.path.resolve(), link)
-    except (OSError, NotImplementedError):
-        shutil.copy2(origin.path, link)
-    return link
+    Dosya doğrudan kendi yerinden okunur (sembolik bağ/kopya YOK: Windows'ta sembolik bağ ve bulut
+    yer tutucuları 'Errno 22' veriyordu)."""
+    return origin.label.replace("/", "__").replace("\\", "__")[:200]
+
+
+def _okunamadi_mesaji(o: Origin, e: OSError) -> str:
+    """Okunamayan dosya için gerçek dosya adı ve nedeni: kullanıcı neyin sorun olduğunu görür."""
+    neden = e.strerror or str(e)
+    kod = getattr(e, "winerror", None) or e.errno
+    ipucu = (
+        "Dosya OneDrive/Google Drive gibi bir bulut klasöründeyse tam olarak indirilmemiş olabilir "
+        "(sağ tık: 'Bu cihazda her zaman tut'), ya da başka bir program dosyayı kullanıyor olabilir. "
+        "Takeout'u zip dosyası olarak vermek de bu sorunu aşar."
+    )
+    return f"Bu dosya okunamadı: {o.label} ({neden}, kod {kod}). {ipucu}"
 
 
 def _taninmama_mesaji(path: Path) -> str:
@@ -170,7 +175,12 @@ def _run_with(hub, path, imp, yine_de, notify, progress) -> RunResult:
 
     # 3) previously_purged
     origins = imp.input_files(path)
-    hashes = {o.path: sha256_file(o.path) for o in origins}
+    hashes = {}
+    for o in origins:
+        try:
+            hashes[o.path] = sha256_file(o.path)
+        except OSError as e:
+            raise FormatError(_okunamadi_mesaji(o, e)) from e
     # Ham arşive kopyalanmayan kaynaklar (ör. yerinde kalan bilgisayar dosyaları) kendi özetini verir.
     own_sha = getattr(imp, "source_sha", None)
     total_sha = own_sha(path) if own_sha else _combined_sha(path, origins, hashes)
@@ -187,10 +197,14 @@ def _run_with(hub, path, imp, yine_de, notify, progress) -> RunResult:
     source_id = hub.add_source(imp.name, imp.version, total_sha)
     notify("kopyala", 0)
     raws: list[RawFile] = []
-    with tempfile.TemporaryDirectory(prefix="kimlikimport-") as td:
-        for o in origins:
-            src = o.path if o.is_zip or o.path == path else _flat_link(Path(td), o)
-            raws.append(hub.store_raw(source_id, src))
+    for o in origins:
+        try:
+            if o.is_zip or o.path == path:
+                raws.append(hub.store_raw(source_id, o.path))
+            else:
+                raws.append(hub.store_raw(source_id, o.path, name=_arsiv_adi(o)))
+        except OSError as e:
+            raise FormatError(_okunamadi_mesaji(o, e)) from e
 
     # 6) parse -> 7) add_events
     counter = [0]

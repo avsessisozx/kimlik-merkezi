@@ -125,9 +125,10 @@ function pencere(baslik,...icerik){const k=$('#kok-pencere');k.textContent='';
   const kapat=()=>{k.textContent='';};
   k.append(h('div',{class:'yer'},h('div',{class:'pencere',role:'dialog'},h('h2',{},baslik),...icerik)));return kapat;}
 function utc(yerel){return yerel?new Date(yerel).toISOString().slice(0,19)+'Z':null;}
-function tarih(s){if(!s)return '-';const t=s.replace('T',' ').replace('Z','');return t.includes(':')?t+' '+UTC_ETIKET:t;}
-// Kayıt saatleri UTC'dir (Harita da UTC gösterir); kullanıcıya her listede tek cümleyle söylenir.
-function utcNotu(){return h('div',{class:'soluk not-utc'},'Saatler UTC olarak gösterilir (yerel saatiniz değil). Türkiye saati için 3 saat ekleyin; tarih seçicileri de UTC gününü kullanır.');}
+function trGun(g,son){return g?g+(son?'T23:59:59+03:00':'T00:00:00+03:00'):null;}
+function tarih(s){if(!s)return '-';if(!String(s).includes(':'))return s;const d=new Date(/Z|[+-]\d\d:\d\d$/.test(s)?s:s+'Z');if(isNaN(d))return s;return d.toLocaleString('sv-SE',{timeZone:TR_DILIM})+' '+UTC_ETIKET;}
+// Kayıtlar UTC saklanır; arayüzde Türkiye saatiyle (TSİ) gösterilir.
+function utcNotu(){return h('div',{class:'soluk not-utc'},'Saatler Türkiye saatiyle (TSİ) gösterilir.');}
 // Terim sözlüğü: kısa Türkçe açıklamalar, "?" simgesiyle yanında gösterilir (fare, dokunma ya da klavye odağı).
 const SOZLUK={
  mcp:['MCP','Claude gibi bir yapay zekâ uygulamasının, verdiğiniz izin kadar bilgiyi bu bilgisayardan okumasını sağlayan bağlantı biçimi. Okunan bilgi, sohbet sırasında o uygulamaya (ör. Claude) gider.'],
@@ -316,10 +317,10 @@ SF.zaman=async a=>{
   if(!KATEGORILER.length)KATEGORILER=(await api('durum')).kategoriler;
   const kat=kategoriKutulari(null);const b=h('input',{type:'date'}),e=h('input',{type:'date'});const son=h('div',{});let atla=0;
   const yukle=async ilk=>{if(ilk){atla=0;son.textContent='';}
-    const r=await api('zaman',{kategoriler:kat.sec(),baslangic:b.value?b.value+'T00:00:00Z':null,bitis:e.value?e.value+'T23:59:59Z':null,limit:100,atla});
+    const r=await api('zaman',{kategoriler:kat.sec(),baslangic:trGun(b.value),bitis:trGun(e.value,1),limit:100,atla});
     atla+=r.kayitlar.length;son.querySelector('.daha')?.remove();son.append(kayitListesi(r.kayitlar,true));
     if(r.kayitlar.length===100)son.append(h('button',{class:'i daha',onclick:()=>yukle(false).catch(hataGoster)},'Daha fazla'));};
-  a.append(h('h2',{},'Zaman çizelgesi'),utcNotu(),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç (UTC günü) ',b,' Bitiş (UTC günü) ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
+  a.append(h('h2',{},'Zaman çizelgesi'),utcNotu(),h('div',{class:'kart'},kat,h('div',{class:'satir'},'Başlangıç ',b,' Bitiş ',e,h('button',{class:'d',onclick:()=>yukle(true).catch(hataGoster)},'Göster'))),son);
   yukle(true).catch(hataGoster);};
 // ------------------------------------------------------------------ persona
 let PERSONA_SEKME='bilgiler';
@@ -346,7 +347,7 @@ async function oneriPaneli(kok){
       h('div',{class:'oneri-meta'},h('span',{class:'rozet'},o.kategori_ad),h('span',{class:'guven',title:'Yapay zekânın kendi bildirdiği güven'},h('span',{class:'soluk'},'güven '),h('b',{},'%'+pct),h('i',{style:`--g:${pct}%`})),
         h('button',{class:'baglanti',onclick:async e=>{if(kanit.dataset.acik){kanit.textContent='';delete kanit.dataset.acik;return;}kanit.dataset.acik='1';kanit.textContent='Yükleniyor…';
           const k=await api('oneri_kanit',{oneri_id:o.id}).catch(x=>{hataGoster(x);return null;});kanit.textContent='';if(!k)return;
-          k.kanit.forEach(x=>kanit.append(x.yok?h('div',{class:'kanit-satir soluk'},'Kayıt artık yok.'):h('div',{class:'kanit-satir'},h('div',{class:'soluk'},new Date(x.zaman).toLocaleString('tr-TR',{timeZone:'UTC'})+' '+UTC_ETIKET+' · ',h('span',{class:'rozet'+(x.hassas?' h':'')},x.kategori),' ',x.tur),h('div',{class:'m'},x.gizli?'(gizlenmiş kayıt)':(x.metin||'(metin yok)')))));}},`${o.kanit_sayisi} kanıt kaydı ▾`),
+          k.kanit.forEach(x=>kanit.append(x.yok?h('div',{class:'kanit-satir soluk'},'Kayıt artık yok.'):h('div',{class:'kanit-satir'},h('div',{class:'soluk'},new Date(x.zaman).toLocaleString('tr-TR',{timeZone:TR_DILIM})+' '+UTC_ETIKET+' · ',h('span',{class:'rozet'+(x.hassas?' h':'')},x.kategori),' ',x.tur),h('div',{class:'m'},x.gizli?'(gizlenmiş kayıt)':(x.metin||'(metin yok)')))));}},`${o.kanit_sayisi} kanıt kaydı ▾`),
         h('span',{class:'soluk'},`${o.uygulama} · ${new Date(o.ts).toLocaleDateString('tr-TR')}`)),
       kanit,duzen,
       h('div',{class:'oneri-eylem'},h('button',{class:'d',onclick:async()=>{const x=await api('oneri_onayla',{oneri_id:o.id}).catch(hataGoster);if(x)yenile('Persona\'ya eklendi.');}},'Onayla'),
@@ -372,9 +373,9 @@ SF.persona=async a=>{
         h('div',{class:'satir'},h('span',{},'Yeni: '+x.yeni.metin),h('button',{class:'i',onclick:()=>sec(x.yeni.id)},'Bu geçerli'))));});
     a.append(k);}
   const katAd=Object.fromEntries(p.kategoriler.map(k=>[k.kimlik,k.ad]));
-  const t=h('table',{class:'duyarli'},h('tr',{},h('th',{},'Bilgi'),h('th',{},'Kategori'),h('th',{},'Durum'),h('th',{},'Geçerlilik bitişi (UTC)'),h('th',{},'')));
+  const t=h('table',{class:'duyarli'},h('tr',{},h('th',{},'Bilgi'),h('th',{},'Kategori'),h('th',{},'Durum'),h('th',{},'Geçerlilik bitişi (TSİ)'),h('th',{},'')));
   const durumAd={beyan_edilen:'Beyan edilen',dosyadan_alinan:'Dosyadan alınan',cikarilan:'Çıkarılan',eskimis:'Eskimiş'};
-  p.bilgiler.forEach(f=>t.append(h('tr',{},h('td',{'data-e':'Bilgi'},f.metin),h('td',{'data-e':'Kategori'},katAd[f.kategori]||f.kategori),h('td',{'data-e':'Durum'},durumAd[f.durum]||f.durum),h('td',{'data-e':'Geçerlilik bitişi (UTC)'},f.gecerlilik_bitis?tarih(f.gecerlilik_bitis):'süresiz'),
+  p.bilgiler.forEach(f=>t.append(h('tr',{},h('td',{'data-e':'Bilgi'},f.metin),h('td',{'data-e':'Kategori'},katAd[f.kategori]||f.kategori),h('td',{'data-e':'Durum'},durumAd[f.durum]||f.durum),h('td',{'data-e':'Geçerlilik bitişi (TSİ)'},f.gecerlilik_bitis?tarih(f.gecerlilik_bitis):'süresiz'),
     h('td',{},f.durum==='beyan_edilen'||f.durum==='dosyadan_alinan'?h('button',{class:'i',onclick:()=>{
         const m=h('input',{type:'text',value:f.metin});const kapat=pencere('Bilgiyi düzelt',m,h('div',{class:'satir'},
           h('button',{class:'d',onclick:async()=>{await api('persona_guncelle',{bilgi_id:f.id,metin:m.value}).catch(hataGoster);kapat();git('persona');}},'Kaydet'),h('button',{class:'i',onclick:()=>kapat()},'Vazgeç')));}},'Düzelt'):null,' ',
@@ -502,8 +503,8 @@ SF.erisim=async a=>{
         kart.append(h('label',{},c,' ',k.ad,k.hassas?hassasRozet():null,var_&&var_.bitis?h('span',{class:'rozet'},'bitiş '+tarih(var_.bitis)):null));});
       kart.append(konuBolumu(u,'kart'));}
     a.append(kart);});
-  const t=h('table',{class:'duyarli'},h('tr',{},['Zaman (UTC)','Uygulama','Araç','Kategori','Sayı','Sonuç'].map(x=>h('th',{},x))));
-  l.satirlar.forEach(s=>t.append(h('tr',{},h('td',{'data-e':'Zaman (UTC)'},tarih(s.zaman)),h('td',{'data-e':'Uygulama'},s.uygulama),h('td',{'data-e':'Araç'},s.arac),h('td',{'data-e':'Kategori'},s.kategori||'-'),h('td',{'data-e':'Sayı'},SAYI(s.sayi)),h('td',{'data-e':'Sonuç',class:s.sonuc==='ok'?'tamam':'kotu'},s.sonuc))));
+  const t=h('table',{class:'duyarli'},h('tr',{},['Zaman (TSİ)','Uygulama','Araç','Kategori','Sayı','Sonuç'].map(x=>h('th',{},x))));
+  l.satirlar.forEach(s=>t.append(h('tr',{},h('td',{'data-e':'Zaman (TSİ)'},tarih(s.zaman)),h('td',{'data-e':'Uygulama'},s.uygulama),h('td',{'data-e':'Araç'},s.arac),h('td',{'data-e':'Kategori'},s.kategori||'-'),h('td',{'data-e':'Sayı'},SAYI(s.sayi)),h('td',{'data-e':'Sonuç',class:s.sonuc==='ok'?'tamam':'kotu'},s.sonuc))));
   a.append(h('div',{class:'kart'},h('h3',{},'Erişim kaydı (son 200)'),l.satirlar.length?h('div',{class:'tablo-kap'},t):h('p',{class:'soluk'},'Henüz erişim yok.')));
 };
 function hassasOnay(u,k,bitis){
